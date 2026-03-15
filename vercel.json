@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/points-expiry",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/birthday-bonus",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/token-refresh",
+      "schedule": "30 2 * * 1-5"
+    }
+  ]
+}
