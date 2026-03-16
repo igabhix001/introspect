@@ -19,14 +19,15 @@ export function TextReveal({
       {words.map((word, i) => (
         <motion.span
           key={`${word}-${i}`}
-          initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          initial={{ opacity: 0, transform: "translateY(20px) translateZ(0)" }}
+          animate={{ opacity: 1, transform: "translateY(0px) translateZ(0)" }}
           transition={{
             duration: 0.4,
             delay: delay + i * 0.08,
             ease: [0.25, 0.4, 0.25, 1],
           }}
-          className="inline-block mr-[0.25em]"
+          className="inline-block mr-[0.25em] will-change-transform"
+          style={{ backfaceVisibility: "hidden" }}
         >
           {word}
         </motion.span>

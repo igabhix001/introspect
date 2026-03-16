@@ -11,6 +11,9 @@ const outfit = Outfit({
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700", "800"],
+  preload: true,
+  fallback: ["system-ui", "sans-serif"],
+  adjustFontFallback: true,
 });
 
 const jakarta = Plus_Jakarta_Sans({
@@ -18,6 +21,9 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
+  preload: true,
+  fallback: ["system-ui", "sans-serif"],
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
