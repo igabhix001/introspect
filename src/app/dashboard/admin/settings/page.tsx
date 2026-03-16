@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -22,7 +23,8 @@ import {
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
-  const [pricing, setPricing] = useState({ monthly: 333, sixMonth: 1999, yearly: 3663 });
+  const searchParams = useSearchParams();
+  const [pricing, setPricing] = useState({ monthly: 333, sixMonth: 1836, yearly: 3654 });
   const [pricingSaved, setPricingSaved] = useState(false);
   const [pricingLoading, setPricingLoading] = useState(false);
 
@@ -38,6 +40,20 @@ export default function AdminSettingsPage() {
   const [fyersAppId, setFyersAppId] = useState("");
   const [fyersLoading, setFyersLoading] = useState(false);
   const [fyersMessage, setFyersMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [autoConnecting, setAutoConnecting] = useState(false);
+
+  // Auto-capture auth code from URL params (Fyers redirect)
+  useEffect(() => {
+    const authCodeFromUrl = searchParams.get("auth_code");
+    const codeStatus = searchParams.get("code");
+    
+    if (authCodeFromUrl && codeStatus === "200") {
+      setFyersAuthCode(authCodeFromUrl);
+      setFyersMessage({ type: "success", text: "Auth code captured! Click 'Connect Fyers' to complete setup." });
+      // Clear URL params without reload
+      window.history.replaceState({}, "", "/dashboard/admin/settings");
+    }
+  }, [searchParams]);
 
   // Load saved pricing
   useEffect(() => {
@@ -127,8 +143,9 @@ export default function AdminSettingsPage() {
     setFyersLoading(false);
   };
 
+  // Redirect to admin settings page to auto-capture auth code
   const fyersAuthUrl = fyersAppId
-    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${fyersAppId}&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_FYERS_REDIRECT_URI || "http://127.0.0.1:3000/auth/fyers/callback")}&response_type=code&state=introspect`
+    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${fyersAppId}&redirect_uri=${encodeURIComponent("https://www.intradaymindview.com/dashboard/admin/settings")}&response_type=code&state=introspect`
     : "";
 
   const systemChecks = [

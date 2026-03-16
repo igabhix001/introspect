@@ -124,7 +124,7 @@ export function Hero() {
               >
                 <div className="flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5 text-success/70" />
-                  <span>SEBI Compliant</span>
+                  <span>Risk-First Framework</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5 text-success/70" />

@@ -14,65 +14,159 @@ const categories = [
 ];
 
 const blogPosts = [
+  // LinkedIn Posts
   {
-    title: "Why 90% of Intraday Traders Lose Money (And How to Be the 10%)",
-    excerpt:
-      "The data is clear — most traders fail not because of bad strategy, but because of emotional decision-making. Here's how to break the cycle.",
+    title: "Risk-Reward Ratio - The Silent Edge in Intraday Trading",
+    excerpt: "Understanding risk-reward is the foundation of profitable trading. Learn why this ratio matters more than win rate.",
     category: "Trading Psychology",
-    date: "Mar 10, 2026",
-    readTime: "8 min read",
+    date: "Mar 15, 2026",
+    readTime: "5 min read",
     featured: true,
-    slug: "why-90-percent-traders-lose",
+    slug: "risk-reward-ratio",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_tradingpsychology-riskmanagement-disciplinefirst-activity-7437391886006493185-z_Gu",
   },
   {
-    title: "The Stop-Loss Rule That Saved My Account",
-    excerpt:
-      "How implementing a non-negotiable stop-loss policy changed everything about my trading discipline.",
-    category: "Discipline Mondays",
-    date: "Mar 3, 2026",
+    title: "The Sachin Tendulkar Analogy – Applied to Trading",
+    excerpt: "What cricket's greatest batsman can teach us about patience, discipline, and playing the long game in trading.",
+    category: "Trading Psychology",
+    date: "Mar 14, 2026",
+    readTime: "4 min read",
+    featured: false,
+    slug: "sachin-tendulkar-trading",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_the-sachin-tendulkar-analogy-applied-to-activity-7438422659148947456-8Y34",
+  },
+  {
+    title: "Revenge Trading Hurts Intraday Traders",
+    excerpt: "After a loss, the urge to immediately make it back is powerful. Here's why revenge trading destroys accounts.",
+    category: "Trading Psychology",
+    date: "Mar 12, 2026",
     readTime: "5 min read",
     featured: false,
-    slug: "stop-loss-rule-saved-account",
+    slug: "revenge-trading-hurts",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_intradaytrading-tradingpsychology-disciplinefirst-activity-7437010339348611073-6DE2",
   },
   {
-    title: "Understanding Position Sizing: The Calculator Every Trader Needs",
-    excerpt:
-      "Most traders risk too much per trade. Learn how proper position sizing protects your capital even during losing streaks.",
-    category: "Risk-First Fridays",
-    date: "Feb 28, 2026",
-    readTime: "6 min read",
-    featured: false,
-    slug: "position-sizing-calculator",
-  },
-  {
-    title: "Revenge Trading: How to Recognize It and Stop",
-    excerpt:
-      "After a loss, the urge to immediately make it back is powerful. Here are 5 strategies to break the revenge trading cycle.",
+    title: "INTROSPECT: The Mirror Most Traders Refuse to Look Into",
+    excerpt: "Self-awareness is the first step to trading discipline. Are you ready to face your trading patterns?",
     category: "Trading Psychology",
-    date: "Feb 24, 2026",
-    readTime: "7 min read",
-    featured: false,
-    slug: "revenge-trading-how-to-stop",
-  },
-  {
-    title: "The 30-Day Discipline Challenge: A Complete Guide",
-    excerpt:
-      "Transform your trading habits with our proven 30-day challenge framework. Day-by-day breakdown included.",
-    category: "Discipline Mondays",
-    date: "Feb 17, 2026",
-    readTime: "10 min read",
-    featured: false,
-    slug: "30-day-discipline-challenge",
-  },
-  {
-    title: "India VIX and Trading: What Every Nifty Trader Must Know",
-    excerpt:
-      "VIX above 20? Here's why you should reduce your position size by 50% and how INTROSPECT™ automates this for you.",
-    category: "Weekly Newsletter",
-    date: "Feb 14, 2026",
+    date: "Mar 10, 2026",
     readTime: "6 min read",
     featured: false,
-    slug: "india-vix-nifty-trading",
+    slug: "introspect-mirror",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_tradingpsychology-discipline-riskmanagement-activity-7436375744953507842-wQAP",
+  },
+  {
+    title: "The Psychology Mirror: Trader vs. Investor",
+    excerpt: "Understanding the fundamental mindset differences between traders and investors - and why it matters.",
+    category: "Trading Psychology",
+    date: "Mar 8, 2026",
+    readTime: "5 min read",
+    featured: false,
+    slug: "trader-vs-investor",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_tradingpsychology-investing-mindset-activity-7435943884721037313--PP_",
+  },
+  // Discipline Mondays
+  {
+    title: "Most traders lose money not because they're wrong — but because they can't sit still",
+    excerpt: "The hardest skill in trading isn't finding entries. It's doing nothing when there's nothing to do.",
+    category: "Discipline Mondays",
+    date: "Mar 11, 2026",
+    readTime: "4 min read",
+    featured: false,
+    slug: "sit-still-discipline",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_disciplinemondays-tradingpsychology-riskfirst-activity-7434057413009448960-QhYb",
+  },
+  {
+    title: "You're posting about stop losses again? No profits today?",
+    excerpt: "Why focusing on stop losses is more important than chasing profits. The real edge is in risk management.",
+    category: "Discipline Mondays",
+    date: "Mar 9, 2026",
+    readTime: "4 min read",
+    featured: false,
+    slug: "stop-losses-focus",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_marketlearningdisciplinemondays-tradingpsychology-activity-7436650526739529728-5FE6",
+  },
+  {
+    title: "Your Costliest Trade Isn't the Stop Loss",
+    excerpt: "The trades that hurt most aren't the ones you stopped out of. It's the ones you held hoping for a miracle.",
+    category: "Discipline Mondays",
+    date: "Mar 7, 2026",
+    readTime: "5 min read",
+    featured: false,
+    slug: "costliest-trade",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_disciplinemonday-tradingpsychology-riskmanagement-activity-7436610719346761728-O-yS",
+  },
+  {
+    title: "Trading isn't about clicking buttons",
+    excerpt: "Real trading is about preparation, patience, and process. The button click is just the final step.",
+    category: "Discipline Mondays",
+    date: "Mar 5, 2026",
+    readTime: "4 min read",
+    featured: false,
+    slug: "not-clicking-buttons",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_disciplinemonday-riskfirst-intradaytrading-activity-7439147434854981632-RI6X",
+  },
+  // Risk First Fridays
+  {
+    title: "The ₹1,999 Psychology Gap",
+    excerpt: "Why traders treat ₹1,999 differently than ₹2,000 and how this psychological quirk affects your risk management.",
+    category: "Risk-First Fridays",
+    date: "Mar 13, 2026",
+    readTime: "5 min read",
+    featured: false,
+    slug: "psychology-gap",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_tradingpsychology-riskmanagement-nifty50-activity-7438060512296321024-UvDr",
+  },
+  {
+    title: "The 1% Rule – Your Account's Best Friend",
+    excerpt: "Never risk more than 1% of your capital on a single trade. Here's why this simple rule saves accounts.",
+    category: "Risk-First Fridays",
+    date: "Mar 6, 2026",
+    readTime: "5 min read",
+    featured: false,
+    slug: "one-percent-rule",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_riskfirstfriday-tradingpsychology-riskmanagement-activity-7435521543419392000-5bpk",
+  },
+  // Newsletter
+  {
+    title: "Introspect Risk Guardian Newsletter",
+    excerpt: "Weekly insights on trading psychology, risk management, and building discipline. Subscribe to stay ahead.",
+    category: "Weekly Newsletter",
+    date: "Mar 4, 2026",
+    readTime: "Newsletter",
+    featured: false,
+    slug: "newsletter-risk-guardian",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_introspect-tradingpsychology-riskmanagement-activity-7434831206313185280-7v_5",
+  },
+  {
+    title: "Why 'Perfect' Algorithms Fail in Imperfect Markets",
+    excerpt: "Automation isn't a profit machine. Understanding why even the best algos need human oversight.",
+    category: "Weekly Newsletter",
+    date: "Mar 2, 2026",
+    readTime: "Newsletter",
+    featured: false,
+    slug: "algorithms-fail",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_activity-7436688921557712896-49gR",
+  },
+  {
+    title: "The Mental Battle of Day Trading: It's You vs. You",
+    excerpt: "Your biggest opponent in trading isn't the market. It's the voice in your head telling you to break your rules.",
+    category: "Weekly Newsletter",
+    date: "Feb 28, 2026",
+    readTime: "Newsletter",
+    featured: false,
+    slug: "mental-battle",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_new-newsletter-alert-ever-felt-like-the-activity-7437697883065245696-AuTB",
+  },
+  {
+    title: "When Greed Disguised Itself as Logic",
+    excerpt: "Ever had a day where you knew better... but did it anyway? A story about greed wearing the mask of reason.",
+    category: "Weekly Newsletter",
+    date: "Feb 25, 2026",
+    readTime: "Newsletter",
+    featured: false,
+    slug: "greed-as-logic",
+    externalUrl: "https://www.linkedin.com/posts/venkat-iyer-7839883b2_ever-had-a-day-where-you-knew-betterbut-activity-7438782530394251264-mSDK",
   },
 ];
 
@@ -169,20 +263,14 @@ export function BlogContent() {
                     {featuredPost.readTime}
                   </span>
                 </div>
-                {featuredPost.category === "Weekly Newsletter" ? (
-                  <a
-                    href="https://www.linkedin.com/build-relation/newsletter-follow?entityUrn=7434829408936513536"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-success hover:text-success/80 flex items-center transition-colors mt-4"
-                  >
-                    Subscribe on LinkedIn <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-sm text-success font-semibold mt-4 group-hover:underline">
-                    Read article <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
-                )}
+                <a
+                  href={(featuredPost as typeof blogPosts[0]).externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-success font-semibold mt-4 hover:underline"
+                >
+                  Read on LinkedIn <ArrowRight className="h-3.5 w-3.5" />
+                </a>
               </motion.article>
             )}
 
@@ -218,20 +306,14 @@ export function BlogContent() {
                       {post.readTime}
                     </span>
                   </div>
-                  {post.category === "Weekly Newsletter" ? (
-                    <a
-                      href="https://www.linkedin.com/build-relation/newsletter-follow?entityUrn=7434829408936513536"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-sm text-success hover:text-success/80 flex items-center transition-colors mt-auto pt-4"
-                    >
-                      Subscribe on LinkedIn <ArrowRight className="ml-1 h-3 w-3" />
-                    </a>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-sm text-success font-semibold mt-auto pt-4 group-hover:underline">
-                      Read article <ArrowRight className="h-3 w-3" />
-                    </span>
-                  )}
+                  <a
+                    href={(post as typeof blogPosts[0]).externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-success font-semibold mt-auto pt-4 hover:underline"
+                  >
+                    Read on LinkedIn <ArrowRight className="h-3 w-3" />
+                  </a>
                 </motion.article>
               ))}
             </div>

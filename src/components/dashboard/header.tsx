@@ -43,7 +43,14 @@ const mobileNavItems = [
   { label: "Challenges", href: "/dashboard/challenges", icon: Trophy },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
-  { label: "← Back to Home", href: "/", icon: LayoutDashboard, isHome: true },
+];
+
+const mobileAdminNavItems = [
+  { label: "Admin Overview", href: "/dashboard/admin", icon: LayoutDashboard },
+  { label: "User Management", href: "/dashboard/admin/users", icon: User },
+  { label: "Subscriptions", href: "/dashboard/admin/subscriptions", icon: BarChart3 },
+  { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
+  { label: "System Settings", href: "/dashboard/admin/settings", icon: Settings },
 ];
 
 // Page title mapping
@@ -88,7 +95,8 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isAdmin } = useAuth();
+  const isOnAdminPage = pathname.startsWith("/dashboard/admin");
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,10 +107,10 @@ export function DashboardHeader({
   // Get page info
   const pageInfo = pageTitles[pathname] || pageTitles["/dashboard"];
 
-  // Client-side only for theme
-  useState(() => {
+  // Client-side only for theme - fix hydration
+  useEffect(() => {
     setMounted(true);
-  });
+  }, []);
 
   // Fetch notifications
   useEffect(() => {
@@ -318,12 +326,31 @@ export function DashboardHeader({
                 </span>
               </div>
 
+              {/* Admin/User Switch Banner for Mobile */}
+              {isAdmin && (
+                <div className={`mx-3 mt-3 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2 ${
+                  isOnAdminPage
+                    ? "bg-amber-500/10 border border-amber-500/20 text-amber-500"
+                    : "bg-success/10 border border-success/20 text-success"
+                }`}>
+                  {isOnAdminPage ? "Admin Panel" : "User Dashboard"}
+                  <Link
+                    href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
+                    onClick={onMobileMenuToggle}
+                    className="ml-auto text-[10px] underline underline-offset-2 opacity-80 hover:opacity-100"
+                  >
+                    Switch →
+                  </Link>
+                </div>
+              )}
+
               {/* Mobile nav items */}
               <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-                {mobileNavItems.map((item) => {
+                {(isOnAdminPage && isAdmin ? mobileAdminNavItems : mobileNavItems).map((item) => {
                   const isActive =
                     pathname === item.href ||
                     (item.href !== "/dashboard" &&
+                      item.href !== "/dashboard/admin" &&
                       pathname.startsWith(item.href));
                   const Icon = item.icon;
                   return (
@@ -333,7 +360,7 @@ export function DashboardHeader({
                       onClick={onMobileMenuToggle}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                         isActive
-                          ? "bg-success/10 text-success"
+                          ? isOnAdminPage ? "bg-amber-500/10 text-amber-500" : "bg-success/10 text-success"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       }`}
                     >

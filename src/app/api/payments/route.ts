@@ -119,6 +119,35 @@ export async function POST(request: NextRequest) {
         description: `${plan} subscription purchase`,
       });
 
+      // Send email notification to admin
+      try {
+        const adminEmail = "intradaymindview@gmail.com";
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", user.id)
+          .single();
+        
+        const userName = profile?.full_name || profile?.email || user.email || "Unknown User";
+        const userEmail = profile?.email || user.email || "N/A";
+        const amountPaid = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
+        
+        // Store notification in database for admin to see
+        const adminDb = createAdminClient();
+        await adminDb.from("notifications").insert({
+          title: `💰 New ${plan} Subscription!`,
+          message: `${userName} (${userEmail}) just subscribed to the ${plan} plan for ${amountPaid}. Payment ID: ${razorpay_payment_id}`,
+          type: "payment",
+        });
+
+        // Also try to send email via Supabase Edge Function or external service
+        // For now, we log it and store in notifications table
+        console.log(`[PAYMENT] New subscription: ${userName} - ${plan} - ${amountPaid}`);
+      } catch (emailErr) {
+        console.error("Failed to send payment notification:", emailErr);
+        // Don't fail the payment if notification fails
+      }
+
       return NextResponse.json({ subscription, pointsAwarded: points });
     }
 
