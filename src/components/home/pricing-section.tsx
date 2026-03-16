@@ -29,10 +29,10 @@ const plans = [
   {
     id: "6-month",
     name: "6 Months",
-    price: "1,799",
+    price: "1,836",
     period: "/6 mo",
-    monthlyEquivalent: "₹300/month",
-    savings: "Save ₹199",
+    monthlyEquivalent: "₹306/month",
+    savings: null,
     description: "Build serious consistency with medium-term commitment.",
     features: [
       "Everything in Monthly plan",
@@ -48,10 +48,10 @@ const plans = [
   {
     id: "yearly",
     name: "Yearly",
-    price: "3,663",
+    price: "3,654",
     period: "/year",
-    monthlyEquivalent: "₹305/month",
-    savings: "Save ₹333",
+    monthlyEquivalent: "Only ₹304/month",
+    savings: "Best Value",
     description: "Commit to discipline. Build lasting habits over a full year.",
     features: [
       "Everything in 6-Month plan",

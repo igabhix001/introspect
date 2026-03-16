@@ -235,7 +235,7 @@ export function PricingContent() {
               </p>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-sm text-muted-foreground">₹</span>
-                <span className="font-heading text-5xl font-extrabold">1,799</span>
+                <span className="font-heading text-5xl font-extrabold">1,836</span>
                 <span className="text-muted-foreground">/6 mo</span>
               </div>
 
@@ -277,15 +277,15 @@ export function PricingContent() {
               </p>
               <div className="flex items-center gap-2 mb-6">
                 <Badge variant="outline" className="text-success border-success/30 text-xs">
-                  Save ₹333/year
+                  Best Value
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  effectively ₹305/mo
+                  Only ₹304/mo
                 </span>
               </div>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-sm text-muted-foreground">₹</span>
-                <span className="font-heading text-5xl font-extrabold">3,663</span>
+                <span className="font-heading text-5xl font-extrabold">3,654</span>
                 <span className="text-muted-foreground">/year</span>
               </div>
 

@@ -351,30 +351,28 @@ export default function SentimentEnginePage() {
     return () => clearInterval(interval);
   }, [isLive, fetchData]);
 
-  if (error) {
+  // Show loading state instead of error when Fyers not connected
+  if (error || !data) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-8 max-w-lg w-full flex flex-col items-center">
-          <WifiOff className="h-10 w-10 text-destructive mb-4" />
-          <h2 className="text-xl font-bold mb-2 text-foreground">Market Data Offline</h2>
-          <p className="text-sm text-destructive mb-6 leading-relaxed">
-            {error}
+        <div className="rounded-2xl border border-border bg-card/50 p-8 max-w-lg w-full flex flex-col items-center">
+          <div className="relative mb-6">
+            <div className="h-12 w-12 rounded-full border-4 border-muted border-t-success animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold mb-2 text-foreground">Connecting to Market Data...</h2>
+          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            Loading real-time market sentiment engine. This may take a moment.
           </p>
-          <p className="text-xs text-muted-foreground mb-6">
-            Introspect requires a real-time market data feed to generate sentiment analytics.
-          </p>
-          <a
-            href="/dashboard/admin/settings"
-            className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+          <button
+            onClick={fetchData}
+            className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
           >
-            Connect Fyers in Settings
-          </a>
+            Retry Connection
+          </button>
         </div>
       </div>
     );
   }
-
-  if (!data) return null;
 
   const zone = zoneConfig[data.market_zone];
   const ZoneIcon = zone.icon;

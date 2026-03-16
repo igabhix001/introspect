@@ -33,6 +33,7 @@ export function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -41,64 +42,91 @@ export function Navbar() {
     };
     window.addEventListener("scroll", handleScroll);
 
-    // Check auth state with persistence
     const supabase = createClient();
+    let isMounted = true;
     
-    // Initial auth check
-    supabase.auth.getUser().then(async ({ data }) => {
-      setUser(data.user);
-      if (data.user) {
-        // Check if user is admin
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-        setIsAdmin(profile?.role === "admin" || data.user.email === "intradaymindview@gmail.com");
+    // Fast initial auth check with timeout fallback
+    const checkAuth = async () => {
+      try {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), 3000)
+        );
+        
+        const authPromise = supabase.auth.getUser();
+        const { data } = await Promise.race([authPromise, timeoutPromise]) as { data: { user: User | null } };
+        
+        if (!isMounted) return;
+        
+        setUser(data.user);
+        if (data.user) {
+          // Quick admin check - don't block on this
+          supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", data.user.id)
+            .single()
+            .then(({ data: profile, error }) => {
+              if (isMounted) {
+                if (error) {
+                  // Fallback admin check by email
+                  setIsAdmin(data.user?.email === "intradaymindview@gmail.com");
+                } else {
+                  setIsAdmin(profile?.role === "admin" || data.user?.email === "intradaymindview@gmail.com");
+                }
+              }
+            });
+        }
+      } catch {
+        // On timeout or error, just show logged out state
+        if (isMounted) {
+          setUser(null);
+          setIsAdmin(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+          setAuthChecked(true);
+        }
       }
-      setIsLoading(false);
-    });
+    };
+    
+    checkAuth();
 
-    // Listen for auth changes - but don't set loading to true on changes
-    // This prevents the button from disappearing during session refresh
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Only update user state, don't trigger loading state
-        // This prevents flickering when session refreshes
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", session.user.id)
-              .single();
+        if (!isMounted) return;
+        
+        // Update user immediately
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Check admin status in background
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", session.user.id)
+            .single();
+          if (isMounted) {
             setIsAdmin(profile?.role === "admin" || session.user.email === "intradaymindview@gmail.com");
-          } else {
-            setIsAdmin(false);
           }
+        } else {
+          setIsAdmin(false);
         }
-        // For initial session, also set loading to false
-        if (event === 'INITIAL_SESSION') {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", session.user.id)
-              .single();
-            setIsAdmin(profile?.role === "admin" || session.user.email === "intradaymindview@gmail.com");
-          }
+        
+        if (!authChecked) {
           setIsLoading(false);
+          setAuthChecked(true);
         }
       }
     );
 
     return () => {
+      isMounted = false;
       window.removeEventListener("scroll", handleScroll);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [authChecked]);
 
   return (
     <motion.header
