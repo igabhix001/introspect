@@ -307,3 +307,47 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ──── Performance optimizations ──── */
+/* GPU acceleration for animations */
+.will-change-transform {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Content visibility for off-screen content */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Optimize paint for fixed elements */
+.optimize-paint {
+  contain: layout style paint;
+}
+
+/* Smooth scrolling with GPU */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Image loading optimization */
+img {
+  content-visibility: auto;
+}
+
+/* Prevent layout shift for images */
+img:not([width]):not([height]) {
+  aspect-ratio: attr(width) / attr(height);
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}

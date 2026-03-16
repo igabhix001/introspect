@@ -1,12 +1,29 @@
+import dynamic from "next/dynamic";
 import { Hero } from "@/components/home/hero";
 import { Stats } from "@/components/home/stats";
-import { Features8 } from "@/components/home/features-8";
-import { CyberneticBentoGrid } from "@/components/ui/cybernetic-bento-grid";
-import { HowItWorks } from "@/components/home/how-it-works";
-import { PricingSection } from "@/components/home/pricing-section";
-import { Testimonials } from "@/components/home/testimonials";
-import { ChallengeCTA } from "@/components/home/challenge-cta";
-import { ServicesSection } from "@/components/home/services-section";
+
+// Lazy load below-the-fold components for faster initial load
+const Features8 = dynamic(() => import("@/components/home/features-8").then(m => m.Features8), {
+  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
+});
+const CyberneticBentoGrid = dynamic(() => import("@/components/ui/cybernetic-bento-grid").then(m => m.CyberneticBentoGrid), {
+  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
+});
+const HowItWorks = dynamic(() => import("@/components/home/how-it-works").then(m => m.HowItWorks), {
+  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
+});
+const PricingSection = dynamic(() => import("@/components/home/pricing-section").then(m => m.PricingSection), {
+  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
+});
+const Testimonials = dynamic(() => import("@/components/home/testimonials").then(m => m.Testimonials), {
+  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
+});
+const ChallengeCTA = dynamic(() => import("@/components/home/challenge-cta").then(m => m.ChallengeCTA), {
+  loading: () => <div className="h-48 animate-pulse bg-muted/10" />,
+});
+const ServicesSection = dynamic(() => import("@/components/home/services-section").then(m => m.ServicesSection), {
+  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
+});
 
 export default function HomePage() {
   return (
