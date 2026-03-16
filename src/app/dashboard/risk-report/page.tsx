@@ -66,7 +66,7 @@ export default function RiskReportPage() {
       }
       const supabase = createClient();
 
-      // Fetch latest assessment
+      // Fetch latest assessment with categories_analysis
       const { data: assessment } = await supabase
         .from("assessments")
         .select("*")
@@ -75,43 +75,47 @@ export default function RiskReportPage() {
         .limit(1)
         .single();
 
-      // Fetch trade stats for radar
-      const { data: trades } = await supabase
-        .from("trades")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
+      // Use assessment's categories_analysis for radar chart (from IMV_Master scoring)
+      // This ensures consistency between assessment results and risk report
+      if (assessment?.categories_analysis?.categories) {
+        const catAnalysis = assessment.categories_analysis;
+        
+        // Map IMV categories to radar chart format
+        // DisciplineScore = (1 - riskPercent) * 100, so higher = better discipline
+        const radar = catAnalysis.categories.map((cat: { name: string; risk_percent: number; percentage: number }) => ({
+          category: cat.name.replace("&", "&").split(" ").slice(0, 2).join(" "), // Shorten names for display
+          score: Math.round((1 - cat.risk_percent) * 100), // Convert risk% to discipline score
+          fullMark: 100,
+        }));
+        setRadarData(radar);
 
-      // Calculate radar from real data
-      const tradeArr = trades || [];
-      const tradeCount = tradeArr.length;
-      const disciplineScore = tradeCount > 0 ? Math.round((tradeArr.filter((t: { followed_plan: boolean }) => t.followed_plan).length / tradeCount) * 100) : (assessment?.discipline_score || 65);
-      const riskMgmt = tradeCount > 0 ? Math.round((tradeArr.filter((t: { stop_loss: number | null }) => t.stop_loss !== null).length / tradeCount) * 100) : 70;
-      const executionScore = tradeCount > 0 ? Math.min(100, Math.round((tradeArr.filter((t: { pnl: number }) => t.pnl > 0).length / tradeCount) * 100 * 1.3)) : 60;
-      const psychScore = assessment?.discipline_score || 55;
-      const consistencyScore = tradeCount >= 10 ? 75 : tradeCount >= 5 ? 60 : 40;
-      const selfAwareScore = tradeCount > 0 ? Math.round((tradeArr.filter((t: { emotion_before: string | null }) => t.emotion_before !== null).length / tradeCount) * 100) : 50;
+        // Overall score from assessment's discipline_score (already calculated correctly)
+        const overall = assessment.discipline_score || 0;
+        setOverallScore(overall);
 
-      const radar = [
-        { category: "Discipline", score: disciplineScore, fullMark: 100 },
-        { category: "Risk Mgmt", score: riskMgmt, fullMark: 100 },
-        { category: "Execution", score: executionScore, fullMark: 100 },
-        { category: "Psychology", score: psychScore, fullMark: 100 },
-        { category: "Consistency", score: consistencyScore, fullMark: 100 },
-        { category: "Self-Aware", score: selfAwareScore, fullMark: 100 },
-      ];
-      setRadarData(radar);
+        // Risk level from assessment
+        const riskLvl = assessment.risk_level || "medium";
+        if (riskLvl === "low") {
+          setRiskLevel({ label: "Low Risk", color: "text-success", bg: "bg-success/10", border: "border-success/20" });
+        } else if (riskLvl === "medium") {
+          setRiskLevel({ label: "Moderate Risk", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" });
+        } else {
+          setRiskLevel({ label: "High Risk", color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20" });
+        }
 
-      const overall = Math.round(radar.reduce((sum, d) => sum + d.score, 0) / radar.length);
-      setOverallScore(overall);
-
-      if (overall >= 80) {
-        setRiskLevel({ label: "Low Risk", color: "text-success", bg: "bg-success/10", border: "border-success/20" });
-      } else if (overall >= 60) {
-        setRiskLevel({ label: "Moderate Risk", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" });
+        setCategoriesAnalysis(catAnalysis);
       } else {
-        setRiskLevel({ label: "High Risk", color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20" });
+        // Fallback if no assessment exists - show placeholder
+        const radar = [
+          { category: "Stop-Loss", score: 50, fullMark: 100 },
+          { category: "After Profits", score: 50, fullMark: 100 },
+          { category: "Risk Planning", score: 50, fullMark: 100 },
+          { category: "Impulse Control", score: 50, fullMark: 100 },
+          { category: "Rule Consistency", score: 50, fullMark: 100 },
+        ];
+        setRadarData(radar);
+        setOverallScore(50);
+        setRiskLevel({ label: "Take Assessment", color: "text-muted-foreground", bg: "bg-muted/50", border: "border-border" });
       }
 
       // Fetch personalized rules
@@ -144,10 +148,6 @@ export default function RiskReportPage() {
         ]);
       }
 
-      if (assessment?.categories_analysis) {
-        setCategoriesAnalysis(assessment.categories_analysis);
-      }
-
       setLoading(false);
     }
     fetchReport();
@@ -170,7 +170,7 @@ export default function RiskReportPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-heading text-base font-bold">Risk Profile Analysis</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Based on your trades and assessment</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Based on your diagnostic assessment</p>
             </div>
             <Link href="/dashboard/assessment" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <RefreshCw className="h-3 w-3" /> Retake
