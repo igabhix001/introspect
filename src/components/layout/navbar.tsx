@@ -32,6 +32,7 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -44,23 +45,50 @@ export function Navbar() {
     const supabase = createClient();
     
     // Initial auth check
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user);
+      if (data.user) {
+        // Check if user is admin
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+        setIsAdmin(profile?.role === "admin" || data.user.email === "intradaymindview@gmail.com");
+      }
       setIsLoading(false);
     });
 
     // Listen for auth changes - but don't set loading to true on changes
     // This prevents the button from disappearing during session refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         // Only update user state, don't trigger loading state
         // This prevents flickering when session refreshes
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
           setUser(session?.user ?? null);
+          if (session?.user) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", session.user.id)
+              .single();
+            setIsAdmin(profile?.role === "admin" || session.user.email === "intradaymindview@gmail.com");
+          } else {
+            setIsAdmin(false);
+          }
         }
         // For initial session, also set loading to false
         if (event === 'INITIAL_SESSION') {
           setUser(session?.user ?? null);
+          if (session?.user) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", session.user.id)
+              .single();
+            setIsAdmin(profile?.role === "admin" || session.user.email === "intradaymindview@gmail.com");
+          }
           setIsLoading(false);
         }
       }
@@ -157,7 +185,7 @@ export function Navbar() {
                 <div className="h-9 w-24 bg-muted animate-pulse rounded-lg" />
               ) : user ? (
                 <Link
-                  href="/dashboard"
+                  href={isAdmin ? "/dashboard/admin" : "/dashboard"}
                   className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold text-sm px-5 py-2 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.15)] hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all duration-200 cursor-pointer group"
                 >
                   <LayoutDashboard className="h-4 w-4" />
@@ -209,7 +237,7 @@ export function Navbar() {
                   <div className="mt-6 flex flex-col gap-3 px-4 pt-6 border-t border-border">
                     {user ? (
                       <Link
-                        href="/dashboard"
+                        href={isAdmin ? "/dashboard/admin" : "/dashboard"}
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center justify-center gap-2 w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-3 rounded-lg cursor-pointer transition-colors"
                       >
