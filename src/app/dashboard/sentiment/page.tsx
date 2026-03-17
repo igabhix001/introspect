@@ -381,9 +381,9 @@ export default function SentimentEnginePage() {
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
-      {/* Connection Status Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* Connection Status Bar - mobile responsive */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isMarketClosed ? (
             <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium px-2 py-1 bg-amber-500/10 rounded-md">
               <Clock className="h-3.5 w-3.5" />
@@ -395,24 +395,24 @@ export default function SentimentEnginePage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
               </span>
-              Market Live
+              Live
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">
               <WifiOff className="h-3.5 w-3.5" />
-              Stream Paused
+              Paused
             </div>
           )}
           
-          <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 border-l pl-3 border-border">
+          <span className="hidden sm:flex text-[10px] text-muted-foreground items-center gap-1.5 border-l pl-3 border-border">
             {data.data_source === "fyers_live" ? (
                <span className="text-success font-medium flex items-center gap-1 tracking-wide">
-                 <Zap className="h-3 w-3" /> Fyers Data
+                 <Zap className="h-3 w-3" /> Fyers
                </span>
             ) : (
                <span className="text-muted-foreground">Simulation</span>
             )}
-            <span>• {isMarketClosed ? "Last Traded Data from" : "Last updated at"}: {lastUpdate}</span>
+            <span>• {isMarketClosed ? "Last data" : "Updated"}: {lastUpdate}</span>
           </span>
         </div>
         <div className="flex items-center gap-2">

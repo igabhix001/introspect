@@ -41,7 +41,7 @@ const faqs = [
   {
     question: "Is my trading data secure?",
     answer:
-      "Absolutely. We use industry-standard encryption, HTTPS/SSL, and follow SEBI-compliant security practices. Payment data is never stored on our servers — it's handled by Razorpay/Stripe directly.",
+      "Absolutely. We use industry-standard 256-bit encryption, HTTPS/SSL, and follow best security practices. Payment data is never stored on our servers — it's handled by Razorpay directly.",
   },
 ];
 

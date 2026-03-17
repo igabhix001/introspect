@@ -32,7 +32,7 @@ const sections = [
     icon: AlertTriangle,
     title: "5. Disclaimer — Not Financial Advice",
     content:
-      "INTROSPECT™ is a discipline and risk management tool, NOT a financial advisor. We do not recommend specific trades, stocks, or strategies. Trading in financial markets involves substantial risk of loss. Past performance (yours or anyone else's) does not guarantee future results. You are solely responsible for your trading decisions. We are not SEBI registered advisors.",
+      "INTROSPECT™ is a discipline and risk management tool, NOT a financial advisor. We do not recommend specific trades, stocks, or strategies. Trading in financial markets involves substantial risk of loss. Past performance (yours or anyone else's) does not guarantee future results. You are solely responsible for your trading decisions. We are not registered investment advisors.",
   },
   {
     icon: Scale,

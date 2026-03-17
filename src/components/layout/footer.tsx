@@ -84,7 +84,7 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Shield className="h-3.5 w-3.5 text-success" />
-              <span>SEBI Compliant</span>
+              <span>256-bit Encrypted</span>
             </div>
           </div>
 

@@ -29,17 +29,15 @@ const allFeatures = [
   { name: "Position Sizing Calculator", monthly: true, sixMonth: true, yearly: true },
   { name: "Trade Journal + Mistake Detector", monthly: true, sixMonth: true, yearly: true },
   { name: "Daily Progress Tracker", monthly: true, sixMonth: true, yearly: true },
-  { name: "30-Day Challenges", monthly: true, sixMonth: true, yearly: true },
+  { name: "Self-Challenges (30/60/90 days)", monthly: true, sixMonth: true, yearly: true },
   { name: "End-of-Day Reports & Coaching", monthly: true, sixMonth: true, yearly: true },
   { name: "Market Sentiment (Nifty/BankNifty)", monthly: true, sixMonth: true, yearly: true },
   { name: "Pro Tips & Alerts", monthly: true, sixMonth: true, yearly: true },
-  { name: "60-Day Challenges", monthly: false, sixMonth: true, yearly: true },
-  { name: "90-Day Challenges", monthly: false, sixMonth: false, yearly: true },
+  { name: "Referral Rewards System", monthly: true, sixMonth: true, yearly: true },
   { name: "Challenge History & Analytics", monthly: false, sixMonth: true, yearly: true },
   { name: "Journal Export (PDF/CSV)", monthly: false, sixMonth: true, yearly: true },
   { name: "Priority Support", monthly: false, sixMonth: true, yearly: true },
-  { name: "Loyalty Points (earn free months)", monthly: false, sixMonth: "75 pts", yearly: "150 pts" },
-  { name: "Referral Rewards System", monthly: false, sixMonth: false, yearly: true },
+  { name: "Loyalty Points (earn free months)", monthly: "10 pts", sixMonth: "75 pts", yearly: "150 pts" },
   { name: "All Future Feature Updates", monthly: false, sixMonth: false, yearly: true },
 ];
 
@@ -68,7 +66,7 @@ const pricingFAQs = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "UPI, credit/debit cards, net banking via Razorpay (GST included).",
+    a: "UPI, credit/debit cards, net banking via Razorpay. All inclusive pricing — no hidden charges.",
   },
   {
     q: "Can I switch from monthly to yearly?",

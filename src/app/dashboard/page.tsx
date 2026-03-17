@@ -111,6 +111,7 @@ export default function DashboardPage() {
   const disciplineData = data?.disciplineTrend || [];
   const todaysRules = data?.tradingRules || [];
   const recentTrades = data?.recentTrades || [];
+  const hasNoAssessment = disciplineScore === 0;
 
   return (
     <motion.div
@@ -119,6 +120,35 @@ export default function DashboardPage() {
       animate="show"
       className="space-y-6"
     >
+      {/* Welcome Banner - shown when no assessment done yet */}
+      {hasNoAssessment && (
+        <motion.div
+          variants={staggerItem}
+          className="relative overflow-hidden rounded-2xl border-2 border-success/30 bg-gradient-to-r from-success/5 via-success/[0.03] to-transparent p-6"
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+              <Zap className="h-6 w-6 text-success" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-heading text-lg font-bold mb-1">
+                Welcome to INTROSPECT™!
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Start <span className="text-success font-semibold">Step 1: Risk Assessment</span> to unlock your personalized trading rules, discipline score, and risk report.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/assessment"
+              className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-success hover:bg-success/90 text-success-foreground text-sm font-semibold transition-colors shadow-lg shadow-success/20"
+            >
+              Start Assessment
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Discipline Score + Share Card */}

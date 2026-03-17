@@ -39,6 +39,7 @@ const plans = [
       "Self-Challenges (30/60/90 days)",
       "Market Sentiment Engine",
       "End-of-Day Report",
+      "Referral Rewards System",
       "10 Loyalty Points per renewal",
     ],
     badge: null,
@@ -51,7 +52,6 @@ const plans = [
     period: "/6 mo",
     features: [
       "Everything in Monthly",
-      "60-Day Challenges",
       "Challenge History & Analytics",
       "Journal Export (PDF/CSV)",
       "Priority Support",
@@ -68,9 +68,7 @@ const plans = [
     period: "/year",
     features: [
       "Everything in 6-Month plan",
-      "90-Day Challenges",
-      "150 Loyalty Points on purchase",
-      "Referral Rewards System",
+      "150 Loyalty Points (= 1 free month)",
       "All Future Updates",
     ],
     badge: "BEST VALUE",
@@ -262,8 +260,8 @@ export default function PaymentsPage() {
               </div>
 
               {currency === "INR" && (
-                <p className="text-[10px] text-muted-foreground mb-4">
-                  + 18% GST applicable
+                <p className="text-[10px] text-success/70 mb-4">
+                  All inclusive pricing
                 </p>
               )}
 

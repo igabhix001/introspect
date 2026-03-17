@@ -120,7 +120,7 @@ export default function LoginPage() {
               className="mt-12 flex items-center gap-3 text-xs text-muted-foreground/60"
             >
               <Shield className="h-4 w-4 text-success/50" />
-              <span>256-bit Encrypted • SEBI Compliant • Your data is secure</span>
+              <span>256-bit Encrypted • Your data is secure</span>
             </motion.div>
           </div>
         </div>

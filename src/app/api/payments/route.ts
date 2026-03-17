@@ -3,26 +3,28 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// POST /api/payments/create-order — Create Razorpay order
+// POST /api/payments — Handle Razorpay order creation and verification
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { action } = await request.json();
+    // Parse body ONCE - request.json() can only be called once
+    const body = await request.json();
+    const { action } = body;
 
-    if (action === "create-order") {
-      const { plan } = await request.json().catch(() => ({ plan: "monthly" }));
+    if (action === "create-order" || action === "create_order") {
+      const plan = body.plan || "monthly";
 
-      // Fetch dynamic pricing from system settings layout
+      // Fetch dynamic pricing from system settings
       const adminDb = createAdminClient();
       const { data: settings } = await adminDb.from("system_settings").select("*").in("key", ["pricing_monthly", "pricing_6month", "pricing_yearly"]);
       
       const pricingMap: Record<string, number> = {
         "monthly": 33300,
-        "6-month": 199900,
-        "yearly": 366300
+        "6-month": 183600,
+        "yearly": 365400
       };
 
       if (settings) {
@@ -56,14 +58,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "verify") {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } =
-        await request.json();
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = body;
 
       // Verify signature
-      const body = razorpay_order_id + "|" + razorpay_payment_id;
+      const sigBody = razorpay_order_id + "|" + razorpay_payment_id;
       const expectedSignature = crypto
         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-        .update(body)
+        .update(sigBody)
         .digest("hex");
 
       if (expectedSignature !== razorpay_signature) {
@@ -81,7 +82,13 @@ export async function POST(request: NextRequest) {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      // Save subscription
+      // Save subscription with correct amounts
+      const amountPaidMap: Record<string, number> = {
+        "yearly": 3654,
+        "6-month": 1836,
+        "monthly": 333,
+      };
+
       const { data: subscription, error } = await supabase
         .from("subscriptions")
         .insert({
@@ -90,7 +97,7 @@ export async function POST(request: NextRequest) {
           status: "active",
           razorpay_order_id,
           razorpay_payment_id,
-          amount_paid: plan === "yearly" ? 3663 : plan === "6-month" ? 1999 : 333,
+          amount_paid: amountPaidMap[plan] || 333,
           currency: "INR",
           current_period_start: now.toISOString(),
           current_period_end: periodEnd.toISOString(),
@@ -119,9 +126,8 @@ export async function POST(request: NextRequest) {
         description: `${plan} subscription purchase`,
       });
 
-      // Send email notification to admin
+      // Send notification to admin
       try {
-        const adminEmail = "intradaymindview@gmail.com";
         const { data: profile } = await supabase
           .from("profiles")
           .select("full_name, email")
@@ -130,22 +136,18 @@ export async function POST(request: NextRequest) {
         
         const userName = profile?.full_name || profile?.email || user.email || "Unknown User";
         const userEmail = profile?.email || user.email || "N/A";
-        const amountPaid = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
+        const amountDisplay = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
         
-        // Store notification in database for admin to see
         const adminDb = createAdminClient();
         await adminDb.from("notifications").insert({
-          title: `💰 New ${plan} Subscription!`,
-          message: `${userName} (${userEmail}) just subscribed to the ${plan} plan for ${amountPaid}. Payment ID: ${razorpay_payment_id}`,
+          title: `New ${plan} Subscription!`,
+          message: `${userName} (${userEmail}) subscribed to ${plan} plan for ${amountDisplay}. Payment ID: ${razorpay_payment_id}`,
           type: "payment",
         });
 
-        // Also try to send email via Supabase Edge Function or external service
-        // For now, we log it and store in notifications table
-        console.log(`[PAYMENT] New subscription: ${userName} - ${plan} - ${amountPaid}`);
+        console.log(`[PAYMENT] New subscription: ${userName} - ${plan} - ${amountDisplay}`);
       } catch (emailErr) {
         console.error("Failed to send payment notification:", emailErr);
-        // Don't fail the payment if notification fails
       }
 
       return NextResponse.json({ subscription, pointsAwarded: points });
