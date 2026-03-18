@@ -27,6 +27,7 @@ import {
   XAxis,
 } from "recharts";
 import { useDashboardData } from "@/lib/hooks/use-dashboard-data";
+import { useAuth } from "@/lib/auth/auth-context";
 
 const staggerContainer: Variants = {
   hidden: { opacity: 0 },
@@ -92,6 +93,7 @@ function MarketZoneWidget() {
 
 export default function DashboardPage() {
   const { data, loading } = useDashboardData();
+  const { user, profile } = useAuth();
 
   if (loading) {
     return (
@@ -185,9 +187,9 @@ export default function DashboardPage() {
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => {
-                  const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\n${window.location.origin}/join\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
+                  const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
+                  const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
                   navigator.clipboard.writeText(text);
-                  alert("Share text copied!");
                 }}
                 className="text-[10px] font-medium text-muted-foreground hover:text-success px-2 py-1 rounded-md border border-border hover:border-success/30 transition-all cursor-pointer"
               >
