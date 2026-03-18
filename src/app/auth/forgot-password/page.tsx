@@ -4,18 +4,43 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Mail, ArrowRight, ArrowLeft, Shield } from "lucide-react";
+import { Mail, ArrowRight, ArrowLeft, Shield, Loader2 } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
-import { ParticleField } from "@/components/ui/particle-field";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    setError("");
+    
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/verify`,
+      });
+      
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        setSubmitted(true);
+      }
+    } catch {
+      setError("Failed to send reset email. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuroraBackground>
       <div className="relative min-h-screen flex items-center justify-center p-6">
-        <ParticleField count={25} />
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -36,16 +61,16 @@ export default function ForgotPasswordPage() {
               <>
                 <h2 className="font-heading text-2xl font-bold mb-2">Reset Password</h2>
                 <p className="text-sm text-muted-foreground mb-8">
-                  Enter your email address and we&apos;ll send you a verification code to reset your password.
+                  Enter your email address and we&apos;ll send you a password reset link.
                 </p>
 
-                <form
-                  className="space-y-5"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    setSubmitted(true);
-                  }}
-                >
+                {error && (
+                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium mb-4">
+                    {error}
+                  </div>
+                )}
+
+                <form className="space-y-5" onSubmit={handleReset}>
                   <div>
                     <label htmlFor="reset-email" className="text-sm font-medium mb-1.5 block">
                       Email Address
@@ -55,7 +80,10 @@ export default function ForgotPasswordPage() {
                       <input
                         id="reset-email"
                         type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
+                        required
                         className="w-full pl-10 pr-4 py-3 rounded-xl bg-background/50 border border-border text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
                       />
                     </div>
@@ -63,10 +91,17 @@ export default function ForgotPasswordPage() {
 
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all duration-300 cursor-pointer group"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all duration-300 cursor-pointer group disabled:opacity-60"
                   >
-                    Send Reset Code
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Send Reset Link
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </>
+                    )}
                   </button>
                 </form>
               </>
@@ -80,14 +115,18 @@ export default function ForgotPasswordPage() {
                   <Mail className="h-7 w-7 text-success" />
                 </div>
                 <h2 className="font-heading text-2xl font-bold mb-2">Check Your Email</h2>
-                <p className="text-sm text-muted-foreground mb-6">
-                  We&apos;ve sent a verification code to your email address. Enter the code on the next screen.
+                <p className="text-sm text-muted-foreground mb-2">
+                  We&apos;ve sent a password reset link to:
+                </p>
+                <p className="text-sm font-semibold text-foreground mb-6">{email}</p>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Click the link in the email to reset your password. Check your spam folder if you don&apos;t see it.
                 </p>
                 <Link
-                  href="/auth/verify"
+                  href="/auth/login"
                   className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all duration-300 cursor-pointer group"
                 >
-                  Enter Code
+                  Back to Login
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               </motion.div>

@@ -60,17 +60,11 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages
-  if (pathname.startsWith("/auth") && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    const isAdmin = profile?.role === "admin" || user.email === "intradaymindview@gmail.com";
+  // Redirect authenticated users away from login/signup pages ONLY
+  // Do NOT redirect from /auth/fyers/callback, /auth/forgot-password, /auth/verify
+  if (user && (pathname === "/auth/login" || pathname === "/auth/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = isAdmin ? "/dashboard/admin" : "/dashboard";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

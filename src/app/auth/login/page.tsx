@@ -41,19 +41,15 @@ export default function LoginPage() {
         let isAdmin = false;
         
         try {
-          const { data: profile, error: profileError } = await supabase
+          const { data: profile } = await supabase
             .from("profiles")
             .select("role")
             .eq("id", data.user.id)
             .single();
-
-          if (profileError) {
-            console.error("Profile fetch error during login:", profileError.message);
-          }
           
           isAdmin = profile?.role === "admin";
-        } catch (profileErr) {
-          console.error("Profile fetch failed:", profileErr);
+        } catch {
+          // ignore profile fetch errors
         }
 
         // Fallback: check email for known admin
@@ -61,11 +57,18 @@ export default function LoginPage() {
           isAdmin = true;
         }
 
-        if (isAdmin) {
-          router.push("/dashboard/admin");
+        // Use window.location for hard redirect to ensure cookies are sent with fresh request
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirectTo = searchParams.get("redirect");
+        
+        if (redirectTo) {
+          window.location.href = redirectTo;
+        } else if (isAdmin) {
+          window.location.href = "/dashboard/admin";
         } else {
-          router.push("/dashboard");
+          window.location.href = "/dashboard";
         }
+        return;
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");

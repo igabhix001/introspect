@@ -87,17 +87,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) await fetchProfile(user.id, user.email || undefined);
-      setLoading(false);
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (!isMounted) return;
+        
+        if (error) {
+          console.warn("Auth getUser error:", error.message);
+          // Token expired/invalid — clear state, don't crash
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
+        setUser(user);
+        if (user) await fetchProfile(user.id, user.email || undefined);
+      } catch (err) {
+        console.warn("Auth init error:", err);
+        if (isMounted) {
+          setUser(null);
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
 
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+        
+        if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" && !session) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.email || undefined);
@@ -108,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
