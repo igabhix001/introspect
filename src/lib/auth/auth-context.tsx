@@ -10,6 +10,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  hasActiveSubscription: boolean | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   isAdmin: false,
+  hasActiveSubscription: null,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
   const supabase = createClient();
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
@@ -104,7 +107,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         setUser(user);
-        if (user) await fetchProfile(user.id, user.email || undefined);
+        if (user) {
+          await fetchProfile(user.id, user.email || undefined);
+          // Check subscription status
+          try {
+            const { data: sub } = await supabase
+              .from("subscriptions")
+              .select("id, status, current_period_end")
+              .eq("user_id", user.id)
+              .eq("status", "active")
+              .gte("current_period_end", new Date().toISOString())
+              .limit(1)
+              .single();
+            if (isMounted) setHasActiveSubscription(!!sub);
+          } catch {
+            if (isMounted) setHasActiveSubscription(false);
+          }
+        }
       } catch (err) {
         console.warn("Auth init error:", err);
         if (isMounted) {
@@ -160,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdmin: profile?.role === "admin" || user?.email === "intradaymindview@gmail.com",
+        hasActiveSubscription,
         signOut,
         refreshProfile,
       }}

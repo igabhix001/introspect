@@ -93,12 +93,37 @@ function MarketZoneWidget() {
 
 export default function DashboardPage() {
   const { data, loading } = useDashboardData();
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin, hasActiveSubscription } = useAuth();
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Subscription gate — unpaid non-admin users see payment wall
+  if (!isAdmin && hasActiveSubscription === false) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="max-w-md text-center p-8 rounded-2xl border border-border bg-card">
+          <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
+            <Shield className="h-8 w-8 text-success" />
+          </div>
+          <h2 className="font-heading text-2xl font-bold mb-3">Activate Your Account</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Subscribe to INTROSPECT™ to unlock your personalized risk assessment, trading rules, journal, challenges, and more.
+          </p>
+          <Link
+            href="/dashboard/payments"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-success hover:bg-success/90 text-success-foreground font-semibold transition-colors shadow-lg shadow-success/20"
+          >
+            Choose a Plan
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <p className="text-xs text-muted-foreground mt-4">Starting at just ₹333/month • All inclusive</p>
+        </div>
       </div>
     );
   }
