@@ -90,29 +90,28 @@ export function PricingContent() {
 
   const handleSubscribe = async (plan: "monthly" | "6-month" | "yearly") => {
     setLoadingPlan(plan);
-    const amount = plan === "monthly" ? 333 : plan === "6-month" ? 1836 : 3654;
 
     try {
+      // Step 1: Create Razorpay order via API
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, plan }),
+        body: JSON.stringify({ action: "create_order", plan }),
       });
       const data = await res.json();
 
-      if (data.error) {
-        // User not logged in
-        router.push("/auth/login");
+      if (data.error === "Unauthorized" || res.status === 401) {
+        router.push("/auth/login?redirect=/pricing");
         return;
       }
 
-      if (!data.orderId) {
-        alert("Failed to create order. Please try again.");
+      if (data.error || !data.order) {
+        alert(data.error || "Failed to create order. Please try again.");
         setLoadingPlan(null);
         return;
       }
 
-      // Load Razorpay script if not loaded
+      // Step 2: Load Razorpay script if not loaded
       if (!window.Razorpay) {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -120,26 +119,28 @@ export function PricingContent() {
         await new Promise((resolve) => { script.onload = resolve; });
       }
 
+      // Step 3: Open Razorpay checkout
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: amount * 100,
-        currency: "INR",
+        amount: data.order.amount,
+        currency: data.order.currency || "INR",
         name: "INTROSPECT™",
         description: `${plan === "monthly" ? "Monthly" : plan === "6-month" ? "6-Month" : "Yearly"} Subscription`,
-        order_id: data.orderId,
+        order_id: data.order.id,
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
-          // Verify payment
+          // Step 4: Verify payment
           await fetch("/api/payments", {
-            method: "PUT",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              paymentId: response.razorpay_payment_id,
-              orderId: response.razorpay_order_id,
-              signature: response.razorpay_signature,
+              action: "verify",
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
               plan,
             }),
           });
-          router.push("/dashboard/payments?success=true");
+          window.location.href = "/dashboard?payment=success";
         },
         prefill: {},
         theme: { color: "#22c55e" },
