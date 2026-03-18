@@ -75,7 +75,10 @@ export const CyberneticBentoGrid = () => {
                                 Market Sentiment Intelligence
                             </h3>
                             <p className="text-gray-400 text-lg leading-relaxed">
-                                Broker API integration fetches real-time Nifty, VIX, PCR, and Advance-Decline data. The engine processes this and tells you one thing:
+                                It connects to live market data and tracks what&apos;s really happening — fear, confidence, momentum, and market breadth. The engine quietly processes all of it and gives you just one clear signal: what the market mood is right now.
+                            </p>
+                            <p className="text-gray-500 text-base mt-4 leading-relaxed">
+                                No clutter. No confusion. Just a simple read on sentiment.
                             </p>
                             <div className="mt-8 flex gap-4 text-sm font-bold tracking-wider uppercase">
                                 <span className="flex items-center gap-2 text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">🟢 Bullish</span>

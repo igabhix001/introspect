@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -22,6 +22,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useToast } from "@/components/ui/toast";
+import { createClient } from "@/lib/supabase/client";
 
 const allFeatures = [
   { name: "Full Risk Assessment & Scoring", monthly: true, sixMonth: true, yearly: true },
@@ -86,7 +88,40 @@ declare global {
 
 export function PricingContent() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
   const router = useRouter();
+  const { showToast } = useToast();
+
+  // Check subscription status on mount
+  useEffect(() => {
+    const checkSubscription = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setHasSubscription(false);
+        return;
+      }
+
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .gte("current_period_end", new Date().toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      setHasSubscription(!!sub);
+    };
+    checkSubscription();
+  }, []);
+
+  const handleDashboardClick = (e: React.MouseEvent) => {
+    if (hasSubscription === false) {
+      e.preventDefault();
+      showToast("You need to subscribe before using the tool.", "warning", 5000);
+    }
+  };
 
   const handleSubscribe = async (plan: "monthly" | "6-month" | "yearly") => {
     setLoadingPlan(plan);

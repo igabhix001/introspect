@@ -46,10 +46,15 @@ export async function POST(request: NextRequest) {
         key_secret: process.env.RAZORPAY_KEY_SECRET!,
       });
 
+      // Receipt max length is 40 chars for Razorpay
+      // Use short user ID prefix (8 chars) + timestamp (13 chars) = ~25 chars
+      const shortUserId = user.id.replace(/-/g, "").slice(0, 8);
+      const receipt = `rcpt_${shortUserId}_${Date.now()}`.slice(0, 40);
+
       const order = await razorpay.orders.create({
         amount,
         currency: "INR",
-        receipt: `receipt_${user.id}_${Date.now()}`,
+        receipt,
         notes: {
           user_id: user.id,
           plan,

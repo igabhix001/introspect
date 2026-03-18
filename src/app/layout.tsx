@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MarketingShell } from "@/components/layout/marketing-shell";
+import { ToastProvider } from "@/components/ui/toast";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -176,7 +177,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MarketingShell>{children}</MarketingShell>
+          <ToastProvider>
+            <MarketingShell>{children}</MarketingShell>
+          </ToastProvider>
           <SpeedInsights />
           <Analytics />
         </ThemeProvider>
