@@ -20,7 +20,7 @@ const sections = [
     icon: CreditCard,
     title: "3. Subscriptions & Payments",
     content:
-      "INTROSPECT™ offers Monthly (₹333/month) and Yearly (₹3,663/year) plans. Payments are processed securely via Razorpay. Subscriptions auto-renew unless cancelled before the billing period ends. After cancellation, access continues until the end of the paid period. Refunds are available within 7 days of initial purchase if the service hasn't been substantially used.",
+      "INTROSPECT™ offers Monthly (₹333/month), 6-Month (₹1,836), and Yearly (₹3,654/year) plans. All inclusive pricing — no hidden charges. Payments are processed securely via Razorpay. Subscriptions auto-renew unless cancelled before the billing period ends. After cancellation, access continues until the end of the paid period. Refunds are available within 7 days of initial purchase if the service hasn't been substantially used.",
   },
   {
     icon: Ban,

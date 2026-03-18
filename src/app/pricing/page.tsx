@@ -4,7 +4,7 @@ import { PricingContent } from "./pricing-content";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "INTROSPECT™ pricing plans — ₹333/month or ₹3,663/year. Risk assessment, trade journal, position calculator, challenges, and more. Invest in your trading discipline.",
+    "INTROSPECT™ pricing plans — ₹333/month, ₹1,836/6 months, or ₹3,654/year. All inclusive. Risk assessment, trade journal, position calculator, challenges, and more.",
 };
 
 export default function PricingPage() {
