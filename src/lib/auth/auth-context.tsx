@@ -91,12 +91,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    
+    // Safety timeout - never stay loading forever (max 8 seconds)
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("Auth safety timeout triggered - forcing loading to false");
+        setLoading(false);
+      }
+    }, 8000);
 
     const initAuth = async () => {
       try {
         // Step 1: Use getSession (cached, instant) for fast initial render
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
         if (!isMounted) return;
+        
+        if (sessionError) {
+          console.warn("Session error:", sessionError.message);
+          setUser(null);
+          setProfile(null);
+          setHasActiveSubscription(false);
+          setLoading(false);
+          return;
+        }
         
         if (!session?.user) {
           setUser(null);
@@ -110,21 +128,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session.user);
         
         // Step 3: Fetch profile and subscription in parallel
+        const subPromise = supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .eq("status", "active")
+          .gte("current_period_end", new Date().toISOString())
+          .limit(1)
+          .maybeSingle();
+        
         const [profileResult, subResult] = await Promise.allSettled([
           fetchProfile(session.user.id, session.user.email || undefined),
-          supabase
-            .from("subscriptions")
-            .select("id")
-            .eq("user_id", session.user.id)
-            .eq("status", "active")
-            .gte("current_period_end", new Date().toISOString())
-            .limit(1)
-            .single(),
+          Promise.race([
+            subPromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+          ]),
         ]);
         
         if (isMounted) {
-          const subData = subResult.status === "fulfilled" ? subResult.value.data : null;
+          const subData = subResult.status === "fulfilled" && subResult.value && typeof subResult.value === 'object' && 'data' in subResult.value 
+            ? (subResult.value as { data: unknown }).data 
+            : null;
           setHasActiveSubscription(!!subData);
+          setLoading(false);
         }
       } catch (err) {
         console.warn("Auth init error:", err);
@@ -132,9 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setProfile(null);
           setHasActiveSubscription(false);
+          setLoading(false);
         }
-      } finally {
-        if (isMounted) setLoading(false);
       }
     };
 
@@ -165,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

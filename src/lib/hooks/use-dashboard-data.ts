@@ -32,7 +32,14 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (authLoading) return; // Wait for auth to complete
+    // If auth is still loading, don't fetch yet but don't block forever
+    if (authLoading) {
+      // Set a max wait time for auth - if it takes too long, stop loading
+      setTimeout(() => {
+        if (authLoading) setLoading(false);
+      }, 5000);
+      return;
+    }
     if (!user?.id) {
       setLoading(false);
       return;
