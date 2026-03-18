@@ -92,66 +92,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const getUser = async () => {
+    const initAuth = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        // Step 1: Use getSession (cached, instant) for fast initial render
+        const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
         
-        if (error) {
-          console.warn("Auth getUser error:", error.message);
-          // Token expired/invalid — clear state, don't crash
+        if (!session?.user) {
           setUser(null);
           setProfile(null);
+          setHasActiveSubscription(false);
           setLoading(false);
           return;
         }
         
-        setUser(user);
-        if (user) {
-          await fetchProfile(user.id, user.email || undefined);
-          // Check subscription status
-          try {
-            const { data: sub } = await supabase
-              .from("subscriptions")
-              .select("id, status, current_period_end")
-              .eq("user_id", user.id)
-              .eq("status", "active")
-              .gte("current_period_end", new Date().toISOString())
-              .limit(1)
-              .single();
-            if (isMounted) setHasActiveSubscription(!!sub);
-          } catch {
-            if (isMounted) setHasActiveSubscription(false);
-          }
+        // Step 2: We have a session — set user immediately
+        setUser(session.user);
+        
+        // Step 3: Fetch profile and subscription in parallel
+        const [profileResult, subResult] = await Promise.allSettled([
+          fetchProfile(session.user.id, session.user.email || undefined),
+          supabase
+            .from("subscriptions")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .eq("status", "active")
+            .gte("current_period_end", new Date().toISOString())
+            .limit(1)
+            .single(),
+        ]);
+        
+        if (isMounted) {
+          const subData = subResult.status === "fulfilled" ? subResult.value.data : null;
+          setHasActiveSubscription(!!subData);
         }
       } catch (err) {
         console.warn("Auth init error:", err);
         if (isMounted) {
           setUser(null);
           setProfile(null);
+          setHasActiveSubscription(false);
         }
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    getUser();
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
-        if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" && !session) {
+        if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
+          setHasActiveSubscription(false);
           setLoading(false);
           return;
         }
         
-        setUser(session?.user ?? null);
         if (session?.user) {
+          setUser(session.user);
           await fetchProfile(session.user.id, session.user.email || undefined);
         } else {
+          setUser(null);
           setProfile(null);
         }
         setLoading(false);

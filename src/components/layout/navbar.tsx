@@ -45,39 +45,35 @@ export function Navbar() {
     const supabase = createClient();
     let isMounted = true;
     
-    // Fast initial auth check with timeout fallback
+    // Auth check — no timeout, just handle errors gracefully
     const checkAuth = async () => {
       try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('timeout')), 3000)
-        );
-        
-        const authPromise = supabase.auth.getUser();
-        const { data } = await Promise.race([authPromise, timeoutPromise]) as { data: { user: User | null } };
+        // Use getSession first (cached, fast) then getUser (server validation)
+        const { data: { session } } = await supabase.auth.getSession();
         
         if (!isMounted) return;
         
-        setUser(data.user);
-        if (data.user) {
-          // Quick admin check - don't block on this
+        if (session?.user) {
+          setUser(session.user);
+          // Admin check by email immediately (no DB call needed for nav)
+          setIsAdmin(session.user.email === "intradaymindview@gmail.com");
+          
+          // Background DB check for admin role
           supabase
             .from("profiles")
             .select("role")
-            .eq("id", data.user.id)
+            .eq("id", session.user.id)
             .single()
-            .then(({ data: profile, error }) => {
-              if (isMounted) {
-                if (error) {
-                  // Fallback admin check by email
-                  setIsAdmin(data.user?.email === "intradaymindview@gmail.com");
-                } else {
-                  setIsAdmin(profile?.role === "admin" || data.user?.email === "intradaymindview@gmail.com");
-                }
+            .then(({ data: profile }) => {
+              if (isMounted && profile?.role === "admin") {
+                setIsAdmin(true);
               }
             });
+        } else {
+          setUser(null);
+          setIsAdmin(false);
         }
       } catch {
-        // On timeout or error, just show logged out state
         if (isMounted) {
           setUser(null);
           setIsAdmin(false);
@@ -94,30 +90,16 @@ export function Navbar() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted) return;
-        
-        // Update user immediately
         setUser(session?.user ?? null);
-        
         if (session?.user) {
-          // Check admin status in background
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single();
-          if (isMounted) {
-            setIsAdmin(profile?.role === "admin" || session.user.email === "intradaymindview@gmail.com");
-          }
+          setIsAdmin(session.user.email === "intradaymindview@gmail.com");
         } else {
           setIsAdmin(false);
         }
-        
-        if (!authChecked) {
-          setIsLoading(false);
-          setAuthChecked(true);
-        }
+        setIsLoading(false);
+        setAuthChecked(true);
       }
     );
 
@@ -126,7 +108,8 @@ export function Navbar() {
       window.removeEventListener("scroll", handleScroll);
       subscription.unsubscribe();
     };
-  }, [authChecked]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <motion.header
