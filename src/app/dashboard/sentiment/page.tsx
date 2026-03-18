@@ -24,229 +24,34 @@ import {
   Target,
 } from "lucide-react";
 
-// ──── Market Intelligence Object (matching client doc v2.0 ATR-Adaptive) ────
+// ──── Market Intelligence Object (user-facing fields only per client doc) ────
 interface MarketIntelligence {
+  // Sentiment Zone & Score (Section 3)
   market_zone: "BULLISH" | "BEARISH" | "NO_TRADE";
+  radar_score: number;
+  // Market Conditions (Section 4)
   confidence: "HIGH" | "MODERATE" | "LOW";
   stability: "STABLE" | "WATCH" | "UNSTABLE";
   momentum: "RISING" | "STEADY" | "WEAKENING";
   regime: "TREND_DAY" | "BALANCED" | "VOLATILE" | "COMPRESSION";
-  radar_score: number;
-  sentiment_score: number;
-  atr_value: number;
-  current_buffer_percent: number;
+  // Model Insight (Section 6)
   reasons: string[];
-  timestamp: string;
-  last_updated: string;
-  data_source?: "fyers_live" | "simulated";
-  market_status?: "OPEN" | "CLOSED";
-  // Raw data
+  // Market Snapshot (Section 5)
   nifty_price: number;
-  prev_close: number;
-  today_open: number;
   vix: number;
   pcr: number;
   advances: number;
   declines: number;
-  // Computed thresholds
-  bullish_threshold: number;
-  bearish_threshold: number;
-  ref_buy: number;
-  ref_sell: number;
+  // Meta
+  timestamp: string;
+  data_source?: "fyers_live" | "simulated";
+  market_status?: "OPEN" | "CLOSED";
 }
 
-// ──── ATR-Adaptive Sentiment Engine Config (from client doc Section 9) ────
+// ──── Config ────
 const CONFIG = {
-  ATR_PERIOD: 14,
-  ATR_MULTIPLIER: 0.8,
-  MIN_BUFFER_PERCENT: 0.0020,
-  MAX_BUFFER_PERCENT: 0.0060,
-  PCR_BULLISH_THRESHOLD: 1.20,
-  PCR_BEARISH_THRESHOLD: 0.70,
-  PCR_NEUTRAL_LOW: 0.85,
-  PCR_NEUTRAL_HIGH: 1.05,
-  BREADTH_BULLISH_THRESHOLD: 35,
-  BREADTH_BEARISH_THRESHOLD: 35,
-  RADAR_WEIGHT_PRICE: 0.3,
-  RADAR_WEIGHT_BREADTH: 0.3,
-  RADAR_WEIGHT_PCR: 0.2,
-  RADAR_WEIGHT_VIX: 0.2,
   DATA_REFRESH_INTERVAL_SECONDS: 5,
 };
-
-// ──── ATR-Based Zone Classification (Client Doc Section 5) ────
-function calculateATRZone(
-  currentPrice: number,
-  prevClose: number,
-  todayOpen: number,
-  atrValue: number
-) {
-  // 5.1 Reference Price Calculation
-  const ref_buy = Math.max(todayOpen, prevClose);
-  const ref_sell = Math.min(todayOpen, prevClose);
-
-  // 5.2 ATR-Based Dynamic Buffer
-  let buffer_percent = (atrValue / ref_buy) * CONFIG.ATR_MULTIPLIER;
-  buffer_percent = Math.max(CONFIG.MIN_BUFFER_PERCENT, Math.min(CONFIG.MAX_BUFFER_PERCENT, buffer_percent));
-
-  // 5.3 Final Threshold Calculation
-  const bullish_threshold = ref_buy * (1 + buffer_percent);
-  const bearish_threshold = ref_sell * (1 - buffer_percent);
-
-  // 5.4 Zone Assignment
-  let market_zone: "BULLISH" | "BEARISH" | "NO_TRADE";
-  if (currentPrice >= bullish_threshold) {
-    market_zone = "BULLISH";
-  } else if (currentPrice <= bearish_threshold) {
-    market_zone = "BEARISH";
-  } else {
-    market_zone = "NO_TRADE";
-  }
-
-  return { market_zone, bullish_threshold, bearish_threshold, buffer_percent, ref_buy, ref_sell };
-}
-
-// ──── Sentiment Scoring Engine (Client Doc Section 6.1) ────
-function calculateSentiment(advances: number, pcr: number) {
-  // Market Breadth Score (SB)
-  let sb = 0;
-  if (advances >= CONFIG.BREADTH_BULLISH_THRESHOLD) sb = 1;
-  else if ((50 - advances) >= CONFIG.BREADTH_BEARISH_THRESHOLD) sb = -1;
-
-  // Derivatives Sentiment Score (SD)
-  let sd = 0;
-  if (pcr >= CONFIG.PCR_BULLISH_THRESHOLD) sd = 1;
-  else if (pcr <= CONFIG.PCR_BEARISH_THRESHOLD) sd = -1;
-  else if (pcr >= CONFIG.PCR_NEUTRAL_LOW && pcr <= CONFIG.PCR_NEUTRAL_HIGH) sd = 0;
-
-  return sb + sd;
-}
-
-// ──── Confidence Engine (Client Doc Section 6.2) ────
-function calculateConfidence(sentimentScore: number): "HIGH" | "MODERATE" | "LOW" {
-  if (Math.abs(sentimentScore) >= 2) return "HIGH";
-  if (Math.abs(sentimentScore) === 1) return "MODERATE";
-  return "LOW";
-}
-
-// ──── Radar Score (Client Doc Section 6.4) ────
-function calculateRadarScore(
-  currentPrice: number,
-  ref_buy: number,
-  advances: number,
-  pcr: number,
-  vix: number
-): number {
-  const priceScore = Math.min(100, Math.max(0, ((currentPrice - ref_buy) / ref_buy) * 10000 + 50));
-  const breadthScore = (advances / 50) * 100;
-  const pcrScore = Math.min(100, Math.max(0, (pcr - 0.5) * 100));
-  const vixScore = Math.max(0, 100 - (vix - 10) * 3);
-
-  return Math.round(
-    priceScore * CONFIG.RADAR_WEIGHT_PRICE +
-    breadthScore * CONFIG.RADAR_WEIGHT_BREADTH +
-    pcrScore * CONFIG.RADAR_WEIGHT_PCR +
-    vixScore * CONFIG.RADAR_WEIGHT_VIX
-  );
-}
-
-// ──── Regime Detection (Client Doc Section 6.3) ────
-function detectRegime(
-  vix: number,
-  radarScore: number,
-  momentum: "RISING" | "STEADY" | "WEAKENING",
-  advances: number
-): "TREND_DAY" | "VOLATILE" | "COMPRESSION" | "BALANCED" {
-  if (vix > 25) return "VOLATILE";
-  if (vix < 12) return "COMPRESSION";
-  if (momentum === "RISING" && advances >= 35 && radarScore > 65) return "TREND_DAY";
-  return "BALANCED";
-}
-
-// ──── Reason Generator (Client Doc Section 6 - simplified, no internal params exposed) ────
-function generateReasons(data: MarketIntelligence): string[] {
-  const reasons: string[] = [];
-  const zone = data.market_zone;
-
-  if (zone === "BULLISH") {
-    reasons.push("Price trading above short-term resistance levels");
-    if (data.advances >= 35) reasons.push("Market breadth currently bullish");
-    if (data.pcr >= 1.2) reasons.push("Derivatives sentiment supporting upside");
-    if (data.momentum === "RISING") reasons.push("Momentum rising across intraday timeframes");
-    reasons.push("Volatility conditions " + (data.vix > 20 ? "elevated" : "stable"));
-  } else if (zone === "BEARISH") {
-    reasons.push("Price trading below short-term support levels");
-    if (data.declines >= 35) reasons.push("Market breadth currently bearish");
-    if (data.pcr <= 0.7) reasons.push("Derivatives sentiment supporting downside");
-    if (data.momentum === "WEAKENING") reasons.push("Momentum weakening across intraday timeframes");
-    reasons.push("Volatility conditions " + (data.vix > 20 ? "elevated" : "stable"));
-  } else {
-    reasons.push("Price trading within a defined range");
-    reasons.push("Market breadth currently neutral");
-    reasons.push("Momentum mixed across intraday timeframes");
-    reasons.push("Volatility conditions " + (data.vix > 20 ? "elevated" : "stable"));
-  }
-
-  return reasons;
-}
-
-// ──── Mock Data Generator (simulates Fyers API feed) ────
-function generateMockData(): MarketIntelligence {
-  const now = new Date();
-  const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-  const prevClose = 22350;
-  const todayOpen = prevClose + Math.floor(Math.random() * 100 - 50);
-  const currentPrice = todayOpen + Math.floor(Math.random() * 300 - 100);
-  const atrValue = 100 + Math.random() * 80; // Simulated 14-period ATR
-  const vix = 11 + Math.random() * 16;
-  const pcr = 0.6 + Math.random() * 0.8;
-  const advances = 15 + Math.floor(Math.random() * 30);
-  const declines = 50 - advances;
-
-  // Run ATR-based zone classification
-  const { market_zone, bullish_threshold, bearish_threshold, buffer_percent, ref_buy, ref_sell } =
-    calculateATRZone(currentPrice, prevClose, todayOpen, atrValue);
-
-  // Supporting engines
-  const sentiment_score = calculateSentiment(advances, pcr);
-  const confidence = calculateConfidence(sentiment_score);
-  const momentum: "RISING" | "STEADY" | "WEAKENING" =
-    market_zone === "BULLISH" ? "RISING" : market_zone === "BEARISH" ? "WEAKENING" : "STEADY";
-  const radar_score = calculateRadarScore(currentPrice, ref_buy, advances, pcr, vix);
-  const stability: "STABLE" | "WATCH" | "UNSTABLE" =
-    vix > 20 ? "UNSTABLE" : vix > 15 ? "WATCH" : "STABLE";
-  const regime = detectRegime(vix, radar_score, momentum, advances);
-
-  const data: MarketIntelligence = {
-    market_zone,
-    confidence,
-    stability,
-    momentum,
-    regime,
-    radar_score: Math.max(0, Math.min(100, radar_score)),
-    sentiment_score,
-    atr_value: atrValue,
-    current_buffer_percent: buffer_percent,
-    reasons: [],
-    timestamp: timeStr,
-    last_updated: now.toISOString(),
-    nifty_price: currentPrice,
-    prev_close: prevClose,
-    today_open: todayOpen,
-    vix,
-    pcr,
-    advances,
-    declines,
-    bullish_threshold,
-    bearish_threshold,
-    ref_buy,
-    ref_sell,
-  };
-
-  data.reasons = generateReasons(data);
-  return data;
-}
 
 // ──── UI Config ────
 const zoneConfig = {
@@ -307,13 +112,6 @@ const regimeLabels = {
   COMPRESSION: "Compression",
 };
 
-const sentimentLabels: Record<number, string> = {
-  2: "Strong Bullish",
-  1: "Mild Bullish",
-  0: "Neutral",
-  [-1]: "Mild Bearish",
-  [-2]: "Strong Bearish",
-};
 
 export default function SentimentEnginePage() {
   const [data, setData] = useState<MarketIntelligence | null>(null);

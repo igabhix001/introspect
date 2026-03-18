@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { cache, getCacheHeaders } from "@/lib/cache";
 import {
   getFyersToken,
   fetchNiftyPrice,
@@ -18,6 +19,10 @@ const CONFIG = {
   PCR_BEARISH_THRESHOLD: 0.70,
 };
 
+// Cache TTL settings
+const CACHE_TTL_SECONDS = 5; // Fresh data for 5 seconds
+const CACHE_STALE_SECONDS = 30; // Stale-while-revalidate for 30 seconds
+
 // GET: Fetch live market data with real Fyers or fallback
 export async function GET(request: NextRequest) {
   // Rate limiting (more lenient for market data - 200 requests per 15 min)
@@ -34,6 +39,15 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Check cache first (shared across all users for market data)
+    const cacheKey = "market:sentiment:live";
+    const cached = cache.get<Record<string, unknown>>(cacheKey);
+    if (cached && !cached.isStale) {
+      return NextResponse.json(cached.data, {
+        headers: getCacheHeaders({ maxAge: CACHE_TTL_SECONDS, staleWhileRevalidate: CACHE_STALE_SECONDS, private: true }),
+      });
+    }
 
     let niftyPrice: number;
     let prevClose: number;
@@ -125,22 +139,24 @@ export async function GET(request: NextRequest) {
     else if (vix < 12) regime = "COMPRESSION";
     else if (momentum === "RISING" && advances >= 35 && radar_score > 65) regime = "TREND_DAY";
 
-    // Reasons
+    // Reasons - simplified per client doc Section 6 (no internal params exposed)
     const reasons: string[] = [];
     if (market_zone === "BULLISH") {
-      reasons.push(`Price (₹${niftyPrice.toLocaleString("en-IN")}) above bullish threshold (₹${bullish_threshold.toFixed(0)})`);
-      if (advances >= 35) reasons.push(`Advancing stocks dominating (${advances}/50)`);
-      if (pcr >= 1.2) reasons.push(`PCR at ${pcr.toFixed(2)} — bullish sentiment`);
+      reasons.push("Price trading above short-term resistance levels");
+      if (advances >= 35) reasons.push("Market breadth currently bullish");
+      if (pcr >= 1.2) reasons.push("Derivatives sentiment supporting upside");
+      if (momentum === "RISING") reasons.push("Momentum rising across intraday timeframes");
     } else if (market_zone === "BEARISH") {
-      reasons.push(`Price (₹${niftyPrice.toLocaleString("en-IN")}) below bearish threshold (₹${bearish_threshold.toFixed(0)})`);
-      if (declines >= 35) reasons.push(`Declining stocks dominating (${declines}/50)`);
-      if (pcr <= 0.7) reasons.push(`PCR at ${pcr.toFixed(2)} — bearish sentiment`);
+      reasons.push("Price trading below short-term support levels");
+      if (declines >= 35) reasons.push("Market breadth currently bearish");
+      if (pcr <= 0.7) reasons.push("Derivatives sentiment supporting downside");
+      if (momentum === "WEAKENING") reasons.push("Momentum weakening across intraday timeframes");
     } else {
-      reasons.push(`Price between thresholds (₹${bearish_threshold.toFixed(0)} – ₹${bullish_threshold.toFixed(0)})`);
-      reasons.push("Directional conviction is unclear");
+      reasons.push("Price trading within a defined range");
+      reasons.push("Market breadth currently neutral");
+      reasons.push("Momentum mixed across intraday timeframes");
     }
-    reasons.push(`ATR buffer: ${(buffer_percent * 100).toFixed(2)}% (Adaptive)`);
-    if (vix > 20) reasons.push("VIX elevated — consider reducing position size");
+    reasons.push(vix > 20 ? "Volatility conditions elevated" : "Volatility conditions stable");
 
     const nowIst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const day = nowIst.getDay();
@@ -153,31 +169,36 @@ export async function GET(request: NextRequest) {
     const isBeforeClose = hours < 15 || (hours === 15 && minutes <= 30);
     const market_status = (isOpenDay && isAfterOpen && isBeforeClose) ? "OPEN" : "CLOSED";
 
-    return NextResponse.json({
+    // Response - only expose user-facing fields per client doc Section 2-5
+    // Internal params (ATR, buffer %, thresholds, ref_buy/sell) are NOT exposed
+    const responseData = {
+      // Market Snapshot (Section 5)
       nifty_price: Math.round(niftyPrice * 100) / 100,
-      prev_close: prevClose,
-      today_open: todayOpen,
       vix: Math.round(vix * 100) / 100,
       pcr: Math.round(pcr * 100) / 100,
       advances,
       declines,
-      atr_value: Math.round(atrValue * 10) / 10,
+      // Sentiment Zone & Score (Section 3)
       market_zone,
+      radar_score: Math.max(0, Math.min(100, radar_score)),
+      // Market Conditions (Section 4)
       confidence,
       stability,
       momentum,
       regime,
-      radar_score: Math.max(0, Math.min(100, radar_score)),
-      sentiment_score,
-      current_buffer_percent: buffer_percent,
-      bullish_threshold: Math.round(bullish_threshold),
-      bearish_threshold: Math.round(bearish_threshold),
-      ref_buy,
-      ref_sell,
+      // Model Insight (Section 6)
       reasons,
+      // Meta
       data_source: dataSource,
       market_status,
       timestamp: new Date().toISOString(),
+    };
+
+    // Cache the response for subsequent requests
+    cache.set(cacheKey, responseData, CACHE_TTL_SECONDS, CACHE_STALE_SECONDS);
+
+    return NextResponse.json(responseData, {
+      headers: getCacheHeaders({ maxAge: CACHE_TTL_SECONDS, staleWhileRevalidate: CACHE_STALE_SECONDS, private: true }),
     });
   } catch (error) {
     console.error("Market data error:", error);

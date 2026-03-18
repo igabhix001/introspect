@@ -1,8 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+
+// Client-side cache for dashboard data (reduces DB calls)
+const CACHE_TTL_MS = 30000; // 30 seconds
+const dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
+
+function getCachedData<T>(key: string): T | null {
+  const cached = dashboardCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data as T;
+  }
+  return null;
+}
+
+function setCachedData<T>(key: string, data: T): void {
+  dashboardCache.set(key, { data, timestamp: Date.now() });
+}
 
 /* ─── Dashboard Overview Data ─── */
 export function useDashboardData() {
@@ -31,7 +47,7 @@ export function useDashboardData() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     // If auth is still loading, don't fetch yet but don't block forever
     if (authLoading) {
       // Set a max wait time for auth - if it takes too long, stop loading
@@ -44,6 +60,18 @@ export function useDashboardData() {
       setLoading(false);
       return;
     }
+
+    // Check cache first (unless force refresh)
+    const cacheKey = `dashboard:${user.id}`;
+    if (!forceRefresh) {
+      const cached = getCachedData<typeof data>(cacheKey);
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     const supabase = createClient();
 
@@ -124,7 +152,7 @@ export function useDashboardData() {
           )
         : 3;
 
-      setData({
+      const dashboardData = {
         disciplineScore: assessment?.discipline_score || 0,
         todayTrades: todayTrades.length,
         maxTrades,
@@ -153,7 +181,11 @@ export function useDashboardData() {
                 { day: "Today", score: 0 },
               ],
         tradingRules,
-      });
+      };
+
+      // Cache the data
+      setCachedData(cacheKey, dashboardData);
+      setData(dashboardData);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {

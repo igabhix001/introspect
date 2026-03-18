@@ -75,7 +75,10 @@ export const CyberneticBentoGrid = () => {
                                 Market Sentiment Intelligence
                             </h3>
                             <p className="text-gray-400 text-lg leading-relaxed">
-                                It connects to live market data and tracks what&apos;s really happening — fear, confidence, momentum, and market breadth. The engine quietly processes all of it and gives you just one clear signal: what the market mood is right now.
+                                It connects to live market data and tracks what&apos;s really happening — fear, confidence, momentum, and market breadth.
+                            </p>
+                            <p className="text-gray-400 text-base mt-4 leading-relaxed">
+                                The engine quietly processes all of it and gives you just one clear signal: what the market mood is right now.
                             </p>
                             <p className="text-gray-500 text-base mt-4 leading-relaxed">
                                 No clutter. No confusion. Just a simple read on sentiment.
