@@ -277,7 +277,10 @@ export function DashboardHeader({
                         Settings
                       </Link>
                       <button
-                        onClick={signOut}
+                        onClick={() => {
+                          setProfileOpen(false);
+                          signOut();
+                        }}
                         className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                       >
                         <LogOut className="h-4 w-4" />
