@@ -60,8 +60,28 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // SaaS subscription gate: non-admin users accessing dashboard (except /payments) must have active subscription
+  if (user && pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/admin") && pathname !== "/dashboard/payments") {
+    const isAdmin = user.email === "intradaymindview@gmail.com";
+    if (!isAdmin) {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .gte("current_period_end", new Date().toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      if (!sub) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/pricing";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   // Redirect authenticated users away from login/signup pages ONLY
-  // Do NOT redirect from /auth/fyers/callback, /auth/forgot-password, /auth/verify
   if (user && (pathname === "/auth/login" || pathname === "/auth/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

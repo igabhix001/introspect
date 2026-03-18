@@ -66,7 +66,21 @@ export default function LoginPage() {
         } else if (isAdmin) {
           window.location.href = "/dashboard/admin";
         } else {
-          window.location.href = "/dashboard";
+          // Check if user has active subscription
+          let hasSub = false;
+          try {
+            const { data: sub } = await supabase
+              .from("subscriptions")
+              .select("id")
+              .eq("user_id", data.user.id)
+              .eq("status", "active")
+              .gte("current_period_end", new Date().toISOString())
+              .limit(1)
+              .maybeSingle();
+            hasSub = !!sub;
+          } catch { /* ignore */ }
+          
+          window.location.href = hasSub ? "/dashboard" : "/pricing";
         }
         return;
       }

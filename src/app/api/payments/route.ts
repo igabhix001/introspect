@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import Razorpay from "razorpay";
 
 // POST /api/payments — Handle Razorpay order creation and verification
 export async function POST(request: NextRequest) {
@@ -17,27 +18,29 @@ export async function POST(request: NextRequest) {
     if (action === "create-order" || action === "create_order") {
       const plan = body.plan || "monthly";
 
-      // Fetch dynamic pricing from system settings
-      const adminDb = createAdminClient();
-      const { data: settings } = await adminDb.from("system_settings").select("*").in("key", ["pricing_monthly", "pricing_6month", "pricing_yearly"]);
-      
       const pricingMap: Record<string, number> = {
         "monthly": 33300,
         "6-month": 183600,
         "yearly": 365400
       };
 
-      if (settings) {
-        settings.forEach((s) => {
-          if (s.key === "pricing_monthly" && s.value?.amount_paise) pricingMap["monthly"] = s.value.amount_paise;
-          if (s.key === "pricing_6month" && s.value?.amount_paise) pricingMap["6-month"] = s.value.amount_paise;
-          if (s.key === "pricing_yearly" && s.value?.amount_paise) pricingMap["yearly"] = s.value.amount_paise;
-        });
+      // Try to fetch dynamic pricing from system settings
+      try {
+        const adminDb = createAdminClient();
+        const { data: settings } = await adminDb.from("system_settings").select("*").in("key", ["pricing_monthly", "pricing_6month", "pricing_yearly"]);
+        if (settings) {
+          settings.forEach((s) => {
+            if (s.key === "pricing_monthly" && s.value?.amount_paise) pricingMap["monthly"] = s.value.amount_paise;
+            if (s.key === "pricing_6month" && s.value?.amount_paise) pricingMap["6-month"] = s.value.amount_paise;
+            if (s.key === "pricing_yearly" && s.value?.amount_paise) pricingMap["yearly"] = s.value.amount_paise;
+          });
+        }
+      } catch {
+        // Use default pricing if settings fetch fails
       }
 
-      const amount = pricingMap[plan as keyof typeof pricingMap] || pricingMap["monthly"]; // paise
-      const Razorpay = (await import("razorpay")).default;
-
+      const amount = pricingMap[plan as keyof typeof pricingMap] || pricingMap["monthly"];
+      
       const razorpay = new Razorpay({
         key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         key_secret: process.env.RAZORPAY_KEY_SECRET!,
