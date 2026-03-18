@@ -127,20 +127,31 @@ export default function PaymentsPage() {
         body: JSON.stringify({
           action: "create_order",
           plan: selectedPlan,
-          amount: plan.priceINR * 100,
-          currency: "INR",
-          userId: user.id,
         }),
       });
-      const { order } = await res.json();
+      const data = await res.json();
+
+      if (data.error || !data.order) {
+        alert(data.error || "Failed to create order. Please try again.");
+        setProcessing(false);
+        return;
+      }
+
+      // Ensure Razorpay is loaded
+      if (!window.Razorpay) {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        document.body.appendChild(script);
+        await new Promise((resolve) => { script.onload = resolve; });
+      }
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency,
+        amount: data.order.amount,
+        currency: data.order.currency || "INR",
         name: "INTROSPECT™",
         description: `${plan.name} Plan Subscription`,
-        order_id: order.id,
+        order_id: data.order.id,
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
           // Verify payment
           await fetch("/api/payments", {
@@ -152,18 +163,10 @@ export default function PaymentsPage() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
               plan: selectedPlan,
-              userId: user.id,
             }),
           });
-          // Refresh subscription status
-          const { data } = await supabase
-            .from("subscriptions")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("status", "active")
-            .limit(1)
-            .single();
-          setActiveSub(data);
+          // Hard refresh to pick up new subscription
+          window.location.href = "/dashboard?payment=success";
         },
         prefill: {
           email: user.email,
@@ -176,6 +179,7 @@ export default function PaymentsPage() {
       rzp.open();
     } catch (err) {
       console.error("Payment error:", err);
+      alert("Payment failed. Please try again.");
     } finally {
       setProcessing(false);
     }
