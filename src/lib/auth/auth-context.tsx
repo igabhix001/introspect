@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types/database";
@@ -31,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
   const supabase = createClient();
+  
+  // Track initialization and refresh state to prevent race conditions
+  const isInitialized = useRef(false);
+  const isRefreshing = useRef(false);
+  const lastRefreshTime = useRef(0);
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
@@ -89,59 +94,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id);
   };
 
-  useEffect(() => {
-    let isMounted = true;
+  // Production-grade session refresh with debouncing
+  const refreshSession = useCallback(async (force = false) => {
+    // Debounce: Don't refresh more than once per 5 seconds unless forced
+    const now = Date.now();
+    if (!force && now - lastRefreshTime.current < 5000) {
+      return;
+    }
     
-    // Safety timeout - never stay loading forever (max 8 seconds)
-    const safetyTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn("Auth safety timeout triggered - forcing loading to false");
+    // Prevent concurrent refreshes
+    if (isRefreshing.current) {
+      return;
+    }
+    
+    isRefreshing.current = true;
+    lastRefreshTime.current = now;
+    
+    try {
+      // Use getUser() for server-validated session (more reliable than getSession)
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        // Session is invalid - user needs to re-authenticate
+        console.warn("Session refresh failed:", error.message);
+        setUser(null);
+        setProfile(null);
+        setHasActiveSubscription(false);
         setLoading(false);
+        return;
       }
-    }, 8000);
-
-    const initAuth = async () => {
-      try {
-        // Step 1: Use getSession (cached, instant) for fast initial render
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (currentUser) {
+        setUser(currentUser);
+        await fetchProfile(currentUser.id, currentUser.email || undefined);
         
-        if (!isMounted) return;
-        
-        if (sessionError) {
-          console.warn("Session error:", sessionError.message);
-          setUser(null);
-          setProfile(null);
-          setHasActiveSubscription(false);
-          setLoading(false);
-          return;
-        }
-        
-        if (!session?.user) {
-          setUser(null);
-          setProfile(null);
-          setHasActiveSubscription(false);
-          setLoading(false);
-          return;
-        }
-        
-        // Step 2: We have a session — set user immediately
-        setUser(session.user);
-        
-        // Step 3: Fetch profile and subscription in parallel
-        const subPromise = supabase
+        // Refresh subscription status
+        const { data: subData } = await supabase
           .from("subscriptions")
           .select("id")
-          .eq("user_id", session.user.id)
+          .eq("user_id", currentUser.id)
           .eq("status", "active")
           .gte("current_period_end", new Date().toISOString())
           .limit(1)
           .maybeSingle();
         
-        const [profileResult, subResult] = await Promise.allSettled([
-          fetchProfile(session.user.id, session.user.email || undefined),
+        setHasActiveSubscription(!!subData);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setHasActiveSubscription(false);
+      }
+    } catch (err) {
+      console.error("Session refresh error:", err);
+    } finally {
+      isRefreshing.current = false;
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    // Safety timeout - never stay loading forever (max 6 seconds)
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("Auth safety timeout triggered - forcing loading to false");
+        setLoading(false);
+      }
+    }, 6000);
+
+    const initAuth = async () => {
+      // Prevent double initialization
+      if (isInitialized.current) return;
+      isInitialized.current = true;
+      
+      try {
+        // Use getUser() for server-validated session (recommended by Supabase)
+        // This is more reliable than getSession() which can return stale tokens
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+        
+        if (!isMounted) return;
+        
+        if (userError || !currentUser) {
+          // No valid session
+          setUser(null);
+          setProfile(null);
+          setHasActiveSubscription(false);
+          setLoading(false);
+          return;
+        }
+        
+        // Valid session - set user immediately
+        setUser(currentUser);
+        
+        // Fetch profile and subscription in parallel with timeout
+        const subPromise = supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", currentUser.id)
+          .eq("status", "active")
+          .gte("current_period_end", new Date().toISOString())
+          .limit(1)
+          .maybeSingle();
+        
+        const [, subResult] = await Promise.allSettled([
+          fetchProfile(currentUser.id, currentUser.email || undefined),
           Promise.race([
             subPromise,
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000))
           ]),
         ]);
         
@@ -165,36 +225,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
+    // Handle auth state changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
-        if (event === "SIGNED_OUT") {
-          setUser(null);
-          setProfile(null);
-          setHasActiveSubscription(false);
-          setLoading(false);
-          return;
+        // Handle all auth events properly
+        switch (event) {
+          case "SIGNED_OUT":
+            setUser(null);
+            setProfile(null);
+            setHasActiveSubscription(false);
+            setLoading(false);
+            break;
+            
+          case "SIGNED_IN":
+          case "TOKEN_REFRESHED":
+          case "USER_UPDATED":
+            if (session?.user) {
+              setUser(session.user);
+              await fetchProfile(session.user.id, session.user.email || undefined);
+            }
+            setLoading(false);
+            break;
+            
+          case "INITIAL_SESSION":
+            // Already handled by initAuth, but ensure loading is false
+            if (!session?.user) {
+              setLoading(false);
+            }
+            break;
+            
+          default:
+            // For any other event, ensure we're not stuck loading
+            setLoading(false);
         }
-        
-        if (session?.user) {
-          setUser(session.user);
-          await fetchProfile(session.user.id, session.user.email || undefined);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        setLoading(false);
       }
     );
 
+    // CRITICAL: Handle tab visibility change to refresh session when user returns
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user) {
+        // User returned to tab - refresh session to ensure it's still valid
+        refreshSession(false);
+      }
+    };
+    
+    // CRITICAL: Handle window focus to catch cases visibility change misses
+    const handleFocus = () => {
+      if (user) {
+        refreshSession(false);
+      }
+    };
+    
+    // CRITICAL: Handle online event - refresh session when connection restored
+    const handleOnline = () => {
+      if (user) {
+        refreshSession(true); // Force refresh when coming back online
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
+
     return () => {
       isMounted = false;
+      isInitialized.current = false;
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user, refreshSession]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
