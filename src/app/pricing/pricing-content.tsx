@@ -127,11 +127,27 @@ export function PricingContent() {
     setLoadingPlan(plan);
 
     try {
+      // Get referral code from localStorage if present
+      let referralCode: string | null = null;
+      try {
+        const referralData = localStorage.getItem("introspect_referral");
+        if (referralData) {
+          const parsed = JSON.parse(referralData);
+          // Only use referral if it's less than 30 days old
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          if (Date.now() - parsed.timestamp < thirtyDaysMs) {
+            referralCode = parsed.code;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to read referral code:", e);
+      }
+
       // Step 1: Create Razorpay order via API
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create_order", plan }),
+        body: JSON.stringify({ action: "create_order", plan, referral_code: referralCode }),
       });
       const data = await res.json();
 
@@ -173,8 +189,15 @@ export function PricingContent() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
               plan,
+              referral_code: referralCode,
             }),
           });
+          // Clear referral code after successful payment
+          try {
+            localStorage.removeItem("introspect_referral");
+          } catch (e) {
+            console.warn("Failed to clear referral code:", e);
+          }
           window.location.href = "/dashboard?payment=success";
         },
         prefill: {},

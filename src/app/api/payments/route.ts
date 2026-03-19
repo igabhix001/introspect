@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
 
     if (action === "create-order" || action === "create_order") {
       const plan = body.plan || "monthly";
+      const referralCode = body.referral_code || null;
 
       const pricingMap: Record<string, number> = {
         "monthly": 33300,
@@ -59,14 +60,15 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           plan,
           email: user.email || "",
+          referral_code: referralCode || "",
         },
       });
 
-      return NextResponse.json({ order });
+      return NextResponse.json({ order, referral_code: referralCode });
     }
 
     if (action === "verify") {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = body;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan, referral_code } = body;
 
       // Verify signature
       const sigBody = razorpay_order_id + "|" + razorpay_payment_id;
@@ -158,7 +160,61 @@ export async function POST(request: NextRequest) {
         console.error("Failed to send payment notification:", emailErr);
       }
 
-      return NextResponse.json({ subscription, pointsAwarded: points });
+      // Process referral reward if referral code exists
+      let referralRewardGiven = false;
+      if (referral_code) {
+        try {
+          const adminDb = createAdminClient();
+          
+          // Find the referrer by their referral code (first 8 chars of user ID)
+          const { data: profiles } = await adminDb
+            .from("profiles")
+            .select("id, full_name, email")
+            .limit(100);
+          
+          // Find profile where ID starts with the referral code
+          const referrer = profiles?.find(p => p.id.replace(/-/g, "").slice(0, 8) === referral_code);
+          
+          if (referrer && referrer.id !== user.id) {
+            // Award 25 points to the referrer
+            await adminDb.from("loyalty_points").insert({
+              user_id: referrer.id,
+              action: "referral_reward",
+              points: 25,
+              description: `Referral reward: ${user.email || "A user"} subscribed using your link`,
+            });
+
+            // Update referrer's total points in profile
+            const { data: refProfile } = await adminDb
+              .from("profiles")
+              .select("current_points_balance, total_lifetime_points")
+              .eq("id", referrer.id)
+              .single();
+            
+            if (refProfile) {
+              await adminDb.from("profiles").update({
+                current_points_balance: (refProfile.current_points_balance || 0) + 25,
+                total_lifetime_points: (refProfile.total_lifetime_points || 0) + 25,
+              }).eq("id", referrer.id);
+            }
+
+            // Send notification to referrer
+            await adminDb.from("notifications").insert({
+              title: "Referral Reward! 🎉",
+              message: `You earned 25 points! Someone subscribed using your referral link.`,
+              type: "reward",
+              user_id: referrer.id,
+            });
+
+            referralRewardGiven = true;
+            console.log(`[REFERRAL] Awarded 25 points to ${referrer.email} for referring ${user.email}`);
+          }
+        } catch (refErr) {
+          console.error("Failed to process referral reward:", refErr);
+        }
+      }
+
+      return NextResponse.json({ subscription, pointsAwarded: points, referralRewardGiven });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
