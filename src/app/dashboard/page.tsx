@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
   TrendingUp,
@@ -26,7 +25,7 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
-import { useDashboardData } from "@/lib/hooks/use-dashboard-data";
+import { useDashboardQuery, useMarketQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
 
 const staggerContainer: Variants = {
@@ -43,13 +42,8 @@ const staggerItem: Variants = {
 };
 
 function MarketZoneWidget() {
-  const [zone, setZone] = useState<string | null>(null);
-  useEffect(() => {
-    fetch("/api/market")
-      .then(r => r.json())
-      .then(d => setZone(d.market_zone || null))
-      .catch(() => setZone(null));
-  }, []);
+  const { data: marketData, isLoading } = useMarketQuery();
+  const zone = marketData?.market_zone || null;
 
   const zoneMap: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
     BULLISH: { label: "Bullish", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
@@ -92,10 +86,11 @@ function MarketZoneWidget() {
 }
 
 export default function DashboardPage() {
-  const { data, loading } = useDashboardData();
-  const { user, profile, isAdmin, hasActiveSubscription } = useAuth();
+  const { data, isLoading, isError } = useDashboardQuery();
+  const { user, profile, isAdmin, hasActiveSubscription, loading: authLoading } = useAuth();
 
-  if (loading) {
+  // Show loading only during initial load, not during background refetches
+  if (authLoading || (isLoading && !data)) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -415,7 +410,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-2.5">
-            {todaysRules.map((rule, i) => (
+            {todaysRules.map((rule: { text: string; followed: boolean }, i: number) => (
               <div
                 key={i}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-colors ${
@@ -480,7 +475,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-1.5">
-            {recentTrades.map((trade) => (
+            {recentTrades.map((trade: { id: string; stock_index: string; direction: string; entry_price: number; exit_price: number; pnl: number; followed_plan: boolean; created_at: string }) => (
               <div
                 key={trade.id}
                 className="grid grid-cols-12 gap-2 items-center px-3 py-2.5 rounded-xl hover:bg-muted/30 transition-colors text-sm"

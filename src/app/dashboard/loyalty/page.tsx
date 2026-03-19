@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Gift,
@@ -15,8 +15,9 @@ import {
   ArrowRight,
   CheckCircle2,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useLoyaltyWithTransactionsQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
@@ -37,57 +38,19 @@ const tiers = [
 
 export default function LoyaltyPage() {
   const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [points, setPoints] = useState(0);
-  const [lifetimePoints, setLifetimePoints] = useState(0);
-  const [tier, setTier] = useState("Bronze");
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const { data: loyaltyData, isLoading } = useLoyaltyWithTransactionsQuery();
+  
   const [redeeming, setRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(false);
 
-  useEffect(() => {
-    async function fetchLoyaltyData() {
-      if (authLoading) return;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const supabase = createClient();
-        
-        // Fetch Profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("current_points_balance, total_lifetime_points, current_tier")
-          .eq("id", user.id)
-          .single();
+  // Extract data with defaults
+  const points = loyaltyData?.points || 0;
+  const lifetimePoints = loyaltyData?.lifetimePoints || 0;
+  const tier = loyaltyData?.tier || "Bronze";
+  const transactions = loyaltyData?.transactions || [];
 
-        if (profile) {
-          setPoints(profile.current_points_balance || 0);
-          setLifetimePoints(profile.total_lifetime_points || 0);
-          setTier(profile.current_tier || "Bronze");
-        }
-
-        // Fetch Ledger
-        const { data: ledger } = await supabase
-          .from("loyalty_points")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(20);
-
-        if (ledger) {
-          setTransactions(ledger);
-        }
-      } catch (err) {
-        console.error("Failed to load loyalty data:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchLoyaltyData();
-  }, [user?.id, authLoading]);
+  const loading = authLoading || (isLoading && !loyaltyData);
 
   if (loading) {
     return (
@@ -217,7 +180,8 @@ export default function LoyaltyPage() {
                             });
                             const data = await res.json();
                             if (data.success) {
-                              setPoints(data.new_balance);
+                              // Invalidate queries to refetch fresh data
+                              queryClient.invalidateQueries({ queryKey: ["loyaltyFull"] });
                               setRedeemSuccess(true);
                               setTimeout(() => setRedeemSuccess(false), 5000);
                             } else {

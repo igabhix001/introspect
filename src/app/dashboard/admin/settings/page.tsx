@@ -144,8 +144,9 @@ export default function AdminSettingsPage() {
   };
 
   // Redirect to admin settings page to auto-capture auth code
+  // Using /dashboard/admin/settings as redirect to avoid conflict with TradeSync's /auth/fyers/callback
   const fyersAuthUrl = fyersAppId
-    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${fyersAppId}&redirect_uri=${encodeURIComponent("https://www.intradaymindview.com/dashboard/admin/settings")}&response_type=code&state=introspect`
+    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${fyersAppId}&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_FYERS_REDIRECT_URI || "https://www.intradaymindview.com/auth/fyers/callback")}&response_type=code&state=introspect`
     : "";
 
   const systemChecks = [

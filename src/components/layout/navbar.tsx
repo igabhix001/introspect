@@ -192,7 +192,7 @@ export function Navbar() {
 
             {/* Desktop Auth/CTA — changes based on login state */}
             <div className="hidden sm:flex items-center gap-3 ml-2 border-l border-border pl-4">
-              {isLoading ? (
+              {!authChecked ? (
                 <div className="h-9 w-24 bg-muted animate-pulse rounded-lg" />
               ) : user ? (
                 <Link

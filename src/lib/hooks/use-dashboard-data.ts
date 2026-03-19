@@ -23,6 +23,7 @@ function setCachedData<T>(key: string, data: T): void {
 /* ─── Dashboard Overview Data ─── */
 export function useDashboardData() {
   const { user, loading: authLoading } = useAuth();
+  const [hasFetched, setHasFetched] = useState(false);
   const [data, setData] = useState<{
     disciplineScore: number;
     todayTrades: number;
@@ -48,16 +49,15 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    // If auth is still loading, don't fetch yet but don't block forever
+    // If auth is still loading, wait but don't block forever
     if (authLoading) {
-      // Set a max wait time for auth - if it takes too long, stop loading
-      setTimeout(() => {
-        if (authLoading) setLoading(false);
-      }, 5000);
-      return;
+      return; // useEffect will re-trigger when authLoading changes
     }
+    
+    // No user = no data to fetch
     if (!user?.id) {
       setLoading(false);
+      setHasFetched(true);
       return;
     }
 
@@ -68,6 +68,7 @@ export function useDashboardData() {
       if (cached) {
         setData(cached);
         setLoading(false);
+        setHasFetched(true);
         return;
       }
     }
@@ -190,19 +191,31 @@ export function useDashboardData() {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
+      setHasFetched(true);
     }
   }, [user?.id, authLoading]);
 
   useEffect(() => {
-    fetchData();
-    // Auto-refresh every 60 seconds for live data
-    const interval = setInterval(() => {
+    // Only fetch when auth is done loading
+    if (!authLoading) {
       fetchData();
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    }
+  }, [fetchData, authLoading]);
 
-  return { data, loading: loading || authLoading, refetch: fetchData };
+  // Auto-refresh every 60 seconds (separate effect to avoid re-triggering on authLoading change)
+  useEffect(() => {
+    if (!authLoading && user?.id) {
+      const interval = setInterval(() => {
+        fetchData(true); // force refresh
+      }, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.id, authLoading, fetchData]);
+
+  // Loading is true only if auth is loading OR we haven't fetched yet
+  const isLoading = authLoading || (!hasFetched && loading);
+
+  return { data, loading: isLoading, refetch: fetchData };
 }
 
 /* ─── Trade Journal Data ─── */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useChallengesQuery, useLoyaltyQuery, queryKeys } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 interface ChallengeRow {
@@ -88,40 +90,23 @@ const stagger = {
 
 export default function ChallengesPage() {
   const { user, loading: authLoading } = useAuth();
-  const [challenges, setChallenges] = useState<ChallengeRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: challengesData, isLoading: challengesLoading } = useChallengesQuery();
+  const { data: loyaltyData } = useLoyaltyQuery();
+  
+  const challenges = [
+    ...(challengesData?.active ? [challengesData.active as ChallengeRow] : []),
+    ...((challengesData?.history || []) as ChallengeRow[]),
+  ];
+  const totalPoints = (loyaltyData as { points?: number })?.points || 0;
+  
   const [starting, setStarting] = useState<string | null>(null);
-  const [totalPoints, setTotalPoints] = useState(0);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [exporting, setExporting] = useState(false);
   const supabase = createClient();
-
-  const fetchChallenges = useCallback(async () => {
-    if (authLoading) return;
-    if (!user) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("challenges")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    setChallenges((data as ChallengeRow[]) || []);
-
-    // Fetch loyalty points
-    const { data: points } = await supabase
-      .from("loyalty_points")
-      .select("points")
-      .eq("user_id", user.id);
-
-    const total = (points || []).reduce((sum: number, p: { points: number }) => sum + p.points, 0);
-    setTotalPoints(total);
-    setLoading(false);
-  }, [user, supabase, authLoading]);
-
-  useEffect(() => {
-    fetchChallenges();
-  }, [fetchChallenges]);
+  
+  const loading = authLoading || (challengesLoading && challenges.length === 0);
 
   const startChallenge = async (template: typeof challengeTemplates[0]) => {
     if (!user) return;
@@ -138,7 +123,8 @@ export default function ChallengesPage() {
       daily_progress: [],
     });
 
-    await fetchChallenges();
+    // Invalidate queries to refetch fresh data
+    queryClient.invalidateQueries({ queryKey: queryKeys.challenges(user.id) });
     setStarting(null);
   };
 
@@ -146,7 +132,7 @@ export default function ChallengesPage() {
   const completedChallenges = challenges.filter((c) => c.status === "completed");
 
   const handleDailyCheckin = async () => {
-    if (!activeChallenge) return;
+    if (!activeChallenge || !user) return;
     setCheckingIn(true);
     try {
       const res = await fetch("/api/challenges/checkin", {
@@ -156,7 +142,9 @@ export default function ChallengesPage() {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchChallenges();
+        // Invalidate queries to refetch fresh data
+        queryClient.invalidateQueries({ queryKey: queryKeys.challenges(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.loyalty(user.id) });
         alert(data.message);
       } else {
         alert(data.error || "Check-in failed");

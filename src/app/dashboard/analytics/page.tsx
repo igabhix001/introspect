@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  BarChart3,
   TrendingUp,
   TrendingDown,
   Brain,
@@ -22,7 +20,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { createClient } from "@/lib/supabase/client";
+import { useAnalyticsQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
 
 const stagger = {
@@ -30,89 +28,26 @@ const stagger = {
   item: { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } },
 };
 
-const mistakeColors: Record<string, string> = {
-  FOMO: "#F59E0B",
-  "Revenge Trade": "#EF4444",
-  "No SL": "#F97316",
-  Overtrading: "#A855F7",
-  "Over-leveraged": "#3B82F6",
-};
-
 export default function AnalyticsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [weeklyPnl, setWeeklyPnl] = useState<{ day: string; pnl: number }[]>([]);
-  const [mistakeData, setMistakeData] = useState<{ name: string; value: number; color: string }[]>([]);
-  const [totalPnl, setTotalPnl] = useState(0);
-  const [winRate, setWinRate] = useState(0);
-  const [ruleAdherence, setRuleAdherence] = useState(0);
-  const [tradeCount, setTradeCount] = useState(0);
+  const { loading: authLoading } = useAuth();
+  const { data, isLoading } = useAnalyticsQuery();
 
-  useEffect(() => {
-    async function fetchAnalytics() {
-      if (authLoading) return;
-      if (!user) { setLoading(false); return; }
-      const supabase = createClient();
-
-      // Fetch trades (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data: trades } = await supabase
-        .from("trades")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .order("created_at", { ascending: true });
-
-      if (trades && trades.length > 0) {
-        setTradeCount(trades.length);
-        const total = trades.reduce((sum: number, t: { pnl: number }) => sum + t.pnl, 0);
-        setTotalPnl(total);
-        const wins = trades.filter((t: { pnl: number }) => t.pnl > 0).length;
-        setWinRate(Math.round((wins / trades.length) * 100));
-        const rulesFollowed = trades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
-        setRuleAdherence(Math.round((rulesFollowed / trades.length) * 100));
-
-        // Weekly P&L - group by day of week
-        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const dayPnl: Record<string, number> = {};
-        trades.forEach((t: { created_at: string; pnl: number }) => {
-          const dayName = dayNames[new Date(t.created_at).getDay()];
-          dayPnl[dayName] = (dayPnl[dayName] || 0) + t.pnl;
-        });
-        setWeeklyPnl(["Mon", "Tue", "Wed", "Thu", "Fri"].map(d => ({ day: d, pnl: dayPnl[d] || 0 })));
-
-        // Mistake breakdown
-        const mistakeCounts: Record<string, number> = {};
-        trades.forEach((t: { mistakes: string[] }) => {
-          if (t.mistakes && t.mistakes.length > 0) {
-            t.mistakes.forEach((m: string) => {
-              mistakeCounts[m] = (mistakeCounts[m] || 0) + 1;
-            });
-          }
-        });
-        const totalMistakes = Object.values(mistakeCounts).reduce((a, b) => a + b, 0) || 1;
-        setMistakeData(
-          Object.entries(mistakeCounts).map(([name, count]) => ({
-            name,
-            value: Math.round((count / totalMistakes) * 100),
-            color: mistakeColors[name] || "#6B7280",
-          }))
-        );
-      }
-
-      setLoading(false);
-    }
-    fetchAnalytics();
-  }, [user?.id, authLoading]);
-
-  if (loading) {
+  // Show loading only on initial load
+  if (authLoading || (isLoading && !data)) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
+  // Extract data with defaults
+  const totalPnl = data?.totalPnl || 0;
+  const winRate = data?.winRate || 0;
+  const tradeCount = data?.tradeCount || 0;
+  const ruleAdherence = data?.ruleAdherence || 0;
+  const weeklyPnl = data?.weeklyPnl || [];
+  const mistakeData = data?.mistakeData || [];
 
   return (
     <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-6">
@@ -162,7 +97,7 @@ export default function AnalyticsPage() {
                   cursor={{ fill: "var(--muted)" }}
                 />
                 <Bar dataKey="pnl" radius={[6, 6, 0, 0]} fill="var(--success)">
-                  {weeklyPnl.map((entry, index) => (
+                  {weeklyPnl.map((entry: { day: string; pnl: number }, index: number) => (
                     <Cell key={index} fill={entry.pnl >= 0 ? "var(--success)" : "var(--destructive)"} fillOpacity={0.8} />
                   ))}
                 </Bar>
@@ -186,7 +121,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={mistakeData} dataKey="value" innerRadius={35} outerRadius={65} paddingAngle={3} strokeWidth={0}>
-                      {mistakeData.map((entry, index) => (
+                      {mistakeData.map((entry: { name: string; value: number; color: string }, index: number) => (
                         <Cell key={index} fill={entry.color} />
                       ))}
                     </Pie>
@@ -194,7 +129,7 @@ export default function AnalyticsPage() {
                 </ResponsiveContainer>
               </div>
               <div className="space-y-2.5 flex-1">
-                {mistakeData.map((item) => (
+                {mistakeData.map((item: { name: string; value: number; color: string }) => (
                   <div key={item.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />

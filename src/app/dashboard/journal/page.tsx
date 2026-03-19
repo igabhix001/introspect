@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Search,
-  Filter,
-  Download,
   X,
   CheckCircle2,
   AlertTriangle,
@@ -20,6 +18,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTradesQuery, queryKeys } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 const emotionColors: Record<string, string> = {
   Calm: "bg-success/10 text-success",
@@ -58,8 +58,10 @@ interface TradeRow {
 
 export default function JournalPage() {
   const { user, loading: authLoading } = useAuth();
-  const [trades, setTrades] = useState<TradeRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: tradesData, isLoading } = useTradesQuery();
+  const trades = (tradesData as TradeRow[]) || [];
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -80,23 +82,7 @@ export default function JournalPage() {
   });
 
   const supabase = createClient();
-
-  const fetchTrades = useCallback(async () => {
-    if (authLoading) return;
-    if (!user) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("trades")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    setTrades((data as TradeRow[]) || []);
-    setLoading(false);
-  }, [user, supabase, authLoading]);
-
-  useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+  const loading = authLoading || (isLoading && trades.length === 0);
 
   const handleAddTrade = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +121,9 @@ export default function JournalPage() {
     });
 
     if (!error) {
-      await fetchTrades();
+      // Invalidate queries to refetch fresh data
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
       setShowAddModal(false);
       setFormData({
         stock: "",
@@ -157,7 +145,9 @@ export default function JournalPage() {
     if (!user) return;
     setDeleting(tradeId);
     await supabase.from("trades").delete().eq("id", tradeId).eq("user_id", user.id);
-    setTrades((prev) => prev.filter((t) => t.id !== tradeId));
+    // Invalidate queries to refetch fresh data
+    queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
     setDeleting(null);
   };
 

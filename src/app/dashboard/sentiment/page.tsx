@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -23,6 +23,7 @@ import {
   Gauge,
   Target,
 } from "lucide-react";
+import { useMarketQuery } from "@/lib/hooks/use-queries";
 
 // ──── Market Intelligence Object (user-facing fields only per client doc) ────
 interface MarketIntelligence {
@@ -114,43 +115,31 @@ const regimeLabels = {
 
 
 export default function SentimentEnginePage() {
-  const [data, setData] = useState<MarketIntelligence | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: rawData, isLoading, isError, refetch } = useMarketQuery();
   const [isLive, setIsLive] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<string>("");
 
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch("/api/market");
-      const newData = await res.json();
-      if (!res.ok) {
-        setError(newData.error || "Failed to connect to Fyers. Check your settings.");
-        return;
-      }
-      setError(null);
-      setData(newData);
-      setLastUpdate(new Date(newData.timestamp).toLocaleTimeString("en-IN"));
-      
-      // Auto-pause polling if market is closed to save API rate limits
-      if (newData.market_status === "CLOSED") {
-        setIsLive(false);
-      }
-    } catch (err) {
-      console.error("Market data fetch error:", err);
-      setError("Network or API failure.");
-    }
-  }, []);
+  // Cast to proper type
+  const data = rawData as MarketIntelligence | null;
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(() => {
-      if (isLive) fetchData();
-    }, CONFIG.DATA_REFRESH_INTERVAL_SECONDS * 1000);
-    return () => clearInterval(interval);
-  }, [isLive, fetchData]);
+  // Show loading state
+  if (isLoading && !data) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center max-w-5xl mx-auto">
+        <div className="rounded-2xl border border-border bg-card/50 p-8 max-w-lg w-full flex flex-col items-center">
+          <div className="relative mb-6">
+            <div className="h-12 w-12 rounded-full border-4 border-muted border-t-success animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold mb-2 text-foreground">Connecting to Market Data...</h2>
+          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            Loading real-time market sentiment engine. This may take a moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  // Show loading state instead of error when Fyers not connected
-  if (error || !data) {
+  // Show error state
+  if (isError || !data) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center max-w-5xl mx-auto">
         <div className="rounded-2xl border border-border bg-card/50 p-8 max-w-lg w-full flex flex-col items-center">
@@ -162,7 +151,7 @@ export default function SentimentEnginePage() {
             Loading real-time market sentiment engine. This may take a moment.
           </p>
           <button
-            onClick={fetchData}
+            onClick={() => refetch()}
             className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
           >
             Retry Connection
@@ -171,6 +160,8 @@ export default function SentimentEnginePage() {
       </div>
     );
   }
+
+  const lastUpdate = data.timestamp ? new Date(data.timestamp).toLocaleTimeString("en-IN") : "";
 
   const zone = zoneConfig[data.market_zone];
   const ZoneIcon = zone.icon;
@@ -225,7 +216,7 @@ export default function SentimentEnginePage() {
             {isLive ? "Pause" : "Resume"}
           </button>
           <button
-            onClick={fetchData}
+            onClick={() => refetch()}
             className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
             title="Refresh now"
           >
@@ -342,7 +333,7 @@ export default function SentimentEnginePage() {
                 Why this zone?
               </p>
               <ul className="space-y-2">
-                {data.reasons.map((reason, i) => (
+                {data.reasons.map((reason: string, i: number) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
                     <span
                       className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${

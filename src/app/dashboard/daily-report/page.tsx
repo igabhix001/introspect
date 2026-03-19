@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar,
-  TrendingUp,
-  TrendingDown,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Lightbulb,
   Trophy,
   Target,
@@ -17,8 +14,9 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useDailyReportQuery, useRecentDailyReportsQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DailyReport {
   id: string;
@@ -39,45 +37,17 @@ interface DailyReport {
 }
 
 export default function DailyReportPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [report, setReport] = useState<DailyReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const { loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [recentReports, setRecentReports] = useState<DailyReport[]>([]);
+  const [generating, setGenerating] = useState(false);
 
-  const fetchReport = async (date: string) => {
-    if (authLoading || !user) return;
-    setLoading(true);
-    
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("daily_reports")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date", date)
-      .single();
+  const { data: reportData, isLoading: reportLoading } = useDailyReportQuery(selectedDate);
+  const { data: recentReportsData } = useRecentDailyReportsQuery();
 
-    setReport(data);
-    setLoading(false);
-  };
-
-  const fetchRecentReports = async () => {
-    if (authLoading || !user) return;
-    
-    const supabase = createClient();
-    const since = new Date();
-    since.setDate(since.getDate() - 7);
-
-    const { data } = await supabase
-      .from("daily_reports")
-      .select("*")
-      .eq("user_id", user.id)
-      .gte("date", since.toISOString().split("T")[0])
-      .order("date", { ascending: false });
-
-    setRecentReports(data || []);
-  };
+  const report = reportData as DailyReport | null;
+  const recentReports = (recentReportsData || []) as DailyReport[];
+  const loading = authLoading || reportLoading;
 
   const generateReport = async () => {
     setGenerating(true);
@@ -89,8 +59,9 @@ export default function DailyReportPage() {
       });
       const data = await res.json();
       if (data.report) {
-        setReport(data.report);
-        fetchRecentReports();
+        // Invalidate queries to refetch fresh data
+        queryClient.invalidateQueries({ queryKey: ["dailyReport"] });
+        queryClient.invalidateQueries({ queryKey: ["recentDailyReports"] });
       }
     } catch (error) {
       console.error("Failed to generate report:", error);
@@ -106,14 +77,6 @@ export default function DailyReportPage() {
       setSelectedDate(newDate);
     }
   };
-
-  useEffect(() => {
-    fetchReport(selectedDate);
-  }, [selectedDate, user?.id, authLoading]);
-
-  useEffect(() => {
-    fetchRecentReports();
-  }, [user?.id, authLoading]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-success";
