@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { awardPoints, POINTS_CONFIG } from "@/lib/services/loyalty-service";
 
 // Progressive messages based on day count
 function getProgressiveMessage(day: number, totalDays: number): string {
@@ -103,29 +104,18 @@ export async function POST(request: NextRequest) {
 
     if (updateError) throw updateError;
 
-    // Award points if completed
+    // Award points if completed using centralized service (sends email)
     if (isCompleted && pointsEarned > 0) {
-      // Update profile points
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("current_points_balance, total_lifetime_points")
-        .eq("id", user.id)
-        .single();
-
-      await supabase
-        .from("profiles")
-        .update({
-          current_points_balance: (profile?.current_points_balance || 0) + pointsEarned,
-          total_lifetime_points: (profile?.total_lifetime_points || 0) + pointsEarned,
-        })
-        .eq("id", user.id);
-
-      // Record in loyalty_points table
-      await supabase.from("loyalty_points").insert({
-        user_id: user.id,
+      const challengeAction = challenge.type === "90" ? "challenge_90" 
+        : challenge.type === "60" ? "challenge_60" 
+        : "challenge_30";
+      
+      await awardPoints({
+        userId: user.id,
         points: pointsEarned,
-        action: "challenge_completion",
+        reason: challengeAction,
         description: `Completed ${challenge.type}-day challenge: ${challenge.name}`,
+        activityNote: `Amazing achievement! You've completed the ${challenge.type}-Day ${challenge.name} Challenge. Your discipline is paying off!`,
       });
     }
 

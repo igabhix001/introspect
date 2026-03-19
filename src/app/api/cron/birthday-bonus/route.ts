@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { awardPoints, POINTS_CONFIG } from "@/lib/services/loyalty-service";
 
 // Birthday bonus automation - runs daily via cron
 // Vercel cron config: { "path": "/api/cron/birthday-bonus", "schedule": "0 6 * * *" }
@@ -56,23 +57,16 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Award birthday bonus
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          current_points_balance: (user.current_points_balance || 0) + BIRTHDAY_BONUS_POINTS,
-        })
-        .eq("id", user.id);
+      // Award birthday bonus using centralized service (sends email)
+      const result = await awardPoints({
+        userId: user.id,
+        points: BIRTHDAY_BONUS_POINTS,
+        reason: "birthday_bonus",
+        description: `🎂 Happy Birthday! Enjoy ${BIRTHDAY_BONUS_POINTS} bonus points!`,
+        activityNote: "Happy Birthday! 🎂 Enjoy your special day with bonus points from INTROSPECT. May this year bring you disciplined trading and great success!",
+      });
 
-      if (!updateError) {
-        // Record in loyalty_points
-        await supabase.from("loyalty_points").insert({
-          user_id: user.id,
-          points: BIRTHDAY_BONUS_POINTS,
-          action: "birthday_bonus",
-          description: `🎂 Happy Birthday! Enjoy ${BIRTHDAY_BONUS_POINTS} bonus points!`,
-        });
-
+      if (result.success) {
         // Create notification
         await supabase.from("notifications").insert({
           user_id: user.id,

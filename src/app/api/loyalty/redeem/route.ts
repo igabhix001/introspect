@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { awardPoints } from "@/lib/services/loyalty-service";
 
 // Client spec: 150 points = 1 free month, 400 points = 3 months
 const REDEMPTION_OPTIONS: Record<number, number> = {
@@ -50,35 +51,32 @@ export async function POST(request: NextRequest) {
     
     currentEnd.setMonth(currentEnd.getMonth() + months);
 
-    // Deduct points and extend subscription
+    // Extend subscription first
     const { error: updateError } = await supabase
       .from("profiles")
       .update({
-        current_points_balance: (profile.current_points_balance || 0) - pointsRequired,
         subscription_end_date: currentEnd.toISOString(),
       })
       .eq("id", user.id);
 
     if (updateError) throw updateError;
 
-    // Record the redemption in loyalty_points table
-    const { error: ledgerError } = await supabase
-      .from("loyalty_points")
-      .insert({
-        user_id: user.id,
-        points: -pointsRequired,
-        action: "redemption",
-        description: `Redeemed ${months} free month(s)`,
-      });
-
-    if (ledgerError) console.error("Ledger error:", ledgerError);
+    // Deduct points using centralized service (sends email notification)
+    const result = await awardPoints({
+      userId: user.id,
+      points: -pointsRequired,
+      reason: "redemption",
+      description: `Redeemed ${pointsRequired} points for ${months} free month(s)`,
+      activityNote: `Points successfully applied to your membership! You've redeemed ${months} free month(s). Your subscription has been extended until ${currentEnd.toLocaleDateString("en-IN")}.`,
+    });
 
     return NextResponse.json({
       success: true,
       months_added: months,
       points_deducted: pointsRequired,
-      new_balance: (profile.current_points_balance || 0) - pointsRequired,
+      new_balance: result.newBalance,
       new_subscription_end: currentEnd.toISOString(),
+      email_sent: result.emailSent,
     });
   } catch (error) {
     console.error("Redemption error:", error);

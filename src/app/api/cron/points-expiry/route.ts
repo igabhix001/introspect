@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { awardPoints } from "@/lib/services/loyalty-service";
 
 // This endpoint should be called by a cron job (e.g., Vercel Cron, AWS EventBridge)
 // Schedule: Daily at 00:00 UTC
@@ -49,38 +50,24 @@ export async function GET(request: NextRequest) {
 
     if (markError) throw markError;
 
-    // Deduct expired points from user profiles
+    // Deduct expired points from user profiles using centralized service (sends email)
     const results: { user_id: string; points_expired: number; success: boolean }[] = [];
 
     for (const [userId, points] of Object.entries(userPoints)) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("current_points_balance")
-        .eq("id", userId)
-        .single();
+      // Use centralized service to deduct points and send email notification
+      const result = await awardPoints({
+        userId,
+        points: -points,
+        reason: "points_expired",
+        description: `${points} points expired due to 24-month inactivity policy`,
+        activityNote: "Some of your points have expired as per our 24-month expiry policy. Remember to use your points before they expire! Earn more points through referrals, challenges, and subscriptions.",
+      });
 
-      if (profile) {
-        const newBalance = Math.max(0, (profile.current_points_balance || 0) - points);
-        
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({ current_points_balance: newBalance })
-          .eq("id", userId);
-
-        // Log expiry in loyalty_points
-        await supabase.from("loyalty_points").insert({
-          user_id: userId,
-          points: -points,
-          action: "points_expired",
-          description: "Points expired due to inactivity",
-        });
-
-        results.push({
-          user_id: userId,
-          points_expired: points,
-          success: !updateError,
-        });
-      }
+      results.push({
+        user_id: userId,
+        points_expired: points,
+        success: result.success,
+      });
     }
 
     return NextResponse.json({

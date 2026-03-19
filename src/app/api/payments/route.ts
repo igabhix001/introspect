@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Razorpay from "razorpay";
+import { awardPoints, POINTS_CONFIG } from "@/lib/services/loyalty-service";
 
 // POST /api/payments — Handle Razorpay order creation and verification
 export async function POST(request: NextRequest) {
@@ -117,23 +118,20 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error;
 
-      // Award loyalty points
-      let points = 10;
-      let rewardAction = "monthly_purchase";
-      
+      // Award loyalty points using centralized service (sends email automatically)
+      let rewardAction: "monthly_purchase" | "semiannual_purchase" | "annual_purchase" = "monthly_purchase";
       if (plan === "yearly") {
-        points = 150;
         rewardAction = "annual_purchase";
       } else if (plan === "6-month") {
-        points = 75;
         rewardAction = "semiannual_purchase";
       }
 
-      await supabase.from("loyalty_points").insert({
-        user_id: user.id,
-        action: rewardAction,
-        points,
+      const pointsResult = await awardPoints({
+        userId: user.id,
+        points: POINTS_CONFIG[rewardAction],
+        reason: rewardAction,
         description: `${plan} subscription purchase`,
+        activityNote: `Thank you for your ${plan} subscription! Your loyalty points have been credited.`,
       });
 
       // Send notification to admin
@@ -176,27 +174,14 @@ export async function POST(request: NextRequest) {
           const referrer = profiles?.find(p => p.id.replace(/-/g, "").slice(0, 8) === referral_code);
           
           if (referrer && referrer.id !== user.id) {
-            // Award 25 points to the referrer
-            await adminDb.from("loyalty_points").insert({
-              user_id: referrer.id,
-              action: "referral_reward",
-              points: 25,
+            // Award 25 points to the referrer using centralized service (sends email)
+            const refResult = await awardPoints({
+              userId: referrer.id,
+              points: POINTS_CONFIG.referral_reward,
+              reason: "referral_reward",
               description: `Referral reward: ${user.email || "A user"} subscribed using your link`,
+              activityNote: "Congratulations on successfully referring a friend! Keep sharing to earn more rewards.",
             });
-
-            // Update referrer's total points in profile
-            const { data: refProfile } = await adminDb
-              .from("profiles")
-              .select("current_points_balance, total_lifetime_points")
-              .eq("id", referrer.id)
-              .single();
-            
-            if (refProfile) {
-              await adminDb.from("profiles").update({
-                current_points_balance: (refProfile.current_points_balance || 0) + 25,
-                total_lifetime_points: (refProfile.total_lifetime_points || 0) + 25,
-              }).eq("id", referrer.id);
-            }
 
             // Send notification to referrer
             await adminDb.from("notifications").insert({
@@ -206,7 +191,7 @@ export async function POST(request: NextRequest) {
               user_id: referrer.id,
             });
 
-            referralRewardGiven = true;
+            referralRewardGiven = refResult.success;
             console.log(`[REFERRAL] Awarded 25 points to ${referrer.email} for referring ${user.email}`);
           }
         } catch (refErr) {
@@ -214,7 +199,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ subscription, pointsAwarded: points, referralRewardGiven });
+      return NextResponse.json({ subscription, pointsAwarded: pointsResult.pointsAwarded, referralRewardGiven });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
