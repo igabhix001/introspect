@@ -1,8 +1,35 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useRef } from "react";
+
+/**
+ * Production-grade pattern: Track if user was ever authenticated
+ * This prevents queries from being disabled during client-side navigation
+ * when auth context briefly shows loading=true
+ */
+function useStableUserId() {
+  const { user, loading } = useAuth();
+  const lastKnownUserId = useRef<string | null>(null);
+  
+  // Once we have a user ID, remember it
+  if (user?.id) {
+    lastKnownUserId.current = user.id;
+  }
+  
+  // Clear on explicit sign out (user becomes null after loading completes)
+  if (!loading && !user) {
+    lastKnownUserId.current = null;
+  }
+  
+  return {
+    userId: user?.id || lastKnownUserId.current,
+    isReady: !loading || !!lastKnownUserId.current,
+    isAuthenticated: !!user?.id,
+  };
+}
 
 /**
  * Production-grade React Query hooks for dashboard data
@@ -97,13 +124,13 @@ export const queryKeys = {
 
 // ─── Dashboard Overview Data ───
 export function useDashboardQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.dashboard(user?.id || ""),
+    queryKey: queryKeys.dashboard(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const today = new Date().toISOString().split("T")[0];
 
@@ -112,26 +139,26 @@ export function useDashboardQuery() {
         supabase
           .from("trades")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .gte("created_at", `${today}T00:00:00`)
           .order("created_at", { ascending: false }),
         supabase
           .from("assessments")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
         supabase
           .from("daily_reports")
           .select("date, discipline_score")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("date", { ascending: false })
           .limit(7),
         supabase
           .from("challenges")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(1)
@@ -185,78 +212,81 @@ export function useDashboardQuery() {
         tradingRules: disciplineResult.ruleDetails,
       };
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
     refetchInterval: 60 * 1000, // Auto-refresh every minute
+    placeholderData: keepPreviousData, // Keep showing old data during navigation
   });
 }
 
 // ─── Trade Journal Data ───
 export function useTradesQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.trades(user?.id || ""),
+    queryKey: queryKeys.trades(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!userId) return [];
 
       const { data } = await supabase
         .from("trades")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(100);
 
       return data || [];
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Assessment Data ───
 export function useAssessmentQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.assessment(user?.id || ""),
+    queryKey: queryKeys.assessment(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const { data } = await supabase
         .from("assessments")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       return data;
     },
-    enabled: !authLoading && !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes (assessments don't change often)
+    enabled: isReady && !!userId,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Challenges Data ───
 export function useChallengesQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.challenges(user?.id || ""),
+    queryKey: queryKeys.challenges(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return { active: null, history: [] };
+      if (!userId) return { active: null, history: [] };
 
       const [activeRes, historyRes] = await Promise.all([
         supabase
           .from("challenges")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(1)
@@ -264,7 +294,7 @@ export function useChallengesQuery() {
         supabase
           .from("challenges")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .neq("status", "active")
           .order("created_at", { ascending: false })
           .limit(10),
@@ -275,14 +305,15 @@ export function useChallengesQuery() {
         history: historyRes.data || [],
       };
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Market Sentiment Data ───
 export function useMarketQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { isReady, isAuthenticated } = useStableUserId();
 
   return useQuery({
     queryKey: queryKeys.market(),
@@ -294,80 +325,83 @@ export function useMarketQuery() {
       }
       return res.json();
     },
-    enabled: !authLoading && !!user,
-    staleTime: 5 * 1000, // 5 seconds (market data is real-time)
-    refetchInterval: 5 * 1000, // Auto-refresh every 5 seconds
+    enabled: isReady && isAuthenticated,
+    staleTime: 5 * 1000,
+    refetchInterval: 5 * 1000,
     retry: 2,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Loyalty Points Data ───
 export function useLoyaltyQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.loyalty(user?.id || ""),
+    queryKey: queryKeys.loyalty(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const { data } = await supabase
         .from("loyalty_points")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       return data;
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Daily Reports Data ───
 export function useDailyReportsQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: queryKeys.dailyReports(user?.id || ""),
+    queryKey: queryKeys.dailyReports(userId || ""),
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!userId) return [];
 
       const { data } = await supabase
         .from("daily_reports")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("date", { ascending: false })
         .limit(30);
 
       return data || [];
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Loyalty Data with Transactions ───
 export function useLoyaltyWithTransactionsQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["loyaltyFull", user?.id || ""] as const,
+    queryKey: ["loyaltyFull", userId || ""] as const,
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const [profileRes, ledgerRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("current_points_balance, total_lifetime_points, current_tier")
-          .eq("id", user.id)
+          .eq("id", userId)
           .single(),
         supabase
           .from("loyalty_points")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(20),
       ]);
@@ -379,44 +413,46 @@ export function useLoyaltyWithTransactionsQuery() {
         transactions: ledgerRes.data || [],
       };
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Daily Report Data ───
 export function useDailyReportQuery(date: string) {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["dailyReport", user?.id || "", date] as const,
+    queryKey: ["dailyReport", userId || "", date] as const,
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const { data } = await supabase
         .from("daily_reports")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("date", date)
         .single();
 
       return data;
     },
-    enabled: !authLoading && !!user?.id && !!date,
+    enabled: isReady && !!userId && !!date,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Recent Daily Reports ───
 export function useRecentDailyReportsQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["recentDailyReports", user?.id || ""] as const,
+    queryKey: ["recentDailyReports", userId || ""] as const,
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!userId) return [];
 
       const since = new Date();
       since.setDate(since.getDate() - 7);
@@ -424,26 +460,27 @@ export function useRecentDailyReportsQuery() {
       const { data } = await supabase
         .from("daily_reports")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("date", since.toISOString().split("T")[0])
         .order("date", { ascending: false });
 
       return data || [];
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Analytics Data ───
 export function useAnalyticsQuery() {
-  const { user, loading: authLoading } = useAuth();
+  const { userId, isReady } = useStableUserId();
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["analytics", user?.id || ""] as const,
+    queryKey: ["analytics", userId || ""] as const,
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!userId) return null;
 
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -451,7 +488,7 @@ export function useAnalyticsQuery() {
       const { data: trades } = await supabase
         .from("trades")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("created_at", thirtyDaysAgo.toISOString())
         .order("created_at", { ascending: true });
 
@@ -508,8 +545,9 @@ export function useAnalyticsQuery() {
         mistakeData,
       };
     },
-    enabled: !authLoading && !!user?.id,
+    enabled: isReady && !!userId,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -571,5 +609,75 @@ export function useChallengeCheckinMutation() {
         queryClient.invalidateQueries({ queryKey: queryKeys.loyalty(user.id) });
       }
     },
+  });
+}
+
+// ─── Admin Queries ───
+
+export function useAdminStatsQuery() {
+  const { isReady, isAuthenticated } = useStableUserId();
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminStats"] as const,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/stats");
+      if (!res.ok) throw new Error("Failed to fetch admin stats");
+      return res.json();
+    },
+    enabled: isReady && isAuthenticated && isAdmin,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminUsersQuery() {
+  const { isReady, isAuthenticated } = useStableUserId();
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminUsers"] as const,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    enabled: isReady && isAuthenticated && isAdmin,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminSubscriptionsQuery() {
+  const { isReady, isAuthenticated } = useStableUserId();
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminSubscriptions"] as const,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/subscriptions");
+      if (!res.ok) throw new Error("Failed to fetch subscriptions");
+      return res.json();
+    },
+    enabled: isReady && isAuthenticated && isAdmin,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminNotificationsQuery() {
+  const { isReady, isAuthenticated } = useStableUserId();
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminNotifications"] as const,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/notifications");
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      return res.json();
+    },
+    enabled: isReady && isAuthenticated && isAdmin,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
   });
 }

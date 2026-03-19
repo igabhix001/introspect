@@ -1,18 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Shield,
   AlertTriangle,
   CheckCircle2,
-  TrendingUp,
   Target,
   Brain,
-  Download,
   RefreshCw,
-  Lock,
-  Clock,
   Flame,
   Loader2,
 } from "lucide-react";
@@ -25,8 +20,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useAssessmentQuery } from "@/lib/hooks/use-queries";
 
 const stagger = {
   container: { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } },
@@ -49,109 +44,47 @@ const categoryIcons: Record<string, typeof Shield> = {
 };
 
 export default function RiskReportPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [radarData, setRadarData] = useState<{ category: string; score: number; fullMark: number }[]>([]);
-  const [overallScore, setOverallScore] = useState(0);
-  const [personalizedRules, setPersonalizedRules] = useState<{ rule: string; detail: string; category: string; severity: string }[]>([]);
-  const [categoriesAnalysis, setCategoriesAnalysis] = useState<any>(null);
-  const [riskLevel, setRiskLevel] = useState({ label: "Moderate Risk", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" });
+  const { loading: authLoading } = useAuth();
+  const { data: assessment, isLoading: assessmentLoading } = useAssessmentQuery();
 
-  useEffect(() => {
-    async function fetchReport() {
-      if (authLoading) return;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const supabase = createClient();
+  const loading = authLoading || (assessmentLoading && !assessment);
 
-      // Fetch latest assessment with categories_analysis
-      const { data: assessment } = await supabase
-        .from("assessments")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+  // Process assessment data
+  const categoriesAnalysis = assessment?.categories_analysis || null;
+  
+  // Build radar data from assessment
+  const radarData = categoriesAnalysis?.categories?.map((cat: { name: string; risk_percent: number }) => ({
+    category: cat.name.replace("&", "&").split(" ").slice(0, 2).join(" "),
+    score: Math.round((1 - cat.risk_percent) * 100),
+    fullMark: 100,
+  })) || [
+    { category: "Stop-Loss", score: 50, fullMark: 100 },
+    { category: "After Profits", score: 50, fullMark: 100 },
+    { category: "Risk Planning", score: 50, fullMark: 100 },
+    { category: "Impulse Control", score: 50, fullMark: 100 },
+    { category: "Rule Consistency", score: 50, fullMark: 100 },
+  ];
 
-      // Use assessment's categories_analysis for radar chart (from IMV_Master scoring)
-      // This ensures consistency between assessment results and risk report
-      if (assessment?.categories_analysis?.categories) {
-        const catAnalysis = assessment.categories_analysis;
-        
-        // Map IMV categories to radar chart format
-        // DisciplineScore = (1 - riskPercent) * 100, so higher = better discipline
-        const radar = catAnalysis.categories.map((cat: { name: string; risk_percent: number; percentage: number }) => ({
-          category: cat.name.replace("&", "&").split(" ").slice(0, 2).join(" "), // Shorten names for display
-          score: Math.round((1 - cat.risk_percent) * 100), // Convert risk% to discipline score
-          fullMark: 100,
-        }));
-        setRadarData(radar);
+  const overallScore = assessment?.discipline_score || 50;
+  const riskLvl = assessment?.risk_level || "medium";
+  
+  const riskLevel = riskLvl === "low" 
+    ? { label: "Low Risk", color: "text-success", bg: "bg-success/10", border: "border-success/20" }
+    : riskLvl === "medium"
+    ? { label: "Moderate Risk", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" }
+    : riskLvl === "high"
+    ? { label: "High Risk", color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20" }
+    : { label: "Take Assessment", color: "text-muted-foreground", bg: "bg-muted/50", border: "border-border" };
 
-        // Overall score from assessment's discipline_score (already calculated correctly)
-        const overall = assessment.discipline_score || 0;
-        setOverallScore(overall);
-
-        // Risk level from assessment
-        const riskLvl = assessment.risk_level || "medium";
-        if (riskLvl === "low") {
-          setRiskLevel({ label: "Low Risk", color: "text-success", bg: "bg-success/10", border: "border-success/20" });
-        } else if (riskLvl === "medium") {
-          setRiskLevel({ label: "Moderate Risk", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" });
-        } else {
-          setRiskLevel({ label: "High Risk", color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20" });
-        }
-
-        setCategoriesAnalysis(catAnalysis);
-      } else {
-        // Fallback if no assessment exists - show placeholder
-        const radar = [
-          { category: "Stop-Loss", score: 50, fullMark: 100 },
-          { category: "After Profits", score: 50, fullMark: 100 },
-          { category: "Risk Planning", score: 50, fullMark: 100 },
-          { category: "Impulse Control", score: 50, fullMark: 100 },
-          { category: "Rule Consistency", score: 50, fullMark: 100 },
-        ];
-        setRadarData(radar);
-        setOverallScore(50);
-        setRiskLevel({ label: "Take Assessment", color: "text-muted-foreground", bg: "bg-muted/50", border: "border-border" });
-      }
-
-      // Fetch personalized rules
-      const { data: rulesData } = await supabase
-        .from("personalized_rules")
-        .select("rules")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (rulesData?.rules && Array.isArray(rulesData.rules)) {
-        setPersonalizedRules(
-          rulesData.rules.map((r: { category?: string; rule?: string; description?: string; severity?: string }) => ({
-            rule: r.rule || "",
-            detail: r.description || r.rule || "",
-            category: r.category || "General",
-            severity: r.severity || "info",
-          }))
-        );
-      } else {
-        // Default rules if none found
-        setPersonalizedRules([
-          { rule: "Maximum 1% risk per trade", detail: "Never risk more than 1% of your trading capital on a single trade.", category: "Capital", severity: "critical" },
-          { rule: "Daily loss limit: ₹2,000", detail: "Stop trading for the day once you hit this limit. No exceptions.", category: "Capital", severity: "critical" },
-          { rule: "Mandatory stop-loss on every trade", detail: "Place your SL before entry. No mental stop-losses.", category: "Execution", severity: "critical" },
-          { rule: "10-minute cooldown after a loss", detail: "Wait before re-entering to avoid revenge trading.", category: "Psychology", severity: "warning" },
-          { rule: "Maximum 5 trades per day", detail: "Limit yourself to high-conviction setups only.", category: "Discipline", severity: "warning" },
-          { rule: "Journal every trade with emotional state", detail: "Log every trade with how you felt during entry and exit.", category: "Discipline", severity: "info" },
-        ]);
-      }
-
-      setLoading(false);
-    }
-    fetchReport();
-  }, [user?.id, authLoading]);
+  // Default personalized rules
+  const personalizedRules = [
+    { rule: "Maximum 1% risk per trade", detail: "Never risk more than 1% of your trading capital on a single trade.", category: "Capital", severity: "critical" },
+    { rule: "Daily loss limit: ₹2,000", detail: "Stop trading for the day once you hit this limit. No exceptions.", category: "Capital", severity: "critical" },
+    { rule: "Mandatory stop-loss on every trade", detail: "Place your SL before entry. No mental stop-losses.", category: "Execution", severity: "critical" },
+    { rule: "10-minute cooldown after a loss", detail: "Wait before re-entering to avoid revenge trading.", category: "Psychology", severity: "warning" },
+    { rule: "Maximum 5 trades per day", detail: "Limit yourself to high-conviction setups only.", category: "Discipline", severity: "warning" },
+    { rule: "Journal every trade with emotional state", detail: "Log every trade with how you felt during entry and exit.", category: "Discipline", severity: "info" },
+  ];
 
   if (loading) {
     return (
@@ -220,7 +153,7 @@ export default function RiskReportPage() {
 
           <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category Scores</h4>
-            {radarData.map((item) => (
+            {radarData.map((item: { category: string; score: number; fullMark: number }) => (
               <div key={item.category} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">{item.category}</span>

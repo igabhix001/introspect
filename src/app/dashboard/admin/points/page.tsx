@@ -1,76 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Gift,
   Search,
   Users,
-  Award,
   TrendingDown,
   TrendingUp,
-  AlertTriangle,
   Loader2,
-  Filter,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth/auth-context";
+
+interface PointTransaction {
+  id: string;
+  points: number;
+  action: string;
+  description: string;
+  action_type: string;
+  created_at: string;
+  profiles?: { full_name: string; email: string };
+}
 
 export default function AdminPointsPage() {
-  const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [totals, setTotals] = useState({ issued: 0, redeemed: 0, members: 0 });
+  const { isAdmin, loading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const supabase = createClient();
-        
-        // In a real app, an admin route would fetch via a protected API 
-        // /api/admin/points to bypass RLS, or RLS would allow admins to read.
-        // Assuming RLS allows admins to read all loyalty_points and profiles.
-        
-        const { data: usersCount } = await supabase
-          .from("profiles")
-          .select("id", { count: "exact" });
-          
-        const { data: pointsData } = await supabase
-          .from("loyalty_points")
-          .select(`
-            *,
-            profiles(full_name, email)
-          `)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (pointsData) {
-          setTransactions(pointsData);
-          
-          let issued = 0;
-          let redeemed = 0;
-          pointsData.forEach((tx) => {
-            if (tx.points > 0) issued += tx.points;
-            else redeemed += Math.abs(tx.points);
-          });
-          
-          setTotals({
-            issued: issued * 10, // Mock multiplier for global view
-            redeemed: redeemed * 5,
-            members: usersCount?.length || 0,
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching admin points data:", err);
-      } finally {
-        setLoading(false);
+  const { data, isLoading } = useQuery({
+    queryKey: ["adminPoints"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/points");
+      if (!res.ok) {
+        // Fallback to empty data if API doesn't exist yet
+        return { transactions: [], totals: { issued: 0, redeemed: 0, members: 0 } };
       }
-    }
+      return res.json();
+    },
+    enabled: isAdmin,
+    staleTime: 30 * 1000,
+  });
 
-    fetchData();
-  }, []);
+  const transactions: PointTransaction[] = data?.transactions || [];
+  const totals = data?.totals || { issued: 0, redeemed: 0, members: 0 };
+  const loading = authLoading || (isLoading && !data);
 
-  const filteredTransactions = transactions.filter((tx) => 
+  const filteredTransactions = transactions.filter((tx: PointTransaction) => 
     tx.profiles?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.action?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -157,7 +133,7 @@ export default function AdminPointsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {filteredTransactions.map((tx) => (
+              {filteredTransactions.map((tx: PointTransaction) => (
                 <tr key={tx.id} className="hover:bg-muted/10 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">

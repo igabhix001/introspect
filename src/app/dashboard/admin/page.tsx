@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -14,12 +13,12 @@ import {
   ChevronRight,
   ArrowUpRight,
   Shield,
-  BarChart3,
   Wallet,
   Loader2,
   ShieldX,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useAdminStatsQuery } from "@/lib/hooks/use-queries";
 
 interface AdminStats {
   totalUsers: number;
@@ -67,29 +66,12 @@ const adminNavItems = [
 
 export default function AdminPage() {
   const { isAdmin, loading: authLoading } = useAuth();
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading: statsLoading } = useAdminStatsQuery();
+  
+  const loading = authLoading || (statsLoading && !stats);
 
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const res = await fetch("/api/admin/stats");
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch admin stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (isAdmin) fetchStats();
-    else setLoading(false);
-  }, [isAdmin]);
-
-  // Show loading spinner while auth is loading
-  if (authLoading) {
+  // Show loading spinner only on initial load
+  if (authLoading && !stats) {
     return (
       <div className="flex items-center justify-center py-32">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -254,9 +236,9 @@ export default function AdminPage() {
               <div key={i} className="h-12 bg-muted rounded-xl animate-pulse" />
             ))}
           </div>
-        ) : stats?.recentUsers?.length ? (
+        ) : (stats as AdminStats)?.recentUsers?.length ? (
           <div className="space-y-2">
-            {stats.recentUsers.map((user) => (
+            {(stats as AdminStats).recentUsers.map((user: AdminStats["recentUsers"][0]) => (
               <div
                 key={user.id}
                 className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors"

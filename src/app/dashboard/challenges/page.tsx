@@ -106,7 +106,8 @@ export default function ChallengesPage() {
   const [exporting, setExporting] = useState(false);
   const supabase = createClient();
   
-  const loading = authLoading || (challengesLoading && challenges.length === 0);
+  // Only show loading on initial load, not during navigation (when we have cached data)
+  const loading = (authLoading && !challengesData) || (challengesLoading && !challengesData);
 
   const startChallenge = async (template: typeof challengeTemplates[0]) => {
     if (!user) return;

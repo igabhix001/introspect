@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     const tradeData = {
       ...validatedData,
       user_id: user.id,
+      date: new Date().toISOString().split("T")[0], // Ensure date is always set
       pnl: Math.round(pnl * 100) / 100,
       risk_pct: Math.round(riskPct * 100) / 100,
       sl_followed: slFollowed,
