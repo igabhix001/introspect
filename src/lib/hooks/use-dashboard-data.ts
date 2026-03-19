@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -18,6 +18,103 @@ function getCachedData<T>(key: string): T | null {
 
 function setCachedData<T>(key: string, data: T): void {
   dashboardCache.set(key, { data, timestamp: Date.now() });
+}
+
+/**
+ * Production-grade discipline score calculation
+ * Matches the daily-report API logic for consistency
+ */
+interface TradeForScore {
+  followed_plan: boolean | null;
+  sl_followed: boolean | null;
+  stop_loss: number | null;
+  risk_pct: number | null;
+  mistakes: string[] | null;
+  emotion: string | null;
+}
+
+function calculateDisciplineFromTrades(trades: TradeForScore[]): {
+  score: number;
+  rulesFollowed: number;
+  totalRules: number;
+  ruleDetails: Array<{ text: string; followed: boolean }>;
+} {
+  // Core discipline rules (5 rules)
+  const rules = {
+    stopLossUsed: true,
+    riskManaged: true,
+    planFollowed: true,
+    noOvertrading: true,
+    emotionalControl: true,
+  };
+
+  if (trades.length === 0) {
+    return {
+      score: 0,
+      rulesFollowed: 0,
+      totalRules: 5,
+      ruleDetails: [
+        { text: "Stop-loss on every trade", followed: false },
+        { text: "Risk ≤ 2% per trade", followed: false },
+        { text: "Follow trading plan", followed: false },
+        { text: "Max 5 trades per day", followed: true },
+        { text: "No emotional trading", followed: true },
+      ],
+    };
+  }
+
+  // Rule 1: Check if ALL trades have stop-loss
+  const tradesWithoutSL = trades.filter(t => !t.stop_loss);
+  if (tradesWithoutSL.length > 0) {
+    rules.stopLossUsed = false;
+  }
+
+  // Rule 2: Check if ALL trades have risk ≤ 2%
+  const overRiskTrades = trades.filter(t => (t.risk_pct || 0) > 2);
+  if (overRiskTrades.length > 0) {
+    rules.riskManaged = false;
+  }
+
+  // Rule 3: Check if ALL trades followed plan
+  const planNotFollowed = trades.filter(t => t.followed_plan === false);
+  if (planNotFollowed.length > 0) {
+    rules.planFollowed = false;
+  }
+
+  // Rule 4: Check overtrading (max 5 trades)
+  if (trades.length > 5) {
+    rules.noOvertrading = false;
+  }
+
+  // Rule 5: Check emotional trading
+  const emotionalTrades = trades.filter(t => {
+    const mistakes = t.mistakes || [];
+    const emotion = (t.emotion || "").toLowerCase();
+    return mistakes.includes("revenge_trade") || 
+           emotion === "frustrated" || 
+           emotion === "angry" ||
+           emotion === "fearful";
+  });
+  if (emotionalTrades.length > 0) {
+    rules.emotionalControl = false;
+  }
+
+  const rulesFollowed = Object.values(rules).filter(Boolean).length;
+  const totalRules = Object.keys(rules).length;
+  const score = Math.round((rulesFollowed / totalRules) * 100);
+
+  return {
+    score,
+    rulesFollowed,
+    totalRules,
+    ruleDetails: [
+      { text: "Stop-loss on every trade", followed: rules.stopLossUsed },
+      { text: "Risk ≤ 2% per trade", followed: rules.riskManaged },
+      { text: "Follow trading plan", followed: rules.planFollowed },
+      { text: "Max 5 trades per day", followed: rules.noOvertrading },
+      { text: "No emotional trading", followed: rules.emotionalControl },
+    ],
+  };
 }
 
 /* ─── Dashboard Overview Data ─── */
@@ -117,20 +214,10 @@ export function useDashboardData() {
         (sum: number, t: { pnl: number | null }) => sum + (t.pnl || 0),
         0
       );
-      const rulesFollowed = todayTrades.filter(
-        (t: { followed_plan: boolean | null }) => t.followed_plan
-      ).length;
 
-      const rules = assessment?.personalized_rules as string[] | null;
-      const tradingRules = (rules || [
-        "Stop-loss on every trade",
-        "Risk ≤ 1% per trade",
-        "No revenge trading",
-        "Max 3 trades per day",
-      ]).map((text: string) => ({
-        text,
-        followed: Math.random() > 0.3, // Will be replaced with actual tracking
-      }));
+      // Calculate discipline score from actual trades (production-grade)
+      const disciplineResult = calculateDisciplineFromTrades(todayTrades as TradeForScore[]);
+      const tradingRules = disciplineResult.ruleDetails;
 
       const disciplineTrend = (reports || [])
         .reverse()
@@ -143,24 +230,16 @@ export function useDashboardData() {
           })
         );
 
-      const maxTrades = (assessment?.personalized_rules as string[])?.find(
-        (r: string) => r.toLowerCase().includes("max trades")
-      )
-        ? parseInt(
-            ((assessment?.personalized_rules as string[])
-              ?.find((r: string) => r.toLowerCase().includes("max trades"))
-              ?.match(/\d+/) || ["3"])[0]
-          )
-        : 3;
+      const maxTrades = 5; // Standard max trades per day
 
       const dashboardData = {
-        disciplineScore: assessment?.discipline_score || 0,
+        disciplineScore: disciplineResult.score, // Use calculated score from trades
         todayTrades: todayTrades.length,
         maxTrades,
         todayPnl,
         capitalUsed: assessment?.capital || 100000,
-        rulesFollowed,
-        totalRules: tradingRules.length,
+        rulesFollowed: disciplineResult.rulesFollowed,
+        totalRules: disciplineResult.totalRules,
         currentStreak: activeChallenge?.current_day || 0,
         recentTrades: todayTrades.slice(0, 5).map((t: Record<string, unknown>) => ({
           id: t.id as string,

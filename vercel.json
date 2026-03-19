@@ -19,6 +19,14 @@
     {
       "path": "/api/cron/daily-summary",
       "schedule": "32 18 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-journal-points",
+      "schedule": "0 0 * * 1"
+    },
+    {
+      "path": "/api/cron/referral-milestones",
+      "schedule": "0 1 * * *"
     }
   ]
 }

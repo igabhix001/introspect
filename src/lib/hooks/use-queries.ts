@@ -14,6 +14,75 @@ import { useAuth } from "@/lib/auth/auth-context";
  * - Optimistic updates support
  */
 
+// Production-grade discipline calculation (matches daily-report API)
+interface TradeForScore {
+  followed_plan: boolean | null;
+  stop_loss: number | null;
+  risk_pct: number | null;
+  mistakes: string[] | null;
+  emotion: string | null;
+}
+
+function calculateDisciplineFromTrades(trades: TradeForScore[]): {
+  score: number;
+  rulesFollowed: number;
+  totalRules: number;
+  ruleDetails: Array<{ text: string; followed: boolean }>;
+} {
+  const rules = {
+    stopLossUsed: true,
+    riskManaged: true,
+    planFollowed: true,
+    noOvertrading: true,
+    emotionalControl: true,
+  };
+
+  if (trades.length === 0) {
+    return {
+      score: 0,
+      rulesFollowed: 0,
+      totalRules: 5,
+      ruleDetails: [
+        { text: "Stop-loss on every trade", followed: false },
+        { text: "Risk ≤ 2% per trade", followed: false },
+        { text: "Follow trading plan", followed: false },
+        { text: "Max 5 trades per day", followed: true },
+        { text: "No emotional trading", followed: true },
+      ],
+    };
+  }
+
+  if (trades.filter(t => !t.stop_loss).length > 0) rules.stopLossUsed = false;
+  if (trades.filter(t => (t.risk_pct || 0) > 2).length > 0) rules.riskManaged = false;
+  if (trades.filter(t => t.followed_plan === false).length > 0) rules.planFollowed = false;
+  if (trades.length > 5) rules.noOvertrading = false;
+  
+  const emotionalTrades = trades.filter(t => {
+    const mistakes = t.mistakes || [];
+    const emotion = (t.emotion || "").toLowerCase();
+    return mistakes.includes("revenge_trade") || 
+           emotion === "frustrated" || emotion === "angry" || emotion === "fearful";
+  });
+  if (emotionalTrades.length > 0) rules.emotionalControl = false;
+
+  const rulesFollowed = Object.values(rules).filter(Boolean).length;
+  const totalRules = 5;
+  const score = Math.round((rulesFollowed / totalRules) * 100);
+
+  return {
+    score,
+    rulesFollowed,
+    totalRules,
+    ruleDetails: [
+      { text: "Stop-loss on every trade", followed: rules.stopLossUsed },
+      { text: "Risk ≤ 2% per trade", followed: rules.riskManaged },
+      { text: "Follow trading plan", followed: rules.planFollowed },
+      { text: "Max 5 trades per day", followed: rules.noOvertrading },
+      { text: "No emotional trading", followed: rules.emotionalControl },
+    ],
+  };
+}
+
 // ─── Query Keys (centralized for cache invalidation) ───
 export const queryKeys = {
   dashboard: (userId: string) => ["dashboard", userId] as const,
@@ -74,13 +143,9 @@ export function useDashboardQuery() {
       const reports = reportsRes.data || [];
       const activeChallenge = challengeRes.data;
 
-      // Calculate metrics
+      // Calculate discipline from actual trades (production-grade)
+      const disciplineResult = calculateDisciplineFromTrades(trades as TradeForScore[]);
       const todayPnl = trades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
-      const tradingRules = (assessment?.personalized_rules as string[] || []).map((rule: string) => ({
-        text: rule,
-        followed: trades.every((t: { followed_plan?: boolean }) => t.followed_plan !== false),
-      }));
-      const rulesFollowed = tradingRules.filter((r: { followed: boolean }) => r.followed).length;
 
       const disciplineTrend = reports
         .slice()
@@ -90,24 +155,14 @@ export function useDashboardQuery() {
           score: r.discipline_score || 0,
         }));
 
-      const maxTrades = (assessment?.personalized_rules as string[])?.find(
-        (r: string) => r.toLowerCase().includes("max trades")
-      )
-        ? parseInt(
-            ((assessment?.personalized_rules as string[])
-              ?.find((r: string) => r.toLowerCase().includes("max trades"))
-              ?.match(/\d+/) || ["3"])[0]
-          )
-        : 3;
-
       return {
-        disciplineScore: assessment?.discipline_score || 0,
+        disciplineScore: disciplineResult.score, // Use calculated score from trades
         todayTrades: trades.length,
-        maxTrades,
+        maxTrades: 5,
         todayPnl,
         capitalUsed: assessment?.capital || 100000,
-        rulesFollowed,
-        totalRules: tradingRules.length,
+        rulesFollowed: disciplineResult.rulesFollowed,
+        totalRules: disciplineResult.totalRules,
         currentStreak: activeChallenge?.current_day || 0,
         recentTrades: trades.slice(0, 5).map((t: Record<string, unknown>) => ({
           id: t.id as string,
@@ -127,7 +182,7 @@ export function useDashboardQuery() {
               { day: "Wed", score: 0 },
               { day: "Today", score: 0 },
             ],
-        tradingRules,
+        tradingRules: disciplineResult.ruleDetails,
       };
     },
     enabled: !authLoading && !!user?.id,

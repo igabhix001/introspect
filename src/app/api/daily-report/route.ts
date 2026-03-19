@@ -1,6 +1,93 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Production-grade discipline score calculation
+ * Based on actual trade data and rule adherence
+ */
+interface Trade {
+  id: string;
+  followed_plan: boolean | null;
+  sl_followed: boolean | null;
+  stop_loss: number | null;
+  risk_pct: number | null;
+  pnl: number | null;
+  mistakes: string[] | null;
+  emotion: string | null;
+  quantity: number | null;
+}
+
+function calculateDisciplineScore(trades: Trade[], capital: number): {
+  score: number;
+  rulesFollowed: number;
+  totalRules: number;
+  violations: string[];
+  details: Record<string, boolean>;
+} {
+  // Core discipline rules (5 rules)
+  const rules = {
+    stopLossUsed: true,        // Rule 1: Stop-loss on every trade
+    riskManaged: true,         // Rule 2: Risk ≤ 2% per trade
+    planFollowed: true,        // Rule 3: Trading plan followed
+    noOvertrading: true,       // Rule 4: Max 5 trades per day
+    emotionalControl: true,    // Rule 5: No revenge/emotional trading
+  };
+
+  const violations: string[] = [];
+
+  if (trades.length === 0) {
+    return { score: 0, rulesFollowed: 0, totalRules: 5, violations: [], details: rules };
+  }
+
+  // Rule 1: Check if ALL trades have stop-loss
+  const tradesWithoutSL = trades.filter(t => !t.stop_loss);
+  if (tradesWithoutSL.length > 0) {
+    rules.stopLossUsed = false;
+    violations.push(`${tradesWithoutSL.length} trade(s) without stop-loss`);
+  }
+
+  // Rule 2: Check if ALL trades have risk ≤ 2%
+  const overRiskTrades = trades.filter(t => (t.risk_pct || 0) > 2);
+  if (overRiskTrades.length > 0) {
+    rules.riskManaged = false;
+    violations.push(`${overRiskTrades.length} trade(s) exceeded 2% risk limit`);
+  }
+
+  // Rule 3: Check if ALL trades followed plan
+  const planNotFollowed = trades.filter(t => t.followed_plan === false);
+  if (planNotFollowed.length > 0) {
+    rules.planFollowed = false;
+    violations.push(`${planNotFollowed.length} trade(s) did not follow trading plan`);
+  }
+
+  // Rule 4: Check overtrading (max 5 trades)
+  if (trades.length > 5) {
+    rules.noOvertrading = false;
+    violations.push(`Overtrading: ${trades.length} trades (max 5 recommended)`);
+  }
+
+  // Rule 5: Check emotional trading (revenge trades, frustrated emotion)
+  const emotionalTrades = trades.filter(t => {
+    const mistakes = t.mistakes || [];
+    const emotion = (t.emotion || "").toLowerCase();
+    return mistakes.includes("revenge_trade") || 
+           emotion === "frustrated" || 
+           emotion === "angry" ||
+           emotion === "fearful";
+  });
+  if (emotionalTrades.length > 0) {
+    rules.emotionalControl = false;
+    violations.push(`${emotionalTrades.length} trade(s) showed emotional trading patterns`);
+  }
+
+  // Calculate score
+  const rulesFollowed = Object.values(rules).filter(Boolean).length;
+  const totalRules = Object.keys(rules).length;
+  const score = Math.round((rulesFollowed / totalRules) * 100);
+
+  return { score, rulesFollowed, totalRules, violations, details: rules };
+}
+
 // POST: Generate end-of-day report
 export async function POST(request: NextRequest) {
   try {
@@ -18,38 +105,6 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .eq("date", reportDate);
 
-    // Fetch personalized rules
-    const { data: rulesData } = await supabase
-      .from("personalized_rules")
-      .select("rules")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    const totalRules = rulesData?.rules?.length || 6;
-    const tradesList = trades || [];
-    const tradesTaken = tradesList.length;
-    const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
-
-    // Analyze mistakes
-    const allMistakes = tradesList.flatMap((t) => t.mistakes || []);
-    const mistakesCount = allMistakes.length;
-    const slFollowed = tradesList.filter((t) => t.sl_followed).length;
-    const planFollowed = tradesList.filter((t) => t.followed_plan).length;
-
-    // Calculate rules followed (simplified)
-    let rulesFollowed = totalRules;
-    if (allMistakes.includes("no_stop_loss")) rulesFollowed--;
-    if (allMistakes.includes("over_risk")) rulesFollowed--;
-    if (allMistakes.includes("plan_not_followed")) rulesFollowed--;
-    if (tradesTaken > 4) rulesFollowed--; // overtrading
-    rulesFollowed = Math.max(0, rulesFollowed);
-
-    const disciplineScore = totalRules > 0
-      ? Math.round((rulesFollowed / totalRules) * 100)
-      : 0;
-
     // Get profile for capital
     const { data: profile } = await supabase
       .from("profiles")
@@ -57,7 +112,22 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const updatedCapital = (profile?.trading_capital || 100000) + totalPnl;
+    const capital = profile?.trading_capital || 100000;
+    const tradesList = (trades || []) as Trade[];
+    const tradesTaken = tradesList.length;
+    const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+    // Calculate discipline using production-grade logic
+    const disciplineResult = calculateDisciplineScore(tradesList, capital);
+    const { score: disciplineScore, rulesFollowed, totalRules, violations } = disciplineResult;
+
+    // Analyze mistakes from trades
+    const allMistakes = tradesList.flatMap((t) => t.mistakes || []);
+    const mistakesCount = allMistakes.length;
+    const slFollowed = tradesList.filter((t) => t.sl_followed).length;
+    const planFollowed = tradesList.filter((t) => t.followed_plan).length;
+
+    const updatedCapital = capital + totalPnl;
 
     // Generate feedback
     const positive: string[] = [];
