@@ -68,10 +68,10 @@ export default function AdminPage() {
   const { isAdmin, loading: authLoading } = useAuth();
   const { data: stats, isLoading: statsLoading } = useAdminStatsQuery();
   
-  const loading = authLoading || (statsLoading && !stats);
+  const loading = statsLoading && !stats;
 
   // Show loading spinner only on initial load
-  if (authLoading && !stats) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

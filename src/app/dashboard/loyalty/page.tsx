@@ -50,8 +50,7 @@ export default function LoyaltyPage() {
   const tier = loyaltyData?.tier || "Bronze";
   const transactions = loyaltyData?.transactions || [];
 
-  // Only show loading on initial load, not during navigation (when we have cached data)
-  const loading = (authLoading && !loyaltyData) || (isLoading && !loyaltyData);
+  const loading = isLoading && !loyaltyData;
 
   if (loading) {
     return (

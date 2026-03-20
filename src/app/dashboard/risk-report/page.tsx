@@ -47,7 +47,7 @@ export default function RiskReportPage() {
   const { loading: authLoading } = useAuth();
   const { data: assessment, isLoading: assessmentLoading } = useAssessmentQuery();
 
-  const loading = authLoading || (assessmentLoading && !assessment);
+  const loading = assessmentLoading && !assessment;
 
   // Process assessment data
   const categoriesAnalysis = assessment?.categories_analysis || null;

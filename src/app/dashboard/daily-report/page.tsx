@@ -47,7 +47,7 @@ export default function DailyReportPage() {
 
   const report = reportData as DailyReport | null;
   const recentReports = (recentReportsData || []) as DailyReport[];
-  const loading = authLoading || reportLoading;
+  const loading = reportLoading && !report;
 
   const generateReport = async () => {
     setGenerating(true);

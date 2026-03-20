@@ -2,90 +2,184 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Production-grade discipline score calculation
- * Based on actual trade data and rule adherence
+ * INTROSPECT™ Behavioral Audit Engine — 4-Pillar Discipline Score
+ *
+ * Per client spec "DISCIPLINE SCORE FROM JOURNAL.md":
+ *   Pillar 1: Capital Guardrail   — daily P&L breaches daily_limit → -100 (score=0)
+ *   Pillar 2: Bullet Precision    — initial_risk > unit_risk → -20/trade (cap -40)
+ *   Pillar 3: The "Stop" Rule     — 3rd trade after 2 consecutive losses → -40
+ *   Pillar 4: Realized R:R        — avg realized R:R < 1.5 → -10
+ *
+ *   Formula: Discipline = max(0, 100 - (P1 + min(P2*n, 40) + P3 + P4))
  */
+
 interface Trade {
   id: string;
+  stock?: string;
+  entry_price: number;
+  exit_price: number | null;
+  stop_loss: number | null;
+  quantity: number;
+  pnl: number | null;
+  direction?: string;
   followed_plan: boolean | null;
   sl_followed: boolean | null;
-  stop_loss: number | null;
   risk_pct: number | null;
-  pnl: number | null;
   mistakes: string[] | null;
-  emotion: string | null;
-  quantity: number | null;
+  emotion_before?: string | null;
 }
 
-function calculateDisciplineScore(trades: Trade[], capital: number): {
+interface PillarResult {
+  penalty: number;
+  breached: boolean;
+  recommendation: string;
+}
+
+interface AuditResult {
   score: number;
-  rulesFollowed: number;
-  totalRules: number;
-  violations: string[];
-  details: Record<string, boolean>;
-} {
-  // Core discipline rules (5 rules)
-  const rules = {
-    stopLossUsed: true,        // Rule 1: Stop-loss on every trade
-    riskManaged: true,         // Rule 2: Risk ≤ 2% per trade
-    planFollowed: true,        // Rule 3: Trading plan followed
-    noOvertrading: true,       // Rule 4: Max 5 trades per day
-    emotionalControl: true,    // Rule 5: No revenge/emotional trading
+  pillar1: PillarResult;
+  pillar2: PillarResult & { violatingTrades: string[] };
+  pillar3: PillarResult;
+  pillar4: PillarResult & { avgRR: number };
+  mistakeTags: Array<{ stock: string; pnl: number; tag: string }>;
+  recommendations: string[];
+}
+
+function runBehavioralAudit(
+  trades: Trade[],
+  capital: number,
+  riskPc: number,       // e.g. 1 for 1%
+  plannedTrades: number // e.g. 40 "bullets"
+): AuditResult {
+  const dailyLimit = capital * (riskPc / 100);           // e.g. ₹1,000
+  const unitRisk = dailyLimit / (plannedTrades || 40);   // e.g. ₹25
+
+  const mistakeTags: AuditResult["mistakeTags"] = [];
+
+  // ── Pillar 1: Capital Guardrail ──
+  const totalDayPnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
+  const p1Breached = totalDayPnl <= -dailyLimit && trades.length > 0;
+  const p1: PillarResult = {
+    penalty: p1Breached ? 100 : 0,
+    breached: p1Breached,
+    recommendation: p1Breached
+      ? `Total Loss Limit Breached. You traded past your survival point. Stop immediately tomorrow if you hit ₹${Math.round(dailyLimit).toLocaleString("en-IN")}.`
+      : "",
   };
 
-  const violations: string[] = [];
+  // ── Pillar 2: Bullet Precision (Position Sizing) ──
+  const p2Violators: string[] = [];
+  let p2Count = 0;
+  for (const t of trades) {
+    const sl = t.stop_loss || 0;
+    const entry = t.entry_price || 0;
+    const qty = t.quantity || 1;
+    const initialRisk = Math.abs(entry - sl) * qty;
 
-  if (trades.length === 0) {
-    return { score: 0, rulesFollowed: 0, totalRules: 5, violations: [], details: rules };
+    if (sl > 0 && initialRisk > unitRisk) {
+      p2Count++;
+      const overPct = Math.round(((initialRisk - unitRisk) / unitRisk) * 100);
+      p2Violators.push(t.stock || `Trade ${t.id?.slice(0, 6)}`);
+      mistakeTags.push({
+        stock: t.stock || "Unknown",
+        pnl: t.pnl || 0,
+        tag: `🔴 SIZE VIOLATION (Risked ₹${Math.round(initialRisk)} vs allowed ₹${Math.round(unitRisk)}, ${overPct}% over)`,
+      });
+    } else if (!t.stop_loss) {
+      mistakeTags.push({
+        stock: t.stock || "Unknown",
+        pnl: t.pnl || 0,
+        tag: "🔴 NO STOP-LOSS",
+      });
+    } else {
+      mistakeTags.push({
+        stock: t.stock || "Unknown",
+        pnl: t.pnl || 0,
+        tag: "✅ Clean",
+      });
+    }
   }
+  const p2Penalty = Math.min(p2Count * 20, 40); // Capped at -40
+  const p2: PillarResult & { violatingTrades: string[] } = {
+    penalty: p2Penalty,
+    breached: p2Count > 0,
+    violatingTrades: p2Violators,
+    recommendation: p2Count > 0
+      ? `Size Violation on ${p2Violators.join(", ")}. Your plan allows ₹${Math.round(unitRisk)} per bullet. Reduce quantity.`
+      : "",
+  };
 
-  // Rule 1: Check if ALL trades have stop-loss
-  const tradesWithoutSL = trades.filter(t => !t.stop_loss);
-  if (tradesWithoutSL.length > 0) {
-    rules.stopLossUsed = false;
-    violations.push(`${tradesWithoutSL.length} trade(s) without stop-loss`);
+  // ── Pillar 3: The "Stop" Rule (Revenge Trading) ──
+  let p3Breached = false;
+  let revengeTrades = 0;
+  for (let i = 2; i < trades.length; i++) {
+    const prev1Pnl = trades[i - 1]?.pnl ?? 0;
+    const prev2Pnl = trades[i - 2]?.pnl ?? 0;
+    if (prev1Pnl < 0 && prev2Pnl < 0) {
+      p3Breached = true;
+      revengeTrades = trades.length - i;
+      // Mark these trades
+      mistakeTags[i] = {
+        ...mistakeTags[i],
+        tag: `🔴 REVENGE TRADE (after 2 consecutive losses)`,
+      };
+      break; // Penalty applies once
+    }
   }
+  const p3: PillarResult = {
+    penalty: p3Breached ? 40 : 0,
+    breached: p3Breached,
+    recommendation: p3Breached
+      ? `Revenge Trading Detected. You took ${revengeTrades} trade(s) after 2 consecutive losses. Walk away earlier.`
+      : "",
+  };
 
-  // Rule 2: Check if ALL trades have risk ≤ 2%
-  const overRiskTrades = trades.filter(t => (t.risk_pct || 0) > 2);
-  if (overRiskTrades.length > 0) {
-    rules.riskManaged = false;
-    violations.push(`${overRiskTrades.length} trade(s) exceeded 2% risk limit`);
+  // ── Pillar 4: Realized R:R ──
+  let totalRealizedRR = 0;
+  let rrCount = 0;
+  for (const t of trades) {
+    const sl = t.stop_loss || 0;
+    const entry = t.entry_price || 0;
+    const initialRisk = Math.abs(entry - sl) * (t.quantity || 1);
+    if (initialRisk > 0 && sl > 0) {
+      const realizedRR = Math.abs(t.pnl || 0) / initialRisk;
+      totalRealizedRR += realizedRR;
+      rrCount++;
+    }
   }
+  const avgRR = rrCount > 0 ? totalRealizedRR / rrCount : 0;
+  const p4Breached = rrCount > 0 && avgRR < 1.5;
+  const p4: PillarResult & { avgRR: number } = {
+    penalty: p4Breached ? 10 : 0,
+    breached: p4Breached,
+    avgRR: Math.round(avgRR * 100) / 100,
+    recommendation: p4Breached
+      ? `Poor R:R (${avgRR.toFixed(2)}). You are scalping for pennies but risking dollars. Hold winners longer to reach 1:1.5 minimum.`
+      : "",
+  };
 
-  // Rule 3: Check if ALL trades followed plan
-  const planNotFollowed = trades.filter(t => t.followed_plan === false);
-  if (planNotFollowed.length > 0) {
-    rules.planFollowed = false;
-    violations.push(`${planNotFollowed.length} trade(s) did not follow trading plan`);
-  }
+  // ── Master Formula ──
+  // If Pillar 1 breached, score = 0 (per spec: "-100 Points (Score = 0)")
+  const rawScore = p1Breached
+    ? 0
+    : Math.max(0, 100 - (p1.penalty + p2Penalty + p3.penalty + p4.penalty));
 
-  // Rule 4: Check overtrading (max 5 trades)
-  if (trades.length > 5) {
-    rules.noOvertrading = false;
-    violations.push(`Overtrading: ${trades.length} trades (max 5 recommended)`);
-  }
+  // Build top 3 recommendations
+  const recommendations: string[] = [];
+  if (p2.recommendation) recommendations.push(p2.recommendation);
+  if (p3.recommendation) recommendations.push(p3.recommendation);
+  if (p4.recommendation) recommendations.push(p4.recommendation);
+  if (p1.recommendation) recommendations.unshift(p1.recommendation); // Most critical first
 
-  // Rule 5: Check emotional trading (revenge trades, frustrated emotion)
-  const emotionalTrades = trades.filter(t => {
-    const mistakes = t.mistakes || [];
-    const emotion = (t.emotion || "").toLowerCase();
-    return mistakes.includes("revenge_trade") || 
-           emotion === "frustrated" || 
-           emotion === "angry" ||
-           emotion === "fearful";
-  });
-  if (emotionalTrades.length > 0) {
-    rules.emotionalControl = false;
-    violations.push(`${emotionalTrades.length} trade(s) showed emotional trading patterns`);
-  }
-
-  // Calculate score
-  const rulesFollowed = Object.values(rules).filter(Boolean).length;
-  const totalRules = Object.keys(rules).length;
-  const score = Math.round((rulesFollowed / totalRules) * 100);
-
-  return { score, rulesFollowed, totalRules, violations, details: rules };
+  return {
+    score: rawScore,
+    pillar1: p1,
+    pillar2: p2,
+    pillar3: p3,
+    pillar4: p4,
+    mistakeTags,
+    recommendations: recommendations.slice(0, 3),
+  };
 }
 
 // POST: Generate end-of-day report
@@ -98,14 +192,15 @@ export async function POST(request: NextRequest) {
     const { date } = await request.json();
     const reportDate = date || new Date().toISOString().split("T")[0];
 
-    // Fetch today's trades
+    // Fetch today's trades (ordered by created_at for Pillar 3 sequence analysis)
     const { data: trades } = await supabase
       .from("trades")
       .select("*")
       .eq("user_id", user.id)
-      .eq("date", reportDate);
+      .eq("date", reportDate)
+      .order("created_at", { ascending: true });
 
-    // Get profile for capital
+    // Get profile for capital and risk settings
     const { data: profile } = await supabase
       .from("profiles")
       .select("trading_capital")
@@ -113,59 +208,62 @@ export async function POST(request: NextRequest) {
       .single();
 
     const capital = profile?.trading_capital || 100000;
+    const riskPc = 1; // 1% standard — can be made configurable later
+    const plannedTrades = 40; // "Bullets" — can be made configurable later
+
     const tradesList = (trades || []) as Trade[];
     const tradesTaken = tradesList.length;
     const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
 
-    // Calculate discipline using production-grade logic
-    const disciplineResult = calculateDisciplineScore(tradesList, capital);
-    const { score: disciplineScore, rulesFollowed, totalRules, violations } = disciplineResult;
-
-    // Analyze mistakes from trades
-    const allMistakes = tradesList.flatMap((t) => t.mistakes || []);
-    const mistakesCount = allMistakes.length;
-    const slFollowed = tradesList.filter((t) => t.sl_followed).length;
-    const planFollowed = tradesList.filter((t) => t.followed_plan).length;
+    // Run the 4-Pillar Behavioral Audit
+    const audit = runBehavioralAudit(tradesList, capital, riskPc, plannedTrades);
 
     const updatedCapital = capital + totalPnl;
 
-    // Generate feedback
+    // Build feedback from audit results
     const positive: string[] = [];
     const negative: string[] = [];
-    const suggestions: string[] = [];
 
-    if (slFollowed === tradesTaken && tradesTaken > 0) positive.push("Stop-loss followed on every trade");
-    if (planFollowed === tradesTaken && tradesTaken > 0) positive.push("Trading plan followed consistently");
-    if (tradesTaken <= 3) positive.push("Good discipline — stayed within trade limits");
+    if (!audit.pillar1.breached && tradesTaken > 0) positive.push("Capital guardrail respected ✅");
+    if (!audit.pillar2.breached && tradesTaken > 0) positive.push("Position sizing within limits ✅");
+    if (!audit.pillar3.breached && tradesTaken > 0) positive.push("No revenge trading detected ✅");
+    if (!audit.pillar4.breached && tradesTaken > 0 && audit.pillar4.avgRR >= 1.5) positive.push(`Good R:R ratio (${audit.pillar4.avgRR.toFixed(1)}) ✅`);
     if (totalPnl > 0) positive.push(`Profitable day: +₹${totalPnl.toLocaleString("en-IN")}`);
 
-    if (allMistakes.includes("no_stop_loss")) negative.push("Traded without stop-loss — high risk");
-    if (allMistakes.includes("over_risk")) negative.push("Risk exceeded allowed limit on some trades");
-    if (allMistakes.includes("plan_not_followed")) negative.push("Trading plan was not followed");
-    if (tradesTaken > 4) negative.push("Overtrading detected — too many trades today");
-
-    if (allMistakes.includes("no_stop_loss")) suggestions.push("Tomorrow: Set stop-loss before entering every trade");
-    if (totalPnl < 0) suggestions.push("Review losing trades and identify patterns");
-    if (tradesTaken === 0) suggestions.push("No trades today. Review market conditions for tomorrow");
-    if (suggestions.length === 0) suggestions.push("Keep up the discipline! Maintain your current approach");
+    if (audit.pillar1.breached) negative.push("⚠️ Daily loss limit breached — critical violation");
+    if (audit.pillar2.breached) negative.push(`⚠️ Position size violation on ${audit.pillar2.violatingTrades.length} trade(s)`);
+    if (audit.pillar3.breached) negative.push("⚠️ Revenge trading detected after consecutive losses");
+    if (audit.pillar4.breached) negative.push(`⚠️ Average R:R too low (${audit.pillar4.avgRR.toFixed(2)} < 1.5)`);
 
     let encouragement = "";
-    if (disciplineScore >= 80) encouragement = "Outstanding discipline today! Keep this momentum going.";
-    else if (disciplineScore >= 60) encouragement = "Good effort today. Small improvements lead to big results.";
-    else if (disciplineScore >= 40) encouragement = "Room for improvement. Focus on your weakest rule tomorrow.";
-    else encouragement = "Tough day. Reset, review, and come back stronger tomorrow.";
+    if (audit.score >= 90) encouragement = "🏆 Elite Executor! Outstanding discipline today.";
+    else if (audit.score >= 70) encouragement = "✅ Professional grade discipline. Keep it up!";
+    else if (audit.score >= 50) encouragement = "⚠️ Room for improvement. Focus on the flagged pillars.";
+    else encouragement = "🔴 Systemic risk day. Reset, review your rules, and come back stronger.";
 
     const report = {
       user_id: user.id,
       date: reportDate,
       trades_taken: tradesTaken,
-      rules_followed: rulesFollowed,
-      total_rules: totalRules,
-      mistakes_count: mistakesCount,
-      discipline_score: disciplineScore,
+      rules_followed: [!audit.pillar1.breached, !audit.pillar2.breached, !audit.pillar3.breached, !audit.pillar4.breached].filter(Boolean).length,
+      total_rules: 4,
+      mistakes_count: audit.mistakeTags.filter(t => !t.tag.startsWith("✅")).length,
+      discipline_score: audit.score,
       total_pnl: totalPnl,
       updated_capital: Math.round(updatedCapital),
-      feedback: { positive, negative, suggestions, encouragement },
+      feedback: {
+        positive,
+        negative,
+        suggestions: audit.recommendations,
+        encouragement,
+        audit: {
+          pillar1: { name: "Capital Guardrail", penalty: audit.pillar1.penalty, breached: audit.pillar1.breached },
+          pillar2: { name: "Bullet Precision", penalty: audit.pillar2.penalty, breached: audit.pillar2.breached, trades: audit.pillar2.violatingTrades },
+          pillar3: { name: "Stop Rule", penalty: audit.pillar3.penalty, breached: audit.pillar3.breached },
+          pillar4: { name: "Realized R:R", penalty: audit.pillar4.penalty, breached: audit.pillar4.breached, avgRR: audit.pillar4.avgRR },
+        },
+        mistakeTags: audit.mistakeTags,
+      },
     };
 
     const { data, error } = await supabase

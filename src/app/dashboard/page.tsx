@@ -90,7 +90,7 @@ export default function DashboardPage() {
   const { user, profile, isAdmin, hasActiveSubscription, loading: authLoading } = useAuth();
 
   // Show loading only during initial load, not during background refetches
-  if (authLoading || (isLoading && !data)) {
+  if (isLoading && !data) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

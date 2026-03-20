@@ -1,114 +1,8 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useRef } from "react";
-
-/**
- * Production-grade pattern: Track if user was ever authenticated
- * This prevents queries from being disabled during client-side navigation
- * when auth context briefly shows loading=true
- */
-function useStableUserId() {
-  const { user, loading } = useAuth();
-  const lastKnownUserId = useRef<string | null>(null);
-  
-  // Once we have a user ID, remember it
-  if (user?.id) {
-    lastKnownUserId.current = user.id;
-  }
-  
-  // Clear on explicit sign out (user becomes null after loading completes)
-  if (!loading && !user) {
-    lastKnownUserId.current = null;
-  }
-  
-  return {
-    userId: user?.id || lastKnownUserId.current,
-    isReady: !loading || !!lastKnownUserId.current,
-    isAuthenticated: !!user?.id,
-  };
-}
-
-/**
- * Production-grade React Query hooks for dashboard data
- * Benefits over manual useState/useEffect:
- * - Automatic caching and deduplication
- * - Background revalidation (stale-while-revalidate)
- * - No race conditions or loading loops
- * - Proper error handling
- * - Optimistic updates support
- */
-
-// Production-grade discipline calculation (matches daily-report API)
-interface TradeForScore {
-  followed_plan: boolean | null;
-  stop_loss: number | null;
-  risk_pct: number | null;
-  mistakes: string[] | null;
-  emotion: string | null;
-}
-
-function calculateDisciplineFromTrades(trades: TradeForScore[]): {
-  score: number;
-  rulesFollowed: number;
-  totalRules: number;
-  ruleDetails: Array<{ text: string; followed: boolean }>;
-} {
-  const rules = {
-    stopLossUsed: true,
-    riskManaged: true,
-    planFollowed: true,
-    noOvertrading: true,
-    emotionalControl: true,
-  };
-
-  if (trades.length === 0) {
-    return {
-      score: 0,
-      rulesFollowed: 0,
-      totalRules: 5,
-      ruleDetails: [
-        { text: "Stop-loss on every trade", followed: false },
-        { text: "Risk ≤ 2% per trade", followed: false },
-        { text: "Follow trading plan", followed: false },
-        { text: "Max 5 trades per day", followed: true },
-        { text: "No emotional trading", followed: true },
-      ],
-    };
-  }
-
-  if (trades.filter(t => !t.stop_loss).length > 0) rules.stopLossUsed = false;
-  if (trades.filter(t => (t.risk_pct || 0) > 2).length > 0) rules.riskManaged = false;
-  if (trades.filter(t => t.followed_plan === false).length > 0) rules.planFollowed = false;
-  if (trades.length > 5) rules.noOvertrading = false;
-  
-  const emotionalTrades = trades.filter(t => {
-    const mistakes = t.mistakes || [];
-    const emotion = (t.emotion || "").toLowerCase();
-    return mistakes.includes("revenge_trade") || 
-           emotion === "frustrated" || emotion === "angry" || emotion === "fearful";
-  });
-  if (emotionalTrades.length > 0) rules.emotionalControl = false;
-
-  const rulesFollowed = Object.values(rules).filter(Boolean).length;
-  const totalRules = 5;
-  const score = Math.round((rulesFollowed / totalRules) * 100);
-
-  return {
-    score,
-    rulesFollowed,
-    totalRules,
-    ruleDetails: [
-      { text: "Stop-loss on every trade", followed: rules.stopLossUsed },
-      { text: "Risk ≤ 2% per trade", followed: rules.riskManaged },
-      { text: "Follow trading plan", followed: rules.planFollowed },
-      { text: "Max 5 trades per day", followed: rules.noOvertrading },
-      { text: "No emotional trading", followed: rules.emotionalControl },
-    ],
-  };
-}
 
 // ─── Query Keys (centralized for cache invalidation) ───
 export const queryKeys = {
@@ -124,7 +18,8 @@ export const queryKeys = {
 
 // ─── Dashboard Overview Data ───
 export function useDashboardQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -134,7 +29,6 @@ export function useDashboardQuery() {
 
       const today = new Date().toISOString().split("T")[0];
 
-      // Parallel fetch for performance
       const [tradesRes, assessmentRes, reportsRes, challengeRes] = await Promise.all([
         supabase
           .from("trades")
@@ -170,9 +64,11 @@ export function useDashboardQuery() {
       const reports = reportsRes.data || [];
       const activeChallenge = challengeRes.data;
 
-      // Calculate discipline from actual trades (production-grade)
-      const disciplineResult = calculateDisciplineFromTrades(trades as TradeForScore[]);
       const todayPnl = trades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
+
+      // Use last daily_report discipline_score if available, else derive from assessment
+      const latestReportScore = reports.length > 0 ? (reports[0] as { discipline_score?: number }).discipline_score : null;
+      const disciplineScore = latestReportScore ?? assessment?.discipline_score ?? 0;
 
       const disciplineTrend = reports
         .slice()
@@ -183,13 +79,13 @@ export function useDashboardQuery() {
         }));
 
       return {
-        disciplineScore: disciplineResult.score, // Use calculated score from trades
+        disciplineScore,
         todayTrades: trades.length,
         maxTrades: 5,
         todayPnl,
         capitalUsed: assessment?.capital || 100000,
-        rulesFollowed: disciplineResult.rulesFollowed,
-        totalRules: disciplineResult.totalRules,
+        rulesFollowed: 0,
+        totalRules: 4,
         currentStreak: activeChallenge?.current_day || 0,
         recentTrades: trades.slice(0, 5).map((t: Record<string, unknown>) => ({
           id: t.id as string,
@@ -209,21 +105,18 @@ export function useDashboardQuery() {
               { day: "Wed", score: 0 },
               { day: "Today", score: 0 },
             ],
-        tradingRules: disciplineResult.ruleDetails,
+        tradingRules: [],
       };
     },
-    enabled: isReady && !!userId,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true,
-    refetchInterval: 60 * 1000, // Auto-refresh every minute
-    placeholderData: keepPreviousData, // Keep showing old data during navigation
+    enabled: !!userId,
+    staleTime: 30 * 1000,
   });
 }
 
 // ─── Trade Journal Data ───
 export function useTradesQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -240,15 +133,15 @@ export function useTradesQuery() {
 
       return data || [];
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Assessment Data ───
 export function useAssessmentQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -266,15 +159,15 @@ export function useAssessmentQuery() {
 
       return data;
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Challenges Data ───
 export function useChallengesQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -305,15 +198,14 @@ export function useChallengesQuery() {
         history: historyRes.data || [],
       };
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Market Sentiment Data ───
 export function useMarketQuery() {
-  const { isReady, isAuthenticated } = useStableUserId();
+  const { user } = useAuth();
 
   return useQuery({
     queryKey: queryKeys.market(),
@@ -325,17 +217,17 @@ export function useMarketQuery() {
       }
       return res.json();
     },
-    enabled: isReady && isAuthenticated,
+    enabled: !!user?.id,
     staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     retry: 2,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Loyalty Points Data ───
 export function useLoyaltyQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -351,15 +243,15 @@ export function useLoyaltyQuery() {
 
       return data;
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Daily Reports Data ───
 export function useDailyReportsQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -376,15 +268,15 @@ export function useDailyReportsQuery() {
 
       return data || [];
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Loyalty Data with Transactions ───
 export function useLoyaltyWithTransactionsQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -413,15 +305,15 @@ export function useLoyaltyWithTransactionsQuery() {
         transactions: ledgerRes.data || [],
       };
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Daily Report Data ───
 export function useDailyReportQuery(date: string) {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -434,19 +326,19 @@ export function useDailyReportQuery(date: string) {
         .select("*")
         .eq("user_id", userId)
         .eq("date", date)
-        .single();
+        .maybeSingle();
 
       return data;
     },
-    enabled: isReady && !!userId && !!date,
+    enabled: !!userId && !!date,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Recent Daily Reports ───
 export function useRecentDailyReportsQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -466,15 +358,15 @@ export function useRecentDailyReportsQuery() {
 
       return data || [];
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Analytics Data ───
 export function useAnalyticsQuery() {
-  const { userId, isReady } = useStableUserId();
+  const { user } = useAuth();
+  const userId = user?.id;
   const supabase = createClient();
 
   return useQuery({
@@ -507,7 +399,6 @@ export function useAnalyticsQuery() {
       const wins = trades.filter((t: { pnl: number }) => t.pnl > 0).length;
       const rulesFollowed = trades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
 
-      // Weekly P&L
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const dayPnl: Record<string, number> = {};
       trades.forEach((t: { created_at: string; pnl: number }) => {
@@ -516,7 +407,6 @@ export function useAnalyticsQuery() {
       });
       const weeklyPnl = dayNames.slice(1, 6).map((day) => ({ day, pnl: dayPnl[day] || 0 }));
 
-      // Mistake breakdown
       const mistakeColors: Record<string, string> = {
         FOMO: "#F59E0B",
         "Revenge Trade": "#EF4444",
@@ -545,15 +435,13 @@ export function useAnalyticsQuery() {
         mistakeData,
       };
     },
-    enabled: isReady && !!userId,
+    enabled: !!userId,
     staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Mutations ───
 
-// Add Trade Mutation
 export function useAddTradeMutation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -573,7 +461,6 @@ export function useAddTradeMutation() {
       return data;
     },
     onSuccess: () => {
-      // Invalidate related queries to refetch fresh data
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
@@ -582,7 +469,6 @@ export function useAddTradeMutation() {
   });
 }
 
-// Challenge Check-in Mutation
 export function useChallengeCheckinMutation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -615,8 +501,7 @@ export function useChallengeCheckinMutation() {
 // ─── Admin Queries ───
 
 export function useAdminStatsQuery() {
-  const { isReady, isAuthenticated } = useStableUserId();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return useQuery({
     queryKey: ["adminStats"] as const,
@@ -625,15 +510,13 @@ export function useAdminStatsQuery() {
       if (!res.ok) throw new Error("Failed to fetch admin stats");
       return res.json();
     },
-    enabled: isReady && isAuthenticated && isAdmin,
+    enabled: !!user?.id && isAdmin,
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 export function useAdminUsersQuery() {
-  const { isReady, isAuthenticated } = useStableUserId();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return useQuery({
     queryKey: ["adminUsers"] as const,
@@ -642,15 +525,13 @@ export function useAdminUsersQuery() {
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
-    enabled: isReady && isAuthenticated && isAdmin,
+    enabled: !!user?.id && isAdmin,
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 export function useAdminSubscriptionsQuery() {
-  const { isReady, isAuthenticated } = useStableUserId();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return useQuery({
     queryKey: ["adminSubscriptions"] as const,
@@ -659,15 +540,13 @@ export function useAdminSubscriptionsQuery() {
       if (!res.ok) throw new Error("Failed to fetch subscriptions");
       return res.json();
     },
-    enabled: isReady && isAuthenticated && isAdmin,
+    enabled: !!user?.id && isAdmin,
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
 export function useAdminNotificationsQuery() {
-  const { isReady, isAuthenticated } = useStableUserId();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return useQuery({
     queryKey: ["adminNotifications"] as const,
@@ -676,8 +555,7 @@ export function useAdminNotificationsQuery() {
       if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json();
     },
-    enabled: isReady && isAuthenticated && isAdmin,
+    enabled: !!user?.id && isAdmin,
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
   });
 }

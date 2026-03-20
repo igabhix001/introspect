@@ -44,7 +44,7 @@ export default function AdminPointsPage() {
 
   const transactions: PointTransaction[] = data?.transactions || [];
   const totals = data?.totals || { issued: 0, redeemed: 0, members: 0 };
-  const loading = authLoading || (isLoading && !data);
+  const loading = isLoading && !data;
 
   const filteredTransactions = transactions.filter((tx: PointTransaction) => 
     tx.profiles?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||

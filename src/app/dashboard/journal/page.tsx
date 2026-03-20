@@ -82,7 +82,7 @@ export default function JournalPage() {
   });
 
   const supabase = createClient();
-  const loading = authLoading || (isLoading && trades.length === 0);
+  const loading = isLoading && trades.length === 0;
 
   const handleAddTrade = async (e: React.FormEvent) => {
     e.preventDefault();
