@@ -66,9 +66,23 @@ export function useDashboardQuery() {
 
       const todayPnl = trades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
 
-      // Use last daily_report discipline_score if available, else derive from assessment
-      const latestReportScore = reports.length > 0 ? (reports[0] as { discipline_score?: number }).discipline_score : null;
-      const disciplineScore = latestReportScore ?? assessment?.discipline_score ?? 0;
+      // Get today's report if it exists
+      const todayReport = reports.find((r: { date: string }) => r.date === today) as { discipline_score?: number } | undefined;
+      
+      // Discipline score logic:
+      // 1. If today's report exists, use it
+      // 2. If no trades today, show 0 (not 100 - you haven't earned discipline yet)
+      // 3. Otherwise show last known score or 0
+      let disciplineScore = 0;
+      if (todayReport?.discipline_score !== undefined) {
+        disciplineScore = todayReport.discipline_score;
+      } else if (trades.length === 0) {
+        // No trades today = no discipline score yet (show 0, not 100)
+        disciplineScore = 0;
+      } else {
+        // Trades exist but no report generated yet - show 0 until report is generated
+        disciplineScore = 0;
+      }
 
       const disciplineTrend = reports
         .slice()
@@ -89,11 +103,11 @@ export function useDashboardQuery() {
         currentStreak: activeChallenge?.current_day || 0,
         recentTrades: trades.slice(0, 5).map((t: Record<string, unknown>) => ({
           id: t.id as string,
-          stock_index: t.stock_index as string,
+          stock_index: (t.stock || t.stock_index || "Unknown") as string,
           direction: t.direction as string,
           entry_price: t.entry_price as number,
-          exit_price: t.exit_price as number,
-          pnl: t.pnl as number,
+          exit_price: (t.exit_price || 0) as number,
+          pnl: (t.pnl || 0) as number,
           followed_plan: t.followed_plan as boolean,
           created_at: t.created_at as string,
         })),

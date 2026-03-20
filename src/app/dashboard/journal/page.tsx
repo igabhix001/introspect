@@ -64,6 +64,9 @@ export default function JournalPage() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>("all"); // "all", "today", "week", "month", or specific date
+  const [directionFilter, setDirectionFilter] = useState<string>("all"); // "all", "long", "short"
+  const [resultFilter, setResultFilter] = useState<string>("all"); // "all", "profit", "loss"
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -151,11 +154,49 @@ export default function JournalPage() {
     setDeleting(null);
   };
 
-  const filteredTrades = trades.filter(
-    (t) =>
+  // Apply all filters
+  const filteredTrades = trades.filter((t) => {
+    // Search filter
+    const matchesSearch = 
       t.stock.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.direction.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      t.direction.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Date filter
+    let matchesDate = true;
+    const tradeDate = new Date(t.created_at);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (dateFilter === "today") {
+      const tradeDateOnly = new Date(tradeDate);
+      tradeDateOnly.setHours(0, 0, 0, 0);
+      matchesDate = tradeDateOnly.getTime() === today.getTime();
+    } else if (dateFilter === "week") {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      matchesDate = tradeDate >= weekAgo;
+    } else if (dateFilter === "month") {
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      matchesDate = tradeDate >= monthAgo;
+    } else if (dateFilter !== "all") {
+      // Specific date selected
+      matchesDate = t.date === dateFilter;
+    }
+    
+    // Direction filter
+    const matchesDirection = directionFilter === "all" || t.direction === directionFilter;
+    
+    // Result filter
+    let matchesResult = true;
+    if (resultFilter === "profit") {
+      matchesResult = t.pnl > 0;
+    } else if (resultFilter === "loss") {
+      matchesResult = t.pnl < 0;
+    }
+    
+    return matchesSearch && matchesDate && matchesDirection && matchesResult;
+  });
 
   const totalPnl = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
   const winRate = filteredTrades.length
@@ -220,28 +261,88 @@ export default function JournalPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by symbol..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
-            />
+      <div className="flex flex-col gap-3">
+        {/* Search and Add Button Row */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by symbol..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success/90 text-success-foreground text-xs font-semibold shadow-[0_0_15px_rgba(34,197,94,0.15)] transition-all cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Log Trade
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success/90 text-success-foreground text-xs font-semibold shadow-[0_0_15px_rgba(34,197,94,0.15)] transition-all cursor-pointer"
+        {/* Filters Row */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Filter */}
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-background/50 border border-border text-xs font-medium focus:outline-none focus:border-success/40 transition-all cursor-pointer appearance-none"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Log Trade
-          </button>
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+          </select>
+
+          {/* Direction Filter */}
+          <select
+            value={directionFilter}
+            onChange={(e) => setDirectionFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-background/50 border border-border text-xs font-medium focus:outline-none focus:border-success/40 transition-all cursor-pointer appearance-none"
+          >
+            <option value="all">All Directions</option>
+            <option value="long">Buy Only</option>
+            <option value="short">Sell Only</option>
+          </select>
+
+          {/* Result Filter */}
+          <select
+            value={resultFilter}
+            onChange={(e) => setResultFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-background/50 border border-border text-xs font-medium focus:outline-none focus:border-success/40 transition-all cursor-pointer appearance-none"
+          >
+            <option value="all">All Results</option>
+            <option value="profit">Profits Only</option>
+            <option value="loss">Losses Only</option>
+          </select>
+
+          {/* Clear Filters */}
+          {(dateFilter !== "all" || directionFilter !== "all" || resultFilter !== "all" || searchQuery) && (
+            <button
+              onClick={() => {
+                setDateFilter("all");
+                setDirectionFilter("all");
+                setResultFilter("all");
+                setSearchQuery("");
+              }}
+              className="px-3 py-2 rounded-xl border border-border hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          )}
+
+          {/* Filter count indicator */}
+          <span className="text-xs text-muted-foreground ml-auto">
+            Showing {filteredTrades.length} of {trades.length} trades
+          </span>
         </div>
       </div>
 

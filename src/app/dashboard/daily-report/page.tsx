@@ -243,6 +243,27 @@ export default function DailyReportPage() {
               <p className="text-sm font-medium">{report.feedback.encouragement}</p>
             </div>
           </div>
+
+          {/* Regenerate Report Button */}
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={generateReport}
+              disabled={generating}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border hover:border-primary/30 hover:bg-primary/5 text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {generating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate Report
+                </>
+              )}
+            </button>
+          </div>
         </motion.div>
       ) : (
         <div className="text-center py-16">
