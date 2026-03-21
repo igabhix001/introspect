@@ -64,7 +64,7 @@ export default function JournalPage() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>("all"); // "all", "today", "week", "month", or specific date
+  const [dateFilter, setDateFilter] = useState<string>("today"); // Default to today
   const [directionFilter, setDirectionFilter] = useState<string>("all"); // "all", "long", "short"
   const [resultFilter, setResultFilter] = useState<string>("all"); // "all", "profit", "loss"
   const [saving, setSaving] = useState(false);
@@ -92,56 +92,65 @@ export default function JournalPage() {
     if (!user) return;
     setSaving(true);
 
-    const entryPrice = parseFloat(formData.entry_price);
-    const exitPrice = parseFloat(formData.exit_price);
-    const quantity = parseInt(formData.quantity) || 1;
-    const pnl =
-      formData.direction === "long"
-        ? (exitPrice - entryPrice) * quantity
-        : (entryPrice - exitPrice) * quantity;
+    try {
+      const entryPrice = parseFloat(formData.entry_price);
+      const exitPrice = parseFloat(formData.exit_price);
+      const quantity = parseInt(formData.quantity) || 1;
+      const pnl =
+        formData.direction === "long"
+          ? (exitPrice - entryPrice) * quantity
+          : (entryPrice - exitPrice) * quantity;
 
-    const riskPct = formData.stop_loss
-      ? Math.abs(entryPrice - parseFloat(formData.stop_loss)) / entryPrice * 100
-      : 0;
+      const riskPct = formData.stop_loss
+        ? Math.abs(entryPrice - parseFloat(formData.stop_loss)) / entryPrice * 100
+        : 0;
 
-    const { error } = await supabase.from("trades").insert({
-      user_id: user.id,
-      date: new Date().toISOString().split("T")[0],
-      stock: formData.stock,
-      direction: formData.direction,
-      entry_price: entryPrice,
-      exit_price: exitPrice,
-      stop_loss: formData.stop_loss ? parseFloat(formData.stop_loss) : null,
-      quantity,
-      pnl,
-      risk_pct: riskPct,
-      followed_plan: formData.followed_plan,
-      sl_followed: !!formData.stop_loss,
-      emotion_before: formData.emotion_before,
-      emotion_after: null,
-      notes: formData.notes || null,
-      mistakes: formData.mistake ? [formData.mistake] : [],
-    });
-
-    if (!error) {
-      // Invalidate queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
-      setShowAddModal(false);
-      setFormData({
-        stock: "",
-        direction: "long",
-        entry_price: "",
-        exit_price: "",
-        stop_loss: "",
-        quantity: "",
-        followed_plan: true,
-        emotion_before: "Calm",
-        notes: "",
-        mistake: "",
+      const { error } = await supabase.from("trades").insert({
+        user_id: user.id,
+        date: new Date().toISOString().split("T")[0],
+        stock: formData.stock,
+        direction: formData.direction,
+        entry_price: entryPrice,
+        exit_price: exitPrice,
+        stop_loss: formData.stop_loss ? parseFloat(formData.stop_loss) : null,
+        quantity,
+        pnl,
+        risk_pct: riskPct,
+        followed_plan: formData.followed_plan,
+        sl_followed: !!formData.stop_loss,
+        emotion_before: formData.emotion_before,
+        emotion_after: null,
+        notes: formData.notes || null,
+        mistakes: formData.mistake ? [formData.mistake] : [],
       });
+
+      if (error) {
+        console.error("Failed to save trade:", error);
+        alert("Failed to save trade. Please try again.");
+      } else {
+        // Invalidate queries to refetch fresh data
+        queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+        setShowAddModal(false);
+        setFormData({
+          stock: "",
+          direction: "long",
+          entry_price: "",
+          exit_price: "",
+          stop_loss: "",
+          quantity: "",
+          followed_plan: true,
+          emotion_before: "Calm",
+          notes: "",
+          mistake: "",
+        });
+      }
+    } catch (err) {
+      console.error("Error saving trade:", err);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleDeleteTrade = async (tradeId: string) => {
@@ -482,8 +491,25 @@ export default function JournalPage() {
             </div>
           ))}
           {filteredTrades.length === 0 && (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              No trades logged yet. Click &quot;Log Trade&quot; to record your first entry.
+            <div className="text-center py-12">
+              {dateFilter === "today" ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    No trades logged today
+                  </p>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success/90 text-success-foreground text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Log Today&apos;s Trade & Get Discipline Score
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No trades found for the selected filter. Click &quot;Log Trade&quot; to record an entry.
+                </p>
+              )}
             </div>
           )}
         </div>

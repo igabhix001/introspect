@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Flame,
   ArrowUpRight,
-  Clock,
   BookOpen,
   Zap,
   ChevronRight,
@@ -124,6 +123,8 @@ export default function DashboardPage() {
   }
 
   const disciplineScore = data?.disciplineScore || 0;
+  const hasJournaledToday = data?.hasJournaledToday || false;
+  const hasTodayReport = data?.hasTodayReport || false;
   const todayPnl = data?.todayPnl || 0;
   const todayTradeCount = data?.todayTrades || 0;
   const maxTrades = data?.maxTrades || 3;
@@ -133,7 +134,7 @@ export default function DashboardPage() {
   const disciplineData = data?.disciplineTrend || [];
   const todaysRules = data?.tradingRules || [];
   const recentTrades = data?.recentTrades || [];
-  const hasNoAssessment = disciplineScore === 0;
+  const hasNoAssessment = !hasJournaledToday && disciplineScore === 0;
 
   return (
     <motion.div
@@ -178,44 +179,63 @@ export default function DashboardPage() {
           variants={staggerItem}
           className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
         >
-          <div className="absolute -top-8 -right-8 w-24 h-24 bg-success/[0.07] rounded-full blur-2xl transition-all group-hover:bg-success/[0.12]" />
+          <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${hasJournaledToday ? "bg-success/[0.07] group-hover:bg-success/[0.12]" : "bg-muted/30"}`} />
           <div className="relative">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Discipline Score
               </p>
-              <div className="flex items-center gap-1 text-success text-xs font-semibold">
-                <ArrowUpRight className="h-3 w-3" />
-                +12%
+              {hasJournaledToday && hasTodayReport && (
+                <div className="flex items-center gap-1 text-success text-xs font-semibold">
+                  <ArrowUpRight className="h-3 w-3" />
+                  Today
+                </div>
+              )}
+            </div>
+            {hasJournaledToday ? (
+              <>
+                <div className="flex items-end gap-2">
+                  <span className="text-3xl font-bold font-heading text-foreground">
+                    {disciplineScore}
+                  </span>
+                  <span className="text-sm text-muted-foreground mb-1">/100</span>
+                </div>
+                <div className="mt-3 w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-success rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${disciplineScore}%` }}
+                    transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
+                  />
+                </div>
+                {/* Share Card buttons per client share card doc */}
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
+                      const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
+                      navigator.clipboard.writeText(text);
+                    }}
+                    className="text-[10px] font-medium text-muted-foreground hover:text-success px-2 py-1 rounded-md border border-border hover:border-success/30 transition-all cursor-pointer"
+                  >
+                    Copy Share Text
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="py-2">
+                <p className="text-sm text-muted-foreground mb-2">
+                  No trades logged today
+                </p>
+                <Link
+                  href="/dashboard/journal?new=true"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-success hover:text-success/80 transition-colors"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Log a trade to get your score
+                </Link>
               </div>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-3xl font-bold font-heading text-foreground">
-                {disciplineScore}
-              </span>
-              <span className="text-sm text-muted-foreground mb-1">/100</span>
-            </div>
-            <div className="mt-3 w-full h-1.5 bg-muted rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-success rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${disciplineScore}%` }}
-                transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
-              />
-            </div>
-            {/* Share Card buttons per client share card doc */}
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => {
-                  const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
-                  const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
-                  navigator.clipboard.writeText(text);
-                }}
-                className="text-[10px] font-medium text-muted-foreground hover:text-success px-2 py-1 rounded-md border border-border hover:border-success/30 transition-all cursor-pointer"
-              >
-                Copy Share Text
-              </button>
-            </div>
+            )}
           </div>
         </motion.div>
 

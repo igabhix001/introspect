@@ -92,8 +92,14 @@ export function useDashboardQuery() {
           score: r.discipline_score || 0,
         }));
 
+      // Determine if user has journaled today
+      const hasJournaledToday = trades.length > 0;
+      const hasTodayReport = !!todayReport;
+
       return {
         disciplineScore,
+        hasJournaledToday,
+        hasTodayReport,
         todayTrades: trades.length,
         maxTrades: 5,
         todayPnl,
@@ -398,8 +404,11 @@ export function useAnalyticsQuery() {
         .gte("created_at", thirtyDaysAgo.toISOString())
         .order("created_at", { ascending: true });
 
-      if (!trades || trades.length === 0) {
+      const allTrades = trades || [];
+
+      if (allTrades.length === 0) {
         return {
+          allTrades: [],
           tradeCount: 0,
           totalPnl: 0,
           winRate: 0,
@@ -409,13 +418,13 @@ export function useAnalyticsQuery() {
         };
       }
 
-      const total = trades.reduce((sum: number, t: { pnl: number }) => sum + t.pnl, 0);
-      const wins = trades.filter((t: { pnl: number }) => t.pnl > 0).length;
-      const rulesFollowed = trades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
+      const total = allTrades.reduce((sum: number, t: { pnl: number }) => sum + t.pnl, 0);
+      const wins = allTrades.filter((t: { pnl: number }) => t.pnl > 0).length;
+      const rulesFollowed = allTrades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
 
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const dayPnl: Record<string, number> = {};
-      trades.forEach((t: { created_at: string; pnl: number }) => {
+      allTrades.forEach((t: { created_at: string; pnl: number }) => {
         const dayName = dayNames[new Date(t.created_at).getDay()];
         dayPnl[dayName] = (dayPnl[dayName] || 0) + t.pnl;
       });
@@ -429,7 +438,7 @@ export function useAnalyticsQuery() {
         "Over-leveraged": "#3B82F6",
       };
       const mistakeCounts: Record<string, number> = {};
-      trades.forEach((t: { mistakes?: string[] }) => {
+      allTrades.forEach((t: { mistakes?: string[] }) => {
         (t.mistakes || []).forEach((m: string) => {
           mistakeCounts[m] = (mistakeCounts[m] || 0) + 1;
         });
@@ -441,10 +450,11 @@ export function useAnalyticsQuery() {
       }));
 
       return {
-        tradeCount: trades.length,
+        allTrades,
+        tradeCount: allTrades.length,
         totalPnl: total,
-        winRate: Math.round((wins / trades.length) * 100),
-        ruleAdherence: Math.round((rulesFollowed / trades.length) * 100),
+        winRate: Math.round((wins / allTrades.length) * 100),
+        ruleAdherence: Math.round((rulesFollowed / allTrades.length) * 100),
         weeklyPnl,
         mistakeData,
       };

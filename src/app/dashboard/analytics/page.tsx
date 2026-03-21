@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -8,6 +9,7 @@ import {
   Target,
   Clock,
   Loader2,
+  Calendar,
 } from "lucide-react";
 import {
   BarChart,
@@ -31,6 +33,7 @@ const stagger = {
 export default function AnalyticsPage() {
   const { loading: authLoading } = useAuth();
   const { data, isLoading } = useAnalyticsQuery();
+  const [dateFilter, setDateFilter] = useState<string>("today");
 
   // Show loading only on initial load
   if (isLoading && !data) {
@@ -41,20 +44,92 @@ export default function AnalyticsPage() {
     );
   }
 
-  // Extract data with defaults
-  const totalPnl = data?.totalPnl || 0;
-  const winRate = data?.winRate || 0;
-  const tradeCount = data?.tradeCount || 0;
-  const ruleAdherence = data?.ruleAdherence || 0;
+  // Filter trades based on date selection
+  const allTrades = data?.allTrades || [];
+  const filteredTrades = allTrades.filter((t: { created_at: string }) => {
+    const tradeDate = new Date(t.created_at);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (dateFilter === "today") {
+      const tradeDateOnly = new Date(tradeDate);
+      tradeDateOnly.setHours(0, 0, 0, 0);
+      return tradeDateOnly.getTime() === today.getTime();
+    } else if (dateFilter === "week") {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return tradeDate >= weekAgo;
+    } else if (dateFilter === "month") {
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return tradeDate >= monthAgo;
+    }
+    return true; // "all"
+  });
+
+  // Calculate metrics from filtered trades
+  const totalPnl = filteredTrades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
+  const winningTrades = filteredTrades.filter((t: { pnl?: number }) => (t.pnl || 0) > 0);
+  const winRate = filteredTrades.length > 0 ? Math.round((winningTrades.length / filteredTrades.length) * 100) : 0;
+  const tradeCount = filteredTrades.length;
+  const rulesFollowedCount = filteredTrades.filter((t: { followed_plan?: boolean }) => t.followed_plan).length;
+  const ruleAdherence = filteredTrades.length > 0 ? Math.round((rulesFollowedCount / filteredTrades.length) * 100) : 0;
+  
+  // Use pre-calculated weekly data for chart (always shows last 7 days)
   const weeklyPnl = data?.weeklyPnl || [];
-  const mistakeData = data?.mistakeData || [];
+  
+  // Calculate mistake breakdown from filtered trades
+  const mistakeCounts: Record<string, number> = {};
+  filteredTrades.forEach((t: { mistakes?: string[] }) => {
+    if (t.mistakes && t.mistakes.length > 0) {
+      t.mistakes.forEach((m: string) => {
+        mistakeCounts[m] = (mistakeCounts[m] || 0) + 1;
+      });
+    }
+  });
+  const totalMistakes = Object.values(mistakeCounts).reduce((a, b) => a + b, 0);
+  const mistakeColors: Record<string, string> = {
+    "FOMO": "#f59e0b",
+    "Revenge Trade": "#ef4444",
+    "Overtrading": "#f97316",
+    "No SL": "#dc2626",
+    "Over-leveraged": "#a855f7",
+  };
+  const mistakeData = Object.entries(mistakeCounts).map(([name, count]) => ({
+    name,
+    value: totalMistakes > 0 ? Math.round((count / totalMistakes) * 100) : 0,
+    color: mistakeColors[name] || "#6b7280",
+  }));
+
+  const dateFilterLabel = dateFilter === "today" ? "Today" : dateFilter === "week" ? "7 Days" : dateFilter === "month" ? "30 Days" : "All Time";
 
   return (
     <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-6">
+      {/* Date Filter */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold font-heading">Analytics</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Deep behavioral insights</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-background/50 border border-border text-xs font-medium focus:outline-none focus:border-success/40 transition-all cursor-pointer appearance-none"
+          >
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+      </div>
+
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <motion.div variants={stagger.item} className="rounded-xl border border-border bg-card p-3.5">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Total P&L (30d)</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Total P&L ({dateFilterLabel})</p>
           <p className={`text-lg font-bold font-mono ${totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
             {totalPnl >= 0 ? "+" : ""}₹{Math.abs(totalPnl).toLocaleString("en-IN")}
           </p>
