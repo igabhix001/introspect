@@ -130,11 +130,17 @@ export default function DashboardPage() {
   const maxTrades = data?.maxTrades || 3;
   const currentStreak = data?.currentStreak || 0;
   const rulesFollowed = data?.rulesFollowed || 0;
-  const totalRules = data?.totalRules || 0;
+  const totalRules = data?.totalRules || 4;
   const disciplineData = data?.disciplineTrend || [];
   const todaysRules = data?.tradingRules || [];
   const recentTrades = data?.recentTrades || [];
-  const hasNoAssessment = !hasJournaledToday && disciplineScore === 0;
+  const todayMistakesCount = data?.todayMistakesCount || 0;
+  const todayMistakeTags = data?.todayMistakeTags || [];
+  const todayAreasToImprove = data?.todayAreasToImprove || [];
+  const hasEverTraded = data?.hasEverTraded || false;
+  const hasAssessment = data?.hasAssessment || false;
+  // Show welcome banner only for truly new users who have never traded or done assessment
+  const hasNoAssessment = !hasEverTraded && !hasAssessment;
 
   return (
     <motion.div
@@ -199,17 +205,36 @@ export default function DashboardPage() {
                     {disciplineScore}
                   </span>
                   <span className="text-sm text-muted-foreground mb-1">/100</span>
+                  {/* Mistakes count badge */}
+                  {hasTodayReport && (
+                    <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      todayMistakesCount === 0 
+                        ? "bg-success/10 text-success" 
+                        : "bg-destructive/10 text-destructive"
+                    }`}>
+                      {todayMistakesCount === 0 ? "0 mistakes" : `${todayMistakesCount} mistake${todayMistakesCount > 1 ? "s" : ""}`}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 w-full h-1.5 bg-muted rounded-full overflow-hidden">
                   <motion.div
-                    className="h-full bg-success rounded-full"
+                    className={`h-full rounded-full ${disciplineScore >= 70 ? "bg-success" : disciplineScore >= 40 ? "bg-amber-500" : "bg-destructive"}`}
                     initial={{ width: 0 }}
                     animate={{ width: `${disciplineScore}%` }}
                     transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
                   />
                 </div>
+                {/* Link to daily report for details */}
+                {hasTodayReport && (
+                  <Link 
+                    href="/dashboard/daily-report" 
+                    className="text-[10px] text-muted-foreground hover:text-success mt-2 inline-block transition-colors"
+                  >
+                    View Daily Report for details →
+                  </Link>
+                )}
                 {/* Share Card buttons per client share card doc */}
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => {
                       const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
@@ -610,20 +635,67 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* Mistake Detector Alert */}
-          <div className="mt-2 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06]">
-            <div className="flex items-start gap-2.5">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-amber-500">
-                  Mistake Detector
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                  You broke a rule on your last trade. Consider pausing and reviewing before the next entry.
-                </p>
+          {/* Mistake Detector Alert - Shows actual mistakes from today's report */}
+          {hasTodayReport && todayMistakesCount > 0 ? (
+            <div className="mt-2 p-3.5 rounded-xl border border-destructive/30 bg-destructive/[0.06]">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-destructive">
+                    Mistake Detector ({todayMistakesCount} issue{todayMistakesCount > 1 ? "s" : ""})
+                  </p>
+                  <ul className="text-[11px] text-muted-foreground mt-1.5 space-y-1">
+                    {todayAreasToImprove.slice(0, 3).map((area, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-destructive">•</span>
+                        <span>{area.replace(/^⚠️\s*/, "")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link 
+                    href="/dashboard/daily-report" 
+                    className="text-[10px] text-destructive hover:underline mt-2 inline-block"
+                  >
+                    View full report →
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          ) : hasTodayReport && todayMistakesCount === 0 ? (
+            <div className="mt-2 p-3.5 rounded-xl border border-success/30 bg-success/[0.06]">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-success">
+                    Clean Trading Day! ✓
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    No rule violations detected. Keep up the discipline!
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : hasJournaledToday ? (
+            <div className="mt-2 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06]">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-500">
+                    Generate Report
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    Generate your daily report to see mistake analysis.
+                  </p>
+                  <Link 
+                    href="/dashboard/daily-report" 
+                    className="text-[10px] text-amber-500 hover:underline mt-1 inline-block"
+                  >
+                    Go to Daily Report →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Services & Enquiries */}
           <div className="mt-4 relative rounded-xl border border-success/20 bg-success/[0.06] p-4 overflow-hidden group">

@@ -29,7 +29,7 @@ export function useDashboardQuery() {
 
       const today = new Date().toISOString().split("T")[0];
 
-      const [tradesRes, assessmentRes, reportsRes, challengeRes] = await Promise.all([
+      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes] = await Promise.all([
         supabase
           .from("trades")
           .select("*")
@@ -57,12 +57,31 @@ export function useDashboardQuery() {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
+        // Fetch full today's report with feedback/mistakes
+        supabase
+          .from("daily_reports")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("date", today)
+          .maybeSingle(),
       ]);
 
       const trades = tradesRes.data || [];
       const assessment = assessmentRes.data;
       const reports = reportsRes.data || [];
       const activeChallenge = challengeRes.data;
+      const todayFullReport = todayReportRes.data as {
+        discipline_score?: number;
+        mistakes_count?: number;
+        rules_followed?: number;
+        total_rules?: number;
+        feedback?: {
+          positive?: string[];
+          negative?: string[];
+          suggestions?: string[];
+          mistakeTags?: Array<{ stock: string; pnl: number; tag: string }>;
+        };
+      } | null;
 
       const todayPnl = trades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
 
@@ -74,13 +93,13 @@ export function useDashboardQuery() {
       // 2. If no trades today, show 0 (not 100 - you haven't earned discipline yet)
       // 3. Otherwise show last known score or 0
       let disciplineScore = 0;
-      if (todayReport?.discipline_score !== undefined) {
+      if (todayFullReport?.discipline_score !== undefined) {
+        disciplineScore = todayFullReport.discipline_score;
+      } else if (todayReport?.discipline_score !== undefined) {
         disciplineScore = todayReport.discipline_score;
       } else if (trades.length === 0) {
-        // No trades today = no discipline score yet (show 0, not 100)
         disciplineScore = 0;
       } else {
-        // Trades exist but no report generated yet - show 0 until report is generated
         disciplineScore = 0;
       }
 
@@ -94,19 +113,35 @@ export function useDashboardQuery() {
 
       // Determine if user has journaled today
       const hasJournaledToday = trades.length > 0;
-      const hasTodayReport = !!todayReport;
+      const hasTodayReport = !!todayFullReport || !!todayReport;
+      
+      // Check if user has ever done assessment (has any historical reports or assessment)
+      const hasEverTraded = reports.length > 0 || trades.length > 0;
+      const hasAssessment = !!assessment;
+
+      // Extract mistakes from today's report
+      const todayMistakesCount = todayFullReport?.mistakes_count || 0;
+      const todayMistakeTags = todayFullReport?.feedback?.mistakeTags || [];
+      const todayAreasToImprove = todayFullReport?.feedback?.negative || [];
+      const rulesFollowed = todayFullReport?.rules_followed || 0;
+      const totalRules = todayFullReport?.total_rules || 4;
 
       return {
         disciplineScore,
         hasJournaledToday,
         hasTodayReport,
+        hasEverTraded,
+        hasAssessment,
         todayTrades: trades.length,
         maxTrades: 5,
         todayPnl,
         capitalUsed: assessment?.capital || 100000,
-        rulesFollowed: 0,
-        totalRules: 4,
+        rulesFollowed,
+        totalRules,
         currentStreak: activeChallenge?.current_day || 0,
+        todayMistakesCount,
+        todayMistakeTags,
+        todayAreasToImprove,
         recentTrades: trades.slice(0, 5).map((t: Record<string, unknown>) => ({
           id: t.id as string,
           stock_index: (t.stock || t.stock_index || "Unknown") as string,
@@ -396,15 +431,84 @@ export function useAnalyticsQuery() {
 
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { data: trades } = await supabase
-        .from("trades")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .order("created_at", { ascending: true });
+      // Fetch trades and weekly reports in parallel
+      const [tradesRes, weeklyReportsRes] = await Promise.all([
+        supabase
+          .from("trades")
+          .select("*")
+          .eq("user_id", userId)
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("daily_reports")
+          .select("*")
+          .eq("user_id", userId)
+          .gte("date", sevenDaysAgo.toISOString().split("T")[0])
+          .order("date", { ascending: false }),
+      ]);
 
-      const allTrades = trades || [];
+      const allTrades = tradesRes.data || [];
+      const weeklyReports = (weeklyReportsRes.data || []) as Array<{
+        date: string;
+        mistakes_count?: number;
+        feedback?: {
+          negative?: string[];
+          suggestions?: string[];
+          mistakeTags?: Array<{ stock: string; pnl: number; tag: string }>;
+        };
+      }>;
+
+      // Extract weekly mistakes from daily reports
+      const weeklyMistakeCounts: Record<string, number> = {};
+      const weeklyAreasToImprove: string[] = [];
+      const weeklySuggestions: string[] = [];
+
+      weeklyReports.forEach((report) => {
+        // Collect mistake tags
+        if (report.feedback?.mistakeTags) {
+          report.feedback.mistakeTags.forEach((mt) => {
+            if (!mt.tag.startsWith("✅")) {
+              const cleanTag = mt.tag.replace(/^🔴\s*/, "").split(" (")[0];
+              weeklyMistakeCounts[cleanTag] = (weeklyMistakeCounts[cleanTag] || 0) + 1;
+            }
+          });
+        }
+        // Collect areas to improve
+        if (report.feedback?.negative) {
+          report.feedback.negative.forEach((neg) => {
+            const cleanNeg = neg.replace(/^⚠️\s*/, "");
+            if (!weeklyAreasToImprove.includes(cleanNeg)) {
+              weeklyAreasToImprove.push(cleanNeg);
+            }
+          });
+        }
+        // Collect suggestions
+        if (report.feedback?.suggestions) {
+          report.feedback.suggestions.forEach((sug) => {
+            if (!weeklySuggestions.includes(sug)) {
+              weeklySuggestions.push(sug);
+            }
+          });
+        }
+      });
+
+      const mistakeColors: Record<string, string> = {
+        "SIZE VIOLATION": "#EF4444",
+        "NO STOP-LOSS": "#F97316",
+        "REVENGE TRADE": "#DC2626",
+        "FOMO": "#F59E0B",
+        "Overtrading": "#A855F7",
+        "Over-leveraged": "#3B82F6",
+      };
+
+      const weeklyMistakeData = Object.entries(weeklyMistakeCounts).map(([name, value]) => ({
+        name,
+        value,
+        color: mistakeColors[name] || "#6B7280",
+      }));
 
       if (allTrades.length === 0) {
         return {
@@ -415,6 +519,9 @@ export function useAnalyticsQuery() {
           ruleAdherence: 0,
           weeklyPnl: [],
           mistakeData: [],
+          weeklyMistakeData,
+          weeklyAreasToImprove,
+          weeklySuggestions,
         };
       }
 
@@ -430,20 +537,14 @@ export function useAnalyticsQuery() {
       });
       const weeklyPnl = dayNames.slice(1, 6).map((day) => ({ day, pnl: dayPnl[day] || 0 }));
 
-      const mistakeColors: Record<string, string> = {
-        FOMO: "#F59E0B",
-        "Revenge Trade": "#EF4444",
-        "No SL": "#F97316",
-        Overtrading: "#A855F7",
-        "Over-leveraged": "#3B82F6",
-      };
-      const mistakeCounts: Record<string, number> = {};
+      // Legacy mistake data from trades (for backward compatibility)
+      const tradeMistakeCounts: Record<string, number> = {};
       allTrades.forEach((t: { mistakes?: string[] }) => {
         (t.mistakes || []).forEach((m: string) => {
-          mistakeCounts[m] = (mistakeCounts[m] || 0) + 1;
+          tradeMistakeCounts[m] = (tradeMistakeCounts[m] || 0) + 1;
         });
       });
-      const mistakeData = Object.entries(mistakeCounts).map(([name, value]) => ({
+      const mistakeData = Object.entries(tradeMistakeCounts).map(([name, value]) => ({
         name,
         value,
         color: mistakeColors[name] || "#6B7280",
@@ -457,6 +558,9 @@ export function useAnalyticsQuery() {
         ruleAdherence: Math.round((rulesFollowed / allTrades.length) * 100),
         weeklyPnl,
         mistakeData,
+        weeklyMistakeData,
+        weeklyAreasToImprove,
+        weeklySuggestions,
       };
     },
     enabled: !!userId,

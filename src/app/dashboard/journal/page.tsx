@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useTradesQuery, queryKeys } from "@/lib/hooks/use-queries";
+import { useTradesQuery, useDailyReportQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
 
 const emotionColors: Record<string, string> = {
@@ -61,6 +61,16 @@ export default function JournalPage() {
   const queryClient = useQueryClient();
   const { data: tradesData, isLoading } = useTradesQuery();
   const trades = (tradesData as TradeRow[]) || [];
+  
+  // Fetch today's daily report to get mistake tags for trades
+  const today = new Date().toISOString().split("T")[0];
+  const { data: todayReportData } = useDailyReportQuery(today);
+  const todayReport = todayReportData as {
+    feedback?: {
+      mistakeTags?: Array<{ stock: string; pnl: number; tag: string }>;
+    };
+  } | null;
+  const mistakeTags = todayReport?.feedback?.mistakeTags || [];
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -434,17 +444,39 @@ export default function JournalPage() {
                   )}
                 </div>
                 <div className="col-span-2 flex items-center gap-2">
-                  {trade.mistakes && trade.mistakes.length > 0 ? (
-                    <span
-                      className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
-                        mistakeBadges[trade.mistakes[0]] || "bg-muted text-foreground border-border"
-                      }`}
-                    >
-                      {trade.mistakes[0]}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground/40">—</span>
-                  )}
+                  {(() => {
+                    // Find mistake tag from daily report for this trade
+                    const reportMistake = mistakeTags.find(
+                      (mt) => mt.stock.toLowerCase() === trade.stock.toLowerCase()
+                    );
+                    const isClean = reportMistake?.tag.startsWith("✅");
+                    const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
+                    
+                    if (reportMistake && !isClean) {
+                      return (
+                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
+                          {mistakeText?.split(" (")[0] || "Violation"}
+                        </span>
+                      );
+                    } else if (reportMistake && isClean) {
+                      return (
+                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
+                          Clean ✓
+                        </span>
+                      );
+                    } else if (trade.mistakes && trade.mistakes.length > 0) {
+                      return (
+                        <span
+                          className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                            mistakeBadges[trade.mistakes[0]] || "bg-muted text-foreground border-border"
+                          }`}
+                        >
+                          {trade.mistakes[0]}
+                        </span>
+                      );
+                    }
+                    return <span className="text-xs text-muted-foreground/40">—</span>;
+                  })()}
                   <button
                     onClick={() => handleDeleteTrade(trade.id)}
                     className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-all cursor-pointer"
@@ -487,6 +519,33 @@ export default function JournalPage() {
                   <span>•</span>
                   <span>{trade.quantity} qty</span>
                 </div>
+                {/* Mobile mistake tag */}
+                {(() => {
+                  const reportMistake = mistakeTags.find(
+                    (mt) => mt.stock.toLowerCase() === trade.stock.toLowerCase()
+                  );
+                  const isClean = reportMistake?.tag.startsWith("✅");
+                  const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
+                  
+                  if (reportMistake && !isClean) {
+                    return (
+                      <div className="pt-1">
+                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
+                          ⚠️ {mistakeText?.split(" (")[0] || "Violation"}
+                        </span>
+                      </div>
+                    );
+                  } else if (reportMistake && isClean) {
+                    return (
+                      <div className="pt-1">
+                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
+                          ✓ Clean Trade
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           ))}
