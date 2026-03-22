@@ -11,55 +11,81 @@ import {
   TrendingDown,
   Copy,
   Check,
+  AlertOctagon,
+  Lightbulb,
 } from "lucide-react";
 
 export default function CalculatorPage() {
   const [accountSize, setAccountSize] = useState<string>("100000");
-  const [riskPercent, setRiskPercent] = useState<string>("1");
+  const [dailyMaxLossPercent, setDailyMaxLossPercent] = useState<string>("3");
+  const [tradesPlannedPerDay, setTradesPlannedPerDay] = useState<string>("5");
   const [entryPrice, setEntryPrice] = useState<string>("");
   const [stopLossPrice, setStopLossPrice] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => {
     const account = parseFloat(accountSize) || 0;
-    const risk = parseFloat(riskPercent) || 0;
+    const dailyMaxLossPct = parseFloat(dailyMaxLossPercent) || 0;
+    const tradesPerDay = parseInt(tradesPlannedPerDay) || 1;
     const entry = parseFloat(entryPrice) || 0;
     const sl = parseFloat(stopLossPrice) || 0;
 
-    if (!account || !risk || !entry || !sl || entry === sl) {
+    if (!account || !dailyMaxLossPct || !tradesPerDay) {
       return null;
     }
 
-    const riskAmount = (account * risk) / 100;
+    // Calculate daily max loss amount
+    const dailyMaxLossAmount = (account * dailyMaxLossPct) / 100;
+    
+    // Risk per trade = Daily Max Loss / Number of Trades Planned
+    const riskPerTrade = dailyMaxLossAmount / tradesPerDay;
+    const riskPerTradePercent = (riskPerTrade / account) * 100;
+
+    if (!entry || !sl || entry === sl) {
+      return {
+        dailyMaxLossAmount: Math.round(dailyMaxLossAmount),
+        riskPerTrade: Math.round(riskPerTrade),
+        riskPerTradePercent: riskPerTradePercent.toFixed(2),
+        tradesPerDay,
+        quantity: null,
+        actualRisk: null,
+        slDistance: null,
+        direction: null,
+        riskOfCapital: null,
+      };
+    }
+
     const slDistance = Math.abs(entry - sl);
-    const quantity = Math.floor(riskAmount / slDistance);
+    const quantity = Math.floor(riskPerTrade / slDistance);
     const actualRisk = quantity * slDistance;
-    const riskReward = slDistance; // placeholder for target-based R:R
 
     return {
-      riskAmount: Math.round(riskAmount),
+      dailyMaxLossAmount: Math.round(dailyMaxLossAmount),
+      riskPerTrade: Math.round(riskPerTrade),
+      riskPerTradePercent: riskPerTradePercent.toFixed(2),
+      tradesPerDay,
       slDistance: slDistance.toFixed(2),
       quantity,
       actualRisk: Math.round(actualRisk),
       direction: entry > sl ? "LONG" : "SHORT",
       riskOfCapital: ((actualRisk / account) * 100).toFixed(2),
     };
-  }, [accountSize, riskPercent, entryPrice, stopLossPrice]);
+  }, [accountSize, dailyMaxLossPercent, tradesPlannedPerDay, entryPrice, stopLossPrice]);
 
   const handleCopy = () => {
-    if (!result) return;
-    const text = `Position Size: ${result.quantity} qty | Entry: ₹${entryPrice} | SL: ₹${stopLossPrice} | Risk: ₹${result.actualRisk} (${result.riskOfCapital}%)`;
+    if (!result || !result.quantity) return;
+    const text = `Position Size: ${result.quantity} qty | Entry: ₹${entryPrice} | SL: ₹${stopLossPrice} | Risk: ₹${result.actualRisk} (${result.riskOfCapital}%) | Daily Limit: ₹${result.dailyMaxLossAmount}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const riskLevel =
-    parseFloat(riskPercent) <= 0.5
+    parseFloat(dailyMaxLossPercent) <= 2
       ? { label: "Conservative", color: "text-success", bg: "bg-success/10" }
-      : parseFloat(riskPercent) <= 1
+      : parseFloat(dailyMaxLossPercent) <= 3
         ? { label: "Recommended", color: "text-success", bg: "bg-success/10" }
-        : parseFloat(riskPercent) <= 2
+        : parseFloat(dailyMaxLossPercent) <= 5
           ? { label: "Moderate", color: "text-amber-500", bg: "bg-amber-500/10" }
           : { label: "Aggressive", color: "text-destructive", bg: "bg-destructive/10" };
 
@@ -83,13 +109,13 @@ export default function CalculatorPage() {
           </div>
 
           <div className="space-y-5">
-            {/* Account Size */}
+            {/* Account Capital */}
             <div>
               <label
                 htmlFor="account-size"
                 className="text-sm font-medium mb-1.5 block"
               >
-                Account Size
+                Account Capital
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
@@ -106,11 +132,11 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            {/* Risk % */}
+            {/* Daily Max Loss % */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="risk-pct" className="text-sm font-medium">
-                  Risk per Trade
+                <label htmlFor="daily-max-loss" className="text-sm font-medium">
+                  Daily Max Loss
                 </label>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${riskLevel.bg} ${riskLevel.color}`}
@@ -120,30 +146,71 @@ export default function CalculatorPage() {
               </div>
               <div className="flex items-center gap-3">
                 <input
-                  id="risk-pct"
+                  id="daily-max-loss"
                   type="range"
-                  min="0.25"
-                  max="3"
-                  step="0.25"
-                  value={riskPercent}
-                  onChange={(e) => setRiskPercent(e.target.value)}
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  value={dailyMaxLossPercent}
+                  onChange={(e) => setDailyMaxLossPercent(e.target.value)}
                   className="flex-1 h-2 bg-muted rounded-full appearance-none cursor-pointer accent-success"
                 />
                 <div className="w-16 text-right">
                   <span className="text-lg font-bold font-heading">
-                    {riskPercent}
+                    {dailyMaxLossPercent}
                   </span>
                   <span className="text-sm text-muted-foreground">%</span>
                 </div>
               </div>
-              {parseFloat(riskPercent) > 2 && (
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-destructive">
-                  <AlertCircle className="h-3 w-3" />
-                  <span>
-                    High risk! Professional traders risk 0.5-1% per trade.
+              {result && (
+                <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg bg-muted/50 border border-border">
+                  <span className="text-xs text-muted-foreground">Max Loss Daily Limit</span>
+                  <span className="text-sm font-mono font-semibold text-destructive">
+                    ₹{result.dailyMaxLossAmount.toLocaleString("en-IN")}
                   </span>
                 </div>
               )}
+              {parseFloat(dailyMaxLossPercent) > 5 && (
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>
+                    High daily risk! Professional traders limit daily loss to 2-3%.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Trades Planned Per Day */}
+            <div>
+              <label
+                htmlFor="trades-per-day"
+                className="text-sm font-medium mb-1.5 block"
+              >
+                No. of Trades Planned Per Day
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="trades-per-day"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={tradesPlannedPerDay}
+                  onChange={(e) => setTradesPlannedPerDay(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
+                  placeholder="5"
+                />
+              </div>
+              {result && (
+                <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg bg-success/5 border border-success/20">
+                  <span className="text-xs text-muted-foreground">Risk Per Trade</span>
+                  <span className="text-sm font-mono font-semibold text-success">
+                    ₹{result.riskPerTrade.toLocaleString("en-IN")} ({result.riskPerTradePercent}%)
+                  </span>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Risk Amount = ₹{result?.dailyMaxLossAmount.toLocaleString("en-IN") || "0"} ÷ {tradesPlannedPerDay} = ₹{result?.riskPerTrade.toLocaleString("en-IN") || "0"} per trade
+              </p>
             </div>
 
             {/* Entry & SL */}
@@ -194,7 +261,7 @@ export default function CalculatorPage() {
 
         {/* Result Panel */}
         <div className="lg:col-span-2 space-y-4">
-          {result ? (
+          {result && result.quantity ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -231,15 +298,21 @@ export default function CalculatorPage() {
               {/* Breakdown */}
               <div className="space-y-3 pt-3 border-t border-border/50">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Risk Amount</span>
+                  <span className="text-muted-foreground">Daily Max Loss</span>
+                  <span className="font-mono font-medium text-destructive">
+                    ₹{result.dailyMaxLossAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Risk Per Trade</span>
                   <span className="font-mono font-medium">
-                    ₹{result.riskAmount.toLocaleString("en-IN")}
+                    ₹{result.riskPerTrade.toLocaleString("en-IN")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Actual Risk</span>
-                  <span className="font-mono font-medium text-destructive">
-                    ₹{result.actualRisk.toLocaleString("en-IN")}
+                  <span className="font-mono font-medium text-amber-500">
+                    ₹{result.actualRisk?.toLocaleString("en-IN")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -252,7 +325,7 @@ export default function CalculatorPage() {
                   <span className="text-muted-foreground">% of Capital</span>
                   <span
                     className={`font-mono font-medium ${
-                      parseFloat(result.riskOfCapital) <= 1
+                      parseFloat(result.riskOfCapital || "0") <= 1
                         ? "text-success"
                         : "text-amber-500"
                     }`}
@@ -302,16 +375,31 @@ export default function CalculatorPage() {
             </div>
           )}
 
-          {/* Pro tip */}
-          <div className="rounded-xl border border-border bg-card p-4">
+          {/* Stop Trading Signal */}
+          <div className="rounded-xl border border-destructive/30 bg-destructive/[0.04] p-4">
             <div className="flex items-start gap-2.5">
-              <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+              <AlertOctagon className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-semibold mb-1">
+                <p className="text-xs font-semibold text-destructive mb-1">
+                  Stop Trading Signal
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Once your ₹{result?.dailyMaxLossAmount.toLocaleString("en-IN") || ((parseFloat(accountSize) * parseFloat(dailyMaxLossPercent)) / 100).toLocaleString("en-IN")} daily loss threshold is hit, <span className="font-semibold text-destructive">STOP TRADING</span> for the day. No exceptions.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pro tip */}
+          <div className="rounded-xl border border-success/30 bg-success/[0.04] p-4">
+            <div className="flex items-start gap-2.5">
+              <Lightbulb className="h-4 w-4 text-success mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-success mb-1">
                   INTROSPECT™ Pro Tip
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Professional traders risk 0.5-1% of capital per trade. Even with a 50% win rate, this ensures your account survives losing streaks.
+                  Never bet your whole day on one trade. By splitting your daily limit into {tradesPlannedPerDay} planned trades, you transform trading from a gamble into a game of mathematical edge.
                 </p>
               </div>
             </div>

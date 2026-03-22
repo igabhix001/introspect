@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode, useMemo } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/types/database";
@@ -30,11 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
-  const supabase = createClient();
+  
+  // Use singleton Supabase client - memoized to prevent recreation
+  const supabase = useMemo(() => createClient(), []);
 
   // Refs to prevent race conditions — NEVER put these in useEffect deps
   const mountedRef = useRef(true);
   const initDoneRef = useRef(false);
+  const hydratingRef = useRef(false); // Prevent concurrent hydrations
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
@@ -98,34 +101,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /**
      * Helper: given a valid user, hydrate profile + subscription in parallel.
      * Does NOT touch `loading` — the caller decides when to clear it.
+     * Uses hydratingRef to prevent concurrent hydrations that cause race conditions.
      */
     const hydrateUser = async (u: User) => {
       if (!mountedRef.current) return;
+      
+      // Prevent concurrent hydrations - this is critical for mobile stability
+      if (hydratingRef.current) {
+        // Just update user object if already hydrating
+        setUser(u);
+        return;
+      }
+      
+      hydratingRef.current = true;
       setUser(u);
 
-      const subPromise = supabase
-        .from("subscriptions")
-        .select("id")
-        .eq("user_id", u.id)
-        .eq("status", "active")
-        .gte("current_period_end", new Date().toISOString())
-        .limit(1)
-        .maybeSingle();
+      try {
+        const subPromise = supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", u.id)
+          .eq("status", "active")
+          .gte("current_period_end", new Date().toISOString())
+          .limit(1)
+          .maybeSingle();
 
-      const [, subResult] = await Promise.allSettled([
-        fetchProfile(u.id, u.email || undefined),
-        Promise.race([subPromise, new Promise<null>((r) => setTimeout(() => r(null), 3000))]),
-      ]);
+        const [, subResult] = await Promise.allSettled([
+          fetchProfile(u.id, u.email || undefined),
+          Promise.race([subPromise, new Promise<null>((r) => setTimeout(() => r(null), 3000))]),
+        ]);
 
-      if (!mountedRef.current) return;
-      const sub =
-        subResult.status === "fulfilled" &&
-        subResult.value &&
-        typeof subResult.value === "object" &&
-        "data" in subResult.value
-          ? (subResult.value as { data: unknown }).data
-          : null;
-      setHasActiveSubscription(!!sub);
+        if (!mountedRef.current) return;
+        const sub =
+          subResult.status === "fulfilled" &&
+          subResult.value &&
+          typeof subResult.value === "object" &&
+          "data" in subResult.value
+            ? (subResult.value as { data: unknown }).data
+            : null;
+        setHasActiveSubscription(!!sub);
+      } finally {
+        hydratingRef.current = false;
+      }
     };
 
     const clearAuth = () => {
@@ -160,27 +177,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
 
     // ── 2. Auth state listener — handles sign-in, sign-out, token refresh ──
+    // CRITICAL: This listener should NOT cause loading states after initial load
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mountedRef.current) return;
 
+        // SIGNED_OUT: Clear everything
         if (event === "SIGNED_OUT") {
           clearAuth();
           setLoading(false);
           return;
         }
 
-        // For SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED — update user state
-        if (session?.user) {
-          // Only do full hydrate on sign-in, lightweight update on token refresh
-          if (event === "SIGNED_IN") {
+        // TOKEN_REFRESHED: Just update user object silently - NO loading state change
+        // This is the most common event and should be invisible to the user
+        if (event === "TOKEN_REFRESHED" && session?.user) {
+          setUser(session.user);
+          // Do NOT change loading state - this prevents the "stuck loading" issue
+          return;
+        }
+
+        // USER_UPDATED: Update user object silently
+        if (event === "USER_UPDATED" && session?.user) {
+          setUser(session.user);
+          return;
+        }
+
+        // SIGNED_IN: Full hydration only for actual sign-in (not token refresh)
+        if (event === "SIGNED_IN" && session?.user) {
+          // Only hydrate if we don't already have this user
+          if (!user || user.id !== session.user.id) {
             await hydrateUser(session.user);
           } else {
-            // TOKEN_REFRESHED / USER_UPDATED — just update the user object
+            // Same user, just update the user object
             setUser(session.user);
           }
+          if (mountedRef.current) setLoading(false);
+          return;
         }
-        if (mountedRef.current) setLoading(false);
+
+        // INITIAL_SESSION: Handle initial session from storage
+        if (event === "INITIAL_SESSION" && session?.user) {
+          // Only hydrate if not already done
+          if (!user) {
+            await hydrateUser(session.user);
+          }
+          if (mountedRef.current) setLoading(false);
+        }
       }
     );
 
