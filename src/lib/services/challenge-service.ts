@@ -6,10 +6,11 @@ import { awardPoints } from "./loyalty-service";
  * 
  * Production-grade service that automatically processes challenge check-ins
  * when a user logs a trade (journal entry). This ensures:
- * - One journal entry = one day of challenge progress
- * - Consecutive day tracking with streak reset on missed days
+ * - One journal entry = one day of challenge progress (1/30, 2/30, 3/30...)
+ * - NO streak reset on missed days - progress is cumulative
  * - Automatic completion detection and point awarding
  * - Idempotent operations (safe to call multiple times per day)
+ * - Tracks last journal date for display
  */
 
 interface ChallengeCheckinResult {
@@ -24,34 +25,39 @@ interface ChallengeCheckinResult {
   error?: string;
   already_checked_in?: boolean;
   no_active_challenge?: boolean;
+  last_journal_date?: string;
 }
 
 // Progressive messages based on day count
 function getProgressiveMessage(day: number, totalDays: number): string {
   const progress = day / totalDays;
-  if (day === 1) return "🚀 Day 1 complete! Your challenge journey begins.";
-  if (day === 7) return "🔥 One week strong! Momentum is building.";
-  if (day === 14) return "💪 Two weeks of discipline! You're proving commitment.";
-  if (day === 21) return "🧠 21 days - habits are forming!";
-  if (progress >= 0.5 && progress < 0.6) return "🎯 Halfway there! Keep pushing!";
-  if (progress >= 0.75 && progress < 0.8) return "⚡ 75% complete! Finish line in sight!";
-  if (progress >= 0.9) return "🏆 Final stretch! Victory awaits!";
-  if (day % 10 === 0) return `📊 ${day} days logged. Building greatness!`;
-  return `✅ Day ${day} complete!`;
+  if (day === 1) return "🚀 Day 1/${totalDays} complete! Your challenge journey begins.";
+  if (day === 7) return `🔥 ${day}/${totalDays} - One week of journaling! Momentum is building.`;
+  if (day === 14) return `💪 ${day}/${totalDays} - Two weeks of discipline! You're proving commitment.`;
+  if (day === 21) return `🧠 ${day}/${totalDays} - 21 days - habits are forming!`;
+  if (progress >= 0.5 && progress < 0.6) return `🎯 ${day}/${totalDays} - Halfway there! Keep pushing!`;
+  if (progress >= 0.75 && progress < 0.8) return `⚡ ${day}/${totalDays} - 75% complete! Finish line in sight!`;
+  if (progress >= 0.9) return `🏆 ${day}/${totalDays} - Final stretch! Victory awaits!`;
+  if (day % 10 === 0) return `📊 ${day}/${totalDays} days logged. Building greatness!`;
+  return `✅ Day ${day}/${totalDays} complete!`;
 }
 
 /**
  * Automatically check-in for active challenge when user logs a trade
  * 
+ * NEW LOGIC (per client request):
+ * - No streak reset on missed days - progress is cumulative (1/30, 2/30, 3/30...)
+ * - Skipped days don't reset progress - there can be no-trade days
+ * - No restart restrictions - user can always continue their challenge
+ * - Tracks last journal date for display
+ * 
  * @param supabase - Supabase client instance
  * @param userId - User ID
- * @param disciplineMet - Whether discipline rules were followed (default: true for trade logging)
  * @returns ChallengeCheckinResult
  */
 export async function autoCheckInChallenge(
   supabase: SupabaseClient,
-  userId: string,
-  disciplineMet: boolean = true
+  userId: string
 ): Promise<ChallengeCheckinResult> {
   try {
     // 1. Get active challenge for user
@@ -72,7 +78,7 @@ export async function autoCheckInChallenge(
       };
     }
 
-    // 2. Check if already checked in today (idempotent)
+    // 2. Check if already checked in today (idempotent - multiple trades per day = 1 check-in)
     const today = new Date().toISOString().split("T")[0];
     const lastCheckin = challenge.last_checkin_date;
 
@@ -84,24 +90,14 @@ export async function autoCheckInChallenge(
         current_day: challenge.current_day,
         total_days: parseInt(challenge.type) || 30,
         progress_pct: Math.round((challenge.current_day / (parseInt(challenge.type) || 30)) * 100),
-        message: "Already checked in today - keep trading!",
+        last_journal_date: lastCheckin,
+        message: "Already journaled today - keep trading!",
       };
     }
 
-    // 3. Validate consecutive day (must be yesterday or first checkin)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    const isConsecutive = !lastCheckin || lastCheckin === yesterdayStr;
-    
-    // Calculate new current day
-    // - If consecutive and discipline met: increment
-    // - If not consecutive but discipline met: reset to 1 (missed a day)
-    // - If discipline not met: reset to 0
-    const newCurrentDay = isConsecutive && disciplineMet
-      ? (challenge.current_day || 0) + 1
-      : disciplineMet ? 1 : 0;
+    // 3. Simply increment the day count - NO STREAK RESET
+    // Skipped days don't matter - progress is cumulative
+    const newCurrentDay = (challenge.current_day || 0) + 1;
 
     // 4. Check if challenge completed
     const totalDays = parseInt(challenge.type) || 30;
@@ -157,16 +153,9 @@ export async function autoCheckInChallenge(
     }
 
     // 8. Generate appropriate message
-    let message: string;
-    if (isCompleted) {
-      message = `🎉 Challenge completed! You earned ${pointsEarned} points!`;
-    } else if (!isConsecutive && disciplineMet) {
-      message = `⚠️ Streak reset (missed a day). Starting fresh at Day 1!`;
-    } else if (disciplineMet) {
-      message = getProgressiveMessage(newCurrentDay, totalDays);
-    } else {
-      message = "❌ Discipline not met. Streak reset.";
-    }
+    const message = isCompleted
+      ? `🎉 Challenge completed! ${newCurrentDay}/${totalDays} days journaled. You earned ${pointsEarned} points!`
+      : getProgressiveMessage(newCurrentDay, totalDays);
 
     return {
       success: true,
@@ -176,6 +165,7 @@ export async function autoCheckInChallenge(
       progress_pct: Math.round((newCurrentDay / totalDays) * 100),
       is_completed: isCompleted,
       points_earned: pointsEarned,
+      last_journal_date: today,
       message,
     };
   } catch (error) {

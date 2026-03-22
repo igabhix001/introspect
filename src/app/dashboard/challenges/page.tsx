@@ -35,6 +35,7 @@ interface ChallengeRow {
   rules_to_follow: string[];
   created_at: string;
   completed_at: string | null;
+  last_checkin_date: string | null;
 }
 
 const challengeTemplates = [
@@ -226,16 +227,24 @@ export default function ChallengesPage() {
         </div>
       </motion.div>
 
-      {/* Auto Check-in Info Banner */}
+      {/* Auto Check-in Info Banner with Last Journal Date */}
       {activeChallenge && (
         <motion.div variants={stagger.item} className="bg-success/10 border border-success/30 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-sm text-success mb-1">Automatic Daily Check-in</h3>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-semibold text-sm text-success">Automatic Daily Check-in</h3>
+                {activeChallenge.last_checkin_date && (
+                  <span className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full font-medium">
+                    Last Journal: {new Date(activeChallenge.last_checkin_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Your challenge progress is <strong>automatically updated</strong> when you log a trade in your journal. 
-                One journal entry per day = one day of challenge progress. Just keep trading and logging!
+                One journal entry per day = one day of progress ({activeChallenge.current_day}/{activeChallenge.type}). 
+                Skipped days don&apos;t reset your progress - just keep journaling!
               </p>
             </div>
           </div>

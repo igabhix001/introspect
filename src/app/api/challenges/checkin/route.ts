@@ -17,13 +17,15 @@ function getProgressiveMessage(day: number, totalDays: number): string {
 }
 
 // POST: Daily check-in for active challenge
+// NOTE: This endpoint is kept for backward compatibility but automatic check-in
+// via trade logging is the primary method now
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { challenge_id, discipline_met } = await request.json();
+    const { challenge_id } = await request.json();
 
     // Get the challenge
     const { data: challenge, error: fetchError } = await supabase
@@ -38,49 +40,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Challenge not found or not active" }, { status: 404 });
     }
 
-    // Check restart limits (max 3 restarts per challenge type per month)
-    if (!discipline_met) {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      
-      const { count: restartCount } = await supabase
-        .from("challenges")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("type", challenge.type)
-        .eq("status", "failed")
-        .gte("created_at", startOfMonth.toISOString());
-
-      if ((restartCount || 0) >= 3) {
-        return NextResponse.json({
-          error: "Challenge restart limit reached",
-          message: "You've restarted this challenge type 3 times this month. Try again next month or choose a different challenge.",
-          restart_limit_reached: true,
-        }, { status: 400 });
-      }
-    }
-
-    // Check if already checked in today
+    // Check if already checked in today (idempotent)
     const today = new Date().toISOString().split("T")[0];
     const lastCheckin = challenge.last_checkin_date;
     
     if (lastCheckin === today) {
-      return NextResponse.json({ error: "Already checked in today" }, { status: 400 });
+      return NextResponse.json({ 
+        error: "Already checked in today",
+        current_day: challenge.current_day,
+        total_days: parseInt(challenge.type) || 30,
+      }, { status: 400 });
     }
 
-    // Validate consecutive day (must be yesterday or first checkin)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    const isConsecutive = !lastCheckin || lastCheckin === yesterdayStr;
-    const newCurrentDay = isConsecutive && discipline_met 
-      ? (challenge.current_day || 0) + 1 
-      : discipline_met ? 1 : 0; // Reset if not consecutive
+    // Simply increment the day count - NO STREAK RESET
+    // Skipped days don't matter - progress is cumulative (1/30, 2/30, 3/30...)
+    const newCurrentDay = (challenge.current_day || 0) + 1;
 
     // Check if challenge completed
-    const isCompleted = newCurrentDay >= (challenge.total_days || 30);
+    const totalDays = parseInt(challenge.type) || 30;
+    const isCompleted = newCurrentDay >= totalDays;
     const newStatus = isCompleted ? "completed" : "active";
 
     // Calculate points earned
@@ -119,10 +97,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get total days for challenge type
-    const totalDaysMap: Record<string, number> = { "30": 30, "60": 60, "90": 90 };
-    const totalDays = totalDaysMap[challenge.type] || 30;
-
     return NextResponse.json({
       success: true,
       current_day: newCurrentDay,
@@ -131,12 +105,10 @@ export async function POST(request: NextRequest) {
       status: newStatus,
       is_completed: isCompleted,
       points_earned: pointsEarned,
-      was_consecutive: isConsecutive,
+      last_journal_date: today,
       message: isCompleted 
-        ? `🎉 Congratulations! Challenge completed! You earned ${pointsEarned} points!`
-        : discipline_met
-          ? getProgressiveMessage(newCurrentDay, totalDays)
-          : "❌ Discipline not met today. Your streak has been reset. Stay focused tomorrow!",
+        ? `🎉 Congratulations! Challenge completed! ${newCurrentDay}/${totalDays} days journaled. You earned ${pointsEarned} points!`
+        : getProgressiveMessage(newCurrentDay, totalDays),
     });
   } catch (error) {
     console.error("Checkin error:", error);

@@ -189,15 +189,10 @@ export async function POST(request: NextRequest) {
 
     // AUTOMATIC CHALLENGE CHECK-IN
     // One journal entry (trade) = one day of challenge progress
-    // This runs asynchronously and doesn't block the trade response
+    // Progress is cumulative - no streak reset on missed days
     let challengeCheckin = null;
     try {
-      // Determine if discipline was met based on trade quality
-      // For now: logging a trade = discipline met (lenient mode)
-      // Strict mode could check: no mistakes, followed plan, etc.
-      const disciplineMet = true;
-      
-      challengeCheckin = await autoCheckInChallenge(supabase, user.id, disciplineMet);
+      challengeCheckin = await autoCheckInChallenge(supabase, user.id);
       
       // If this was a successful check-in, add to response
       if (challengeCheckin.checked_in) {

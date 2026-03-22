@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useTradesQuery, useDailyReportQuery, queryKeys } from "@/lib/hooks/use-queries";
+import { useTradesQuery, useDailyReportQuery, useChallengesQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
 
 const emotionColors: Record<string, string> = {
@@ -62,6 +62,15 @@ export default function JournalPage() {
   const { data: tradesData, isLoading } = useTradesQuery();
   const trades = (tradesData as TradeRow[]) || [];
   
+  // Fetch active challenge to show reminder banner
+  const { data: challengesData } = useChallengesQuery();
+  const activeChallenge = (challengesData?.active as { 
+    id: string; 
+    type: string; 
+    current_day: number; 
+    last_checkin_date: string | null;
+  }) || null;
+  
   // Fetch today's daily report to get mistake tags for trades
   const today = new Date().toISOString().split("T")[0];
   const { data: todayReportData } = useDailyReportQuery(today);
@@ -71,6 +80,9 @@ export default function JournalPage() {
     };
   } | null;
   const mistakeTags = todayReport?.feedback?.mistakeTags || [];
+  
+  // Check if user has already journaled today for the challenge
+  const hasJournaledToday = activeChallenge?.last_checkin_date === today;
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,6 +255,37 @@ export default function JournalPage() {
 
   return (
     <div className="space-y-6">
+      {/* Challenge Reminder Banner */}
+      {activeChallenge && (
+        <div className={`rounded-xl p-4 border ${
+          hasJournaledToday 
+            ? "bg-success/10 border-success/30" 
+            : "bg-amber-500/10 border-amber-500/30"
+        }`}>
+          <div className="flex items-center gap-3">
+            {hasJournaledToday ? (
+              <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            )}
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${hasJournaledToday ? "text-success" : "text-amber-600"}`}>
+                {hasJournaledToday 
+                  ? `✅ Challenge Day ${activeChallenge.current_day}/${activeChallenge.type} logged!` 
+                  : `📝 Log a trade to track Day ${activeChallenge.current_day + 1}/${activeChallenge.type} of your challenge`
+                }
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {hasJournaledToday 
+                  ? "Great job! Keep up the discipline. Your progress is saved." 
+                  : "Journal after every trading day to track your discipline challenge honestly."
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-border bg-card p-3.5">
