@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { tradeSchema } from "@/lib/validation/schemas";
 import { tradeRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { autoCheckInChallenge } from "@/lib/services/challenge-service";
 
 // Mistake Detector per client spec
 function detectMistakes(trade: {
@@ -186,6 +187,27 @@ export async function POST(request: NextRequest) {
     if ((tradeCount || 0) > 3) warnings.push("overtrading");
     if (dailyLossPct >= 1) warnings.push("daily_loss_limit_warning");
 
+    // AUTOMATIC CHALLENGE CHECK-IN
+    // One journal entry (trade) = one day of challenge progress
+    // This runs asynchronously and doesn't block the trade response
+    let challengeCheckin = null;
+    try {
+      // Determine if discipline was met based on trade quality
+      // For now: logging a trade = discipline met (lenient mode)
+      // Strict mode could check: no mistakes, followed plan, etc.
+      const disciplineMet = true;
+      
+      challengeCheckin = await autoCheckInChallenge(supabase, user.id, disciplineMet);
+      
+      // If this was a successful check-in, add to response
+      if (challengeCheckin.checked_in) {
+        console.log(`Challenge auto check-in: Day ${challengeCheckin.current_day}/${challengeCheckin.total_days}`);
+      }
+    } catch (checkinError) {
+      // Don't fail the trade if challenge check-in fails
+      console.error("Challenge auto check-in error (non-blocking):", checkinError);
+    }
+
     return NextResponse.json({ 
       trade, 
       warnings, 
@@ -193,6 +215,19 @@ export async function POST(request: NextRequest) {
       mistakes: tradeData.mistakes,
       mistakeFeedback,
       violations: violations.length > 0 ? violations : undefined,
+      // Include challenge progress in response
+      challengeProgress: challengeCheckin?.checked_in ? {
+        current_day: challengeCheckin.current_day,
+        total_days: challengeCheckin.total_days,
+        progress_pct: challengeCheckin.progress_pct,
+        is_completed: challengeCheckin.is_completed,
+        points_earned: challengeCheckin.points_earned,
+        message: challengeCheckin.message,
+      } : challengeCheckin?.already_checked_in ? {
+        already_checked_in: true,
+        current_day: challengeCheckin.current_day,
+        message: challengeCheckin.message,
+      } : null,
     });
   } catch (error) {
     console.error("Trade error:", error);

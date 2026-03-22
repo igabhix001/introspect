@@ -102,7 +102,6 @@ export default function ChallengesPage() {
   
   const [starting, setStarting] = useState<string | null>(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
-  const [checkingIn, setCheckingIn] = useState(false);
   const [exporting, setExporting] = useState(false);
   const supabase = createClient();
   
@@ -130,30 +129,6 @@ export default function ChallengesPage() {
 
   const activeChallenge = challenges.find((c) => c.status === "active");
   const completedChallenges = challenges.filter((c) => c.status === "completed");
-
-  const handleDailyCheckin = async () => {
-    if (!activeChallenge || !user) return;
-    setCheckingIn(true);
-    try {
-      const res = await fetch("/api/challenges/checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challenge_id: activeChallenge.id, discipline_met: true }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        // Invalidate queries to refetch fresh data
-        queryClient.invalidateQueries({ queryKey: queryKeys.challenges(user.id) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.loyalty(user.id) });
-        alert(data.message);
-      } else {
-        alert(data.error || "Check-in failed");
-      }
-    } catch (error) {
-      console.error("Checkin error:", error);
-    }
-    setCheckingIn(false);
-  };
 
   const handleExport = async (format: "json" | "csv") => {
     setExporting(true);
@@ -218,24 +193,27 @@ export default function ChallengesPage() {
             &ldquo;Complete challenges to earn points, unlock badges, and build unshakeable trading discipline&rdquo;
           </p>
         </div>
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-4 flex-wrap">
           {activeChallenge && (
-            <div className="px-6 py-2.5 rounded-full bg-success text-success-foreground font-semibold text-sm shadow-md">
-              Current: {activeChallenge.name} (Day {activeChallenge.current_day})
+            <div className="px-6 py-2.5 rounded-full bg-success text-success-foreground font-semibold text-sm shadow-md flex items-center gap-2">
+              <span>Current: {activeChallenge.name} (Day {activeChallenge.current_day}/{activeChallenge.type})</span>
+              <span className="text-success-foreground/70 text-xs">
+                | Started: {new Date(activeChallenge.start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                → Ends: {new Date(new Date(activeChallenge.start_date).getTime() + parseInt(activeChallenge.type) * 24 * 60 * 60 * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              </span>
             </div>
           )}
           <Link href="/dashboard/loyalty" className="px-6 py-2.5 rounded-full border border-border hover:bg-muted font-medium text-sm transition-colors">
             View Loyalty Points
           </Link>
           {activeChallenge && (
-            <button
-              onClick={handleDailyCheckin}
-              disabled={checkingIn}
+            <Link
+              href="/dashboard/journal"
               className="px-6 py-2.5 rounded-full bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors flex items-center gap-2"
             >
-              {checkingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
-              Daily Check-in
-            </button>
+              <Calendar className="h-4 w-4" />
+              Log Trade to Check-in
+            </Link>
           )}
           <button
             onClick={() => handleExport("csv")}
@@ -247,6 +225,22 @@ export default function ChallengesPage() {
           </button>
         </div>
       </motion.div>
+
+      {/* Auto Check-in Info Banner */}
+      {activeChallenge && (
+        <motion.div variants={stagger.item} className="bg-success/10 border border-success/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-sm text-success mb-1">Automatic Daily Check-in</h3>
+              <p className="text-xs text-muted-foreground">
+                Your challenge progress is <strong>automatically updated</strong> when you log a trade in your journal. 
+                One journal entry per day = one day of challenge progress. Just keep trading and logging!
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* 5. Benefits Highlight Section */}
       <motion.div variants={stagger.item} className="bg-card border border-border rounded-2xl p-6 overflow-hidden">
@@ -288,6 +282,14 @@ export default function ChallengesPage() {
           {challengeTemplates.map((template) => {
             const alreadyActive = challenges.some((c) => c.type === template.type && c.status === "active");
             const isCompleted = challenges.some((c) => c.type === template.type && c.status === "completed");
+            
+            // Tier progression: must complete previous tier to unlock next
+            const has30Completed = challenges.some((c) => c.type === "30" && c.status === "completed");
+            const has60Completed = challenges.some((c) => c.type === "60" && c.status === "completed");
+            
+            const isLocked = 
+              (template.type === "60" && !has30Completed) ||
+              (template.type === "90" && !has60Completed);
 
             return (
               <div 
@@ -352,10 +354,11 @@ export default function ChallengesPage() {
                   <div className="mt-auto space-y-3">
                     <button
                       onClick={() => startChallenge(template)}
-                      disabled={alreadyActive || isCompleted || (activeChallenge !== undefined && !alreadyActive) || starting === template.type}
+                      disabled={alreadyActive || isCompleted || isLocked || (activeChallenge !== undefined && !alreadyActive) || starting === template.type}
                       className={`w-full py-3 px-4 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                         alreadyActive ? 'bg-success text-success-foreground' :
                         isCompleted ? 'bg-muted text-muted-foreground border border-border' :
+                        isLocked ? 'bg-muted/50 text-muted-foreground opacity-60 cursor-not-allowed border border-dashed border-border' :
                         activeChallenge ? 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed' :
                         'bg-foreground text-background hover:bg-foreground/90'
                       }`}
@@ -366,6 +369,8 @@ export default function ChallengesPage() {
                         <>Active Now</>
                       ) : isCompleted ? (
                         <>Completed <CheckCircle2 className="h-4 w-4" /></>
+                      ) : isLocked ? (
+                        <>🔒 Complete {template.type === "60" ? "30-Day" : "60-Day"} First</>
                       ) : (
                         "START CHALLENGE"
                       )}

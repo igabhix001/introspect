@@ -106,41 +106,45 @@ export default function JournalPage() {
       const entryPrice = parseFloat(formData.entry_price);
       const exitPrice = parseFloat(formData.exit_price);
       const quantity = parseInt(formData.quantity) || 1;
-      const pnl =
-        formData.direction === "long"
-          ? (exitPrice - entryPrice) * quantity
-          : (entryPrice - exitPrice) * quantity;
 
-      const riskPct = formData.stop_loss
-        ? Math.abs(entryPrice - parseFloat(formData.stop_loss)) / entryPrice * 100
-        : 0;
-
-      const { error } = await supabase.from("trades").insert({
-        user_id: user.id,
-        date: new Date().toISOString().split("T")[0],
-        stock: formData.stock,
-        direction: formData.direction,
-        entry_price: entryPrice,
-        exit_price: exitPrice,
-        stop_loss: formData.stop_loss ? parseFloat(formData.stop_loss) : null,
-        quantity,
-        pnl,
-        risk_pct: riskPct,
-        followed_plan: formData.followed_plan,
-        sl_followed: !!formData.stop_loss,
-        emotion_before: formData.emotion_before,
-        emotion_after: null,
-        notes: formData.notes || null,
-        mistakes: formData.mistake ? [formData.mistake] : [],
+      // Use API route for trade creation - this triggers automatic challenge check-in
+      const response = await fetch("/api/trades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stock: formData.stock,
+          direction: formData.direction,
+          entry_price: entryPrice,
+          exit_price: exitPrice,
+          stop_loss: formData.stop_loss ? parseFloat(formData.stop_loss) : null,
+          quantity,
+          followed_plan: formData.followed_plan,
+          emotion_before: formData.emotion_before,
+          notes: formData.notes || null,
+        }),
       });
 
-      if (error) {
-        console.error("Failed to save trade:", error);
-        alert("Failed to save trade. Please try again.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to save trade:", data.error);
+        alert(data.error || "Failed to save trade. Please try again.");
       } else {
+        // Show challenge progress notification if applicable
+        if (data.challengeProgress?.checked_in) {
+          const cp = data.challengeProgress;
+          if (cp.is_completed) {
+            alert(`🎉 Challenge Completed! ${cp.message}`);
+          } else {
+            // Show subtle notification for daily progress
+            console.log(`Challenge progress: ${cp.message}`);
+          }
+        }
+
         // Invalidate queries to refetch fresh data
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.challenges(user.id) });
         setShowAddModal(false);
         setFormData({
           stock: "",
