@@ -25,6 +25,10 @@ import {
   BookOpen,
   Trophy,
   BarChart3,
+  Activity,
+  Gift,
+  FileText,
+  Home,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -39,9 +43,12 @@ const mobileNavItems = [
   { label: "Assessment", href: "/dashboard/assessment", icon: ClipboardCheck },
   { label: "Risk Report", href: "/dashboard/risk-report", icon: ShieldAlert },
   { label: "Position Sizer", href: "/dashboard/calculator", icon: Calculator },
+  { label: "Market Sentiment", href: "/dashboard/sentiment", icon: Activity },
   { label: "Trade Journal", href: "/dashboard/journal", icon: BookOpen },
-  { label: "Challenges", href: "/dashboard/challenges", icon: Trophy },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { label: "Daily Report", href: "/dashboard/daily-report", icon: FileText },
+  { label: "Challenges", href: "/dashboard/challenges", icon: Trophy },
+  { label: "Reward Points", href: "/dashboard/loyalty", icon: Gift },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -377,8 +384,18 @@ export function DashboardHeader({
                 })}
               </div>
 
-              {/* Mobile logout */}
-              <div className="border-t border-border/50 p-3">
+              {/* Mobile bottom actions */}
+              <div className="border-t border-border/50 p-3 space-y-1">
+                {/* Back to Home */}
+                <Link
+                  href="/"
+                  onClick={onMobileMenuToggle}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  <Home className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                  ← Back to Home
+                </Link>
+                {/* Logout */}
                 <button
                   onClick={signOut}
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"

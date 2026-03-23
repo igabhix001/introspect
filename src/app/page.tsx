@@ -24,12 +24,16 @@ const ChallengeCTA = dynamic(() => import("@/components/home/challenge-cta").the
 const ServicesSection = dynamic(() => import("@/components/home/services-section").then(m => m.ServicesSection), {
   loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
 });
+const VideoSection = dynamic(() => import("@/components/home/video-section").then(m => m.VideoSection), {
+  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
+});
 
 export default function HomePage() {
   return (
     <>
       <Hero />
       <Stats />
+      <VideoSection />
       <section className="py-24 bg-background relative overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
           <Features8 />
