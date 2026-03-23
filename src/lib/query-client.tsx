@@ -14,6 +14,9 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             refetchOnWindowFocus: true, // Refetch stale (not fresh) queries on focus
             refetchOnReconnect: true, // Refetch stale queries on reconnect
             retry: 1,
+            retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+            // Network mode: always attempt fetches (don't wait for online status)
+            networkMode: "always",
           },
         },
       })

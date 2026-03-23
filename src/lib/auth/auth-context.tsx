@@ -41,11 +41,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
+      // Add timeout to prevent hanging on slow Supabase responses
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
+        .abortSignal(controller.signal)
         .single();
+
+      clearTimeout(timeout);
 
       if (error) {
         // Handle RLS infinite recursion (42P17)
@@ -73,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (mountedRef.current) setProfile(data as Profile | null);
     } catch {
-      // Absolute fallback — never crash the app
+      // Absolute fallback — never crash the app (also handles AbortError)
       if (mountedRef.current) {
         setProfile({
           id: userId, email: userEmail || "",
@@ -91,24 +98,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading > 5s no matter what
+    // Safety net: never stay loading > 3s no matter what (reduced from 5s)
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current && loading) {
+        console.warn("[AuthProvider] Safety timer fired — forcing loading=false");
         setLoading(false);
       }
-    }, 5000);
+    }, 3000);
 
     /**
      * Helper: given a valid user, hydrate profile + subscription in parallel.
      * Does NOT touch `loading` — the caller decides when to clear it.
      * Uses hydratingRef to prevent concurrent hydrations that cause race conditions.
+     * IMPORTANT: If hydration is already in progress, still ensures loading clears.
      */
     const hydrateUser = async (u: User) => {
       if (!mountedRef.current) return;
       
       // Prevent concurrent hydrations - this is critical for mobile stability
       if (hydratingRef.current) {
-        // Just update user object if already hydrating
+        // Just update user object — the in-flight hydration will clear loading
         setUser(u);
         return;
       }
@@ -117,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
 
       try {
+        // Subscription check with aggressive 2s timeout
         const subPromise = supabase
           .from("subscriptions")
           .select("id")
@@ -128,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const [, subResult] = await Promise.allSettled([
           fetchProfile(u.id, u.email || undefined),
-          Promise.race([subPromise, new Promise<null>((r) => setTimeout(() => r(null), 3000))]),
+          Promise.race([subPromise, new Promise<null>((r) => setTimeout(() => r(null), 2000))]),
         ]);
 
         if (!mountedRef.current) return;
@@ -153,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // ── 1. Initial auth check (runs once) ──
+    // Uses getSession() which reads from local storage (fast) rather than network
     const initAuth = async () => {
       if (initDoneRef.current) return;
       initDoneRef.current = true;
@@ -190,10 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // TOKEN_REFRESHED: Just update user object silently - NO loading state change
-        // This is the most common event and should be invisible to the user
         if (event === "TOKEN_REFRESHED" && session?.user) {
           setUser(session.user);
-          // Do NOT change loading state - this prevents the "stuck loading" issue
           return;
         }
 
@@ -209,19 +218,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!user || user.id !== session.user.id) {
             await hydrateUser(session.user);
           } else {
-            // Same user, just update the user object
             setUser(session.user);
           }
           if (mountedRef.current) setLoading(false);
           return;
         }
 
-        // INITIAL_SESSION: Handle initial session from storage
-        if (event === "INITIAL_SESSION" && session?.user) {
-          // Only hydrate if not already done
-          if (!user) {
-            await hydrateUser(session.user);
+        // INITIAL_SESSION: Always ensure loading clears even if hydration is skipped
+        if (event === "INITIAL_SESSION") {
+          if (session?.user) {
+            // Only hydrate if initAuth hasn't already done it
+            if (!user && !hydratingRef.current) {
+              await hydrateUser(session.user);
+            }
+          } else {
+            clearAuth();
           }
+          // ALWAYS clear loading on INITIAL_SESSION — this is the critical fix
           if (mountedRef.current) setLoading(false);
         }
       }

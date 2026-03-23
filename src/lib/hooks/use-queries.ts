@@ -4,6 +4,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
 
+// Singleton Supabase client — shared across all hooks, never recreated per render
+const supabase = createClient();
+
 // ─── Query Keys (centralized for cache invalidation) ───
 export const queryKeys = {
   dashboard: (userId: string) => ["dashboard", userId] as const,
@@ -20,11 +23,10 @@ export const queryKeys = {
 export function useDashboardQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.dashboard(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const today = new Date().toISOString().split("T")[0];
@@ -35,20 +37,23 @@ export function useDashboardQuery() {
           .select("*")
           .eq("user_id", userId)
           .gte("created_at", `${today}T00:00:00`)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .abortSignal(signal),
         supabase
           .from("assessments")
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(1)
+          .abortSignal(signal)
           .maybeSingle(),
         supabase
           .from("daily_reports")
           .select("date, discipline_score")
           .eq("user_id", userId)
           .order("date", { ascending: false })
-          .limit(7),
+          .limit(7)
+          .abortSignal(signal),
         supabase
           .from("challenges")
           .select("*")
@@ -56,13 +61,14 @@ export function useDashboardQuery() {
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(1)
+          .abortSignal(signal)
           .maybeSingle(),
-        // Fetch full today's report with feedback/mistakes
         supabase
           .from("daily_reports")
           .select("*")
           .eq("user_id", userId)
           .eq("date", today)
+          .abortSignal(signal)
           .maybeSingle(),
       ]);
 
@@ -172,11 +178,10 @@ export function useDashboardQuery() {
 export function useTradesQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.trades(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return [];
 
       const { data } = await supabase
@@ -184,7 +189,8 @@ export function useTradesQuery() {
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(100)
+        .abortSignal(signal);
 
       return data || [];
     },
@@ -197,11 +203,10 @@ export function useTradesQuery() {
 export function useAssessmentQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.assessment(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const { data } = await supabase
@@ -210,6 +215,7 @@ export function useAssessmentQuery() {
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
+        .abortSignal(signal)
         .maybeSingle();
 
       return data;
@@ -223,11 +229,10 @@ export function useAssessmentQuery() {
 export function useChallengesQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.challenges(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return { active: null, history: [] };
 
       const [activeRes, historyRes] = await Promise.all([
@@ -238,6 +243,7 @@ export function useChallengesQuery() {
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(1)
+          .abortSignal(signal)
           .maybeSingle(),
         supabase
           .from("challenges")
@@ -245,7 +251,8 @@ export function useChallengesQuery() {
           .eq("user_id", userId)
           .neq("status", "active")
           .order("created_at", { ascending: false })
-          .limit(10),
+          .limit(10)
+          .abortSignal(signal),
       ]);
 
       return {
@@ -264,10 +271,10 @@ export function useMarketQuery() {
 
   return useQuery({
     queryKey: queryKeys.market(),
-    queryFn: async () => {
-      const res = await fetch("/api/market");
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/market", { signal });
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({ error: "Network error" }));
         throw new Error(error.error || "Failed to fetch market data");
       }
       return res.json();
@@ -275,7 +282,7 @@ export function useMarketQuery() {
     enabled: !!user?.id,
     staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
-    retry: 2,
+    retry: 1,
   });
 }
 
@@ -283,17 +290,17 @@ export function useMarketQuery() {
 export function useLoyaltyQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.loyalty(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const { data } = await supabase
         .from("loyalty_points")
         .select("*")
         .eq("user_id", userId)
+        .abortSignal(signal)
         .maybeSingle();
 
       return data;
@@ -307,11 +314,10 @@ export function useLoyaltyQuery() {
 export function useDailyReportsQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.dailyReports(userId || ""),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return [];
 
       const { data } = await supabase
@@ -319,7 +325,8 @@ export function useDailyReportsQuery() {
         .select("*")
         .eq("user_id", userId)
         .order("date", { ascending: false })
-        .limit(30);
+        .limit(30)
+        .abortSignal(signal);
 
       return data || [];
     },
@@ -332,11 +339,10 @@ export function useDailyReportsQuery() {
 export function useLoyaltyWithTransactionsQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: ["loyaltyFull", userId || ""] as const,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const [profileRes, ledgerRes] = await Promise.all([
@@ -344,13 +350,15 @@ export function useLoyaltyWithTransactionsQuery() {
           .from("profiles")
           .select("current_points_balance, total_lifetime_points, current_tier")
           .eq("id", userId)
+          .abortSignal(signal)
           .single(),
         supabase
           .from("loyalty_points")
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(20),
+          .limit(20)
+          .abortSignal(signal),
       ]);
 
       return {
@@ -369,11 +377,10 @@ export function useLoyaltyWithTransactionsQuery() {
 export function useDailyReportQuery(date: string) {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: ["dailyReport", userId || "", date] as const,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const { data } = await supabase
@@ -381,6 +388,7 @@ export function useDailyReportQuery(date: string) {
         .select("*")
         .eq("user_id", userId)
         .eq("date", date)
+        .abortSignal(signal)
         .maybeSingle();
 
       return data;
@@ -394,11 +402,10 @@ export function useDailyReportQuery(date: string) {
 export function useRecentDailyReportsQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: ["recentDailyReports", userId || ""] as const,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return [];
 
       const since = new Date();
@@ -409,7 +416,8 @@ export function useRecentDailyReportsQuery() {
         .select("*")
         .eq("user_id", userId)
         .gte("date", since.toISOString().split("T")[0])
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .abortSignal(signal);
 
       return data || [];
     },
@@ -422,11 +430,10 @@ export function useRecentDailyReportsQuery() {
 export function useAnalyticsQuery() {
   const { user } = useAuth();
   const userId = user?.id;
-  const supabase = createClient();
 
   return useQuery({
     queryKey: ["analytics", userId || ""] as const,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return null;
 
       const thirtyDaysAgo = new Date();
@@ -441,13 +448,15 @@ export function useAnalyticsQuery() {
           .select("*")
           .eq("user_id", userId)
           .gte("created_at", thirtyDaysAgo.toISOString())
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: true })
+          .abortSignal(signal),
         supabase
           .from("daily_reports")
           .select("*")
           .eq("user_id", userId)
           .gte("date", sevenDaysAgo.toISOString().split("T")[0])
-          .order("date", { ascending: false }),
+          .order("date", { ascending: false })
+          .abortSignal(signal),
       ]);
 
       const allTrades = tradesRes.data || [];
@@ -573,7 +582,6 @@ export function useAnalyticsQuery() {
 export function useAddTradeMutation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (trade: Record<string, unknown>) => {
