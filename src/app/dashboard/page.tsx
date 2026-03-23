@@ -43,6 +43,7 @@ const staggerItem: Variants = {
 function MarketZoneWidget() {
   const { data: marketData, isLoading } = useMarketQuery();
   const zone = marketData?.market_zone || null;
+  const marketStatus = marketData?.market_status as "OPEN" | "CLOSED" | undefined;
 
   const zoneMap: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
     BULLISH: { label: "Bullish", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
@@ -59,9 +60,31 @@ function MarketZoneWidget() {
       <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${z?.bg || "bg-muted/30"}`} />
       <div className="relative">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Nifty 50 Sentiment
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Nifty 50 Sentiment
+            </p>
+            {/* Market Status Indicator */}
+            {marketStatus && (
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                marketStatus === "OPEN" 
+                  ? "bg-success/10 text-success" 
+                  : "bg-amber-500/10 text-amber-500"
+              }`}>
+                {marketStatus === "OPEN" ? (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" />
+                    </span>
+                    LIVE
+                  </>
+                ) : (
+                  "CLOSED"
+                )}
+              </span>
+            )}
+          </div>
           <Link href="/dashboard/sentiment" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
             Details →
           </Link>
