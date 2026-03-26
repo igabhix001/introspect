@@ -65,10 +65,10 @@ const loyaltyRewards = [
   { action: "Monthly Subscription Renewal", points: "10", icon: Zap, color: "text-blue-500", bg: "bg-blue-500/10", why: "Long-term commitment" },
   { action: "Yearly Subscription Renewal", points: "150", icon: Star, color: "text-amber-500", bg: "bg-amber-500/10", why: "Long-term growth" },
   { action: "Referral – Friend Joins & Pays", points: "25", icon: Gift, color: "text-purple-500", bg: "bg-purple-500/10", why: "Build community" },
-  { action: "30-Day Discipline Challenge", points: "50", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "Consistent habits" },
-  { action: "60-Day Consistency Challenge", points: "100", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "Emotional control" },
-  { action: "90-Day Elite Challenge", points: "150", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "Master discipline" },
-  { action: "Weekly Trade Journal (5+ entries)", points: "5", icon: Shield, color: "text-indigo-500", bg: "bg-indigo-500/10", why: "Reflect & improve" },
+  { action: "30-Day Discipline Challenge", points: "30", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "1 pt/day" },
+  { action: "60-Day Consistency Challenge", points: "65", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "60 + 5 bonus" },
+  { action: "90-Day Elite Challenge", points: "100", icon: Trophy, color: "text-success", bg: "bg-success/10", why: "90 + 10 bonus" },
+  { action: "Trade Journal Entry", points: "1", icon: Shield, color: "text-indigo-500", bg: "bg-indigo-500/10", why: "1 pt per entry" },
   { action: "Birthday Bonus", points: "10", icon: Star, color: "text-pink-500", bg: "bg-pink-500/10", why: "Celebrate journey" },
 ];
 

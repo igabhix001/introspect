@@ -5,7 +5,11 @@ import { awardPoints, POINTS_CONFIG } from "@/lib/services/loyalty-service";
 /**
  * Weekly Journal Points Cron Job
  * 
- * Per client spec: 5+ journal entries per week = 5 points
+ * NEW LOGIC (per client spec): 1 point per journal entry
+ * - Each trade entry = 1 point
+ * - No minimum threshold required
+ * - Points awarded weekly based on actual entry count
+ * 
  * Schedule: Every Monday at 00:00 UTC
  * Vercel cron: { "path": "/api/cron/weekly-journal-points", "schedule": "0 0 * * 1" }
  */
@@ -50,9 +54,9 @@ export async function GET(request: NextRequest) {
       userTradeCounts[trade.user_id] = (userTradeCounts[trade.user_id] || 0) + 1;
     });
 
-    // Find users with 5+ entries
+    // All users with at least 1 entry are eligible (1 point per entry)
     const eligibleUsers = Object.entries(userTradeCounts)
-      .filter(([_, count]) => count >= 5)
+      .filter(([_, count]) => count >= 1)
       .map(([userId, count]) => ({ userId, count }));
 
     if (eligibleUsers.length === 0) {
@@ -76,33 +80,40 @@ export async function GET(request: NextRequest) {
     const alreadyAwarded = new Set((existingAwards || []).map(a => a.user_id));
 
     // Award points to eligible users who haven't received them yet
-    const results: { user_id: string; entries: number; success: boolean }[] = [];
+    // NEW: 1 point per entry (not flat 5 points)
+    const results: { user_id: string; entries: number; points: number; success: boolean }[] = [];
 
     for (const { userId, count } of eligibleUsers) {
       if (alreadyAwarded.has(userId)) {
         continue; // Skip users who already got points this week
       }
 
+      // 1 point per journal entry
+      const pointsToAward = count * POINTS_CONFIG.journal_entry;
+
       const result = await awardPoints({
         userId,
-        points: POINTS_CONFIG.weekly_journal,
+        points: pointsToAward,
         reason: "weekly_journal",
         description: `Weekly journal reward: ${count} entries logged (${weekKey})`,
-        activityNote: `Great job maintaining your trading journal this week! You logged ${count} trades and earned 5 bonus points.`,
+        activityNote: `Great job maintaining your trading journal this week! You logged ${count} trades and earned ${pointsToAward} points (1 point per entry).`,
       });
 
       results.push({
         user_id: userId,
         entries: count,
+        points: pointsToAward,
         success: result.success,
       });
     }
 
-    console.log(`[WEEKLY-JOURNAL] Processed ${results.length} users for week ${weekKey}`);
+    const totalPointsAwarded = results.reduce((sum, r) => sum + (r.success ? r.points : 0), 0);
+    console.log(`[WEEKLY-JOURNAL] Processed ${results.length} users for week ${weekKey}, total points: ${totalPointsAwarded}`);
 
     return NextResponse.json({
       message: "Weekly journal points processed",
       processed: results.length,
+      totalPointsAwarded,
       week: `${lastMonday.toISOString().split("T")[0]} to ${lastSunday.toISOString().split("T")[0]}`,
       results,
     });

@@ -176,13 +176,17 @@ export const POINTS_CONFIG = {
   referral_milestone_5: 50,
   referral_milestone_10: 100,
   
-  // Challenge rewards
-  challenge_30: 50,
-  challenge_60: 100,
-  challenge_90: 150,
+  // Challenge rewards (1 point per day + bonus on completion)
+  // 30-day = 30 points (1 per day, no bonus)
+  // 60-day = 65 points (60 + 5 bonus)
+  // 90-day = 100 points (90 + 10 bonus)
+  challenge_30: 30,
+  challenge_60: 65,
+  challenge_90: 100,
   
-  // Engagement rewards
-  weekly_journal: 5,
+  // Engagement rewards (1 point per journal entry)
+  journal_entry: 1,
+  weekly_journal: 5, // Legacy - kept for backward compatibility
   birthday_bonus: 10,
   anniversary: 100,
   

@@ -38,6 +38,10 @@ interface ChallengeRow {
   last_checkin_date: string | null;
 }
 
+// Challenge reward structure: 1 point per day + completion bonus
+// 30-day = 30 points (1 per day, no bonus)
+// 60-day = 65 points (60 + 5 bonus)
+// 90-day = 100 points (90 + 10 bonus)
 const challengeTemplates = [
   {
     type: "30",
@@ -45,7 +49,8 @@ const challengeTemplates = [
     title: "30-Day Builder",
     duration: "30 DAYS",
     focus: "Basic Rules",
-    points: 50,
+    points: 30,
+    pointsBreakdown: "30 days × 1 pt",
     badge: "Bronze Badge",
     badgeIcon: "🟫",
     difficulty: "★★☆☆☆",
@@ -59,7 +64,8 @@ const challengeTemplates = [
     title: "60-Day Master",
     duration: "60 DAYS",
     focus: "Pattern Building",
-    points: 100,
+    points: 65,
+    pointsBreakdown: "60 + 5 bonus",
     badge: "Silver Badge",
     badgeIcon: "⚪",
     difficulty: "★★★☆☆",
@@ -73,7 +79,8 @@ const challengeTemplates = [
     title: "90-Day Elite",
     duration: "90 DAYS",
     focus: "Mastery",
-    points: 150,
+    points: 100,
+    pointsBreakdown: "90 + 10 bonus",
     badge: "Gold Badge",
     badgeIcon: "🟡",
     extraBadge: "💎 Platinum Path",
@@ -261,7 +268,7 @@ export default function ChallengesPage() {
           <div className="p-4 rounded-xl border border-success/20 bg-success/[0.03] text-center">
             <Star className="h-6 w-6 text-success mx-auto mb-2" />
             <h3 className="font-bold text-sm mb-1">EARN POINTS</h3>
-            <p className="text-xs text-muted-foreground">Up to 150 points per challenge</p>
+            <p className="text-xs text-muted-foreground">1 point per day + bonus</p>
           </div>
           <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] text-center">
             <Medal className="h-6 w-6 text-amber-500 mx-auto mb-2" />
@@ -429,9 +436,9 @@ export default function ChallengesPage() {
                   <tbody>
                     <tr className="border-b border-border">
                       <td className="px-4 py-3 font-semibold">Points</td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">50</td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">100</td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">150</td>
+                      <td className="px-4 py-3 font-mono font-medium text-amber-500">30</td>
+                      <td className="px-4 py-3 font-mono font-medium text-amber-500">65 <span className="text-[10px] text-muted-foreground">(60+5)</span></td>
+                      <td className="px-4 py-3 font-mono font-medium text-amber-500">100 <span className="text-[10px] text-muted-foreground">(90+10)</span></td>
                     </tr>
                     <tr className="border-b border-border">
                       <td className="px-4 py-3 font-semibold">Badge Level</td>
@@ -447,9 +454,9 @@ export default function ChallengesPage() {
                     </tr>
                     <tr className="border-b border-border">
                       <td className="px-4 py-3 font-semibold">Tier Progress</td>
-                      <td className="px-4 py-3">17% to Silver</td>
-                      <td className="px-4 py-3">33% to Silver</td>
-                      <td className="px-4 py-3 font-medium text-success">50% to Silver</td>
+                      <td className="px-4 py-3">10% to Silver</td>
+                      <td className="px-4 py-3">22% to Silver</td>
+                      <td className="px-4 py-3 font-medium text-success">33% to Silver</td>
                     </tr>
                     <tr className="border-border">
                       <td className="px-4 py-3 font-semibold">Exclusive Access</td>
@@ -474,7 +481,7 @@ export default function ChallengesPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {completedChallenges.map((challenge) => {
-              const ptsMap: Record<string, number> = { "30": 50, "60": 100, "90": 150 };
+              const ptsMap: Record<string, number> = { "30": 30, "60": 65, "90": 100 };
               const badgeMap: Record<string, string> = { "30": "Bronze", "60": "Silver", "90": "Gold" };
               const pts = ptsMap[challenge.type] || 50;
               const badge = badgeMap[challenge.type] || "Bronze";
