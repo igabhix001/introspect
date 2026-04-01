@@ -5,6 +5,7 @@ import { MarketingShell } from "@/components/layout/marketing-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import { GoogleAnalytics, Hotjar } from "@/components/analytics";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -182,6 +183,8 @@ export default function RootLayout({
           </ToastProvider>
           <SpeedInsights />
           <Analytics />
+          <GoogleAnalytics />
+          <Hotjar />
         </ThemeProvider>
       </body>
     </html>
