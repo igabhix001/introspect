@@ -17,6 +17,8 @@ import {
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/hooks/use-queries";
 
 interface Question {
   id: string;
@@ -171,6 +173,7 @@ const questions: Question[] = [
 
 export default function AssessmentPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [completed, setCompleted] = useState(false);
@@ -223,6 +226,11 @@ export default function AssessmentPage() {
             trader_level: data.assessment?.trader_level || 'beginner',
             personalized_rules: data.categories_analysis?.categories?.flatMap((c: any) => c.recommendations).slice(0, 5) || [],
           });
+          
+          // Invalidate assessment cache so Risk Report page shows fresh data
+          if (user?.id) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+          }
         }
       } catch (err) {
         console.error("Assessment submission error:", err);

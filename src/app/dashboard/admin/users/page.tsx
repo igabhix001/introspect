@@ -16,6 +16,7 @@ import {
   UserPlus,
   Download,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 interface AdminUser {
@@ -58,6 +59,7 @@ export default function AdminUsersPage() {
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [newAdminName, setNewAdminName] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const limit = 15;
 
   const fetchUsers = useCallback(async () => {
@@ -128,6 +130,27 @@ export default function AdminUsersPage() {
       }
     } catch (error) {
       console.error("Failed to create admin:", error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await fetch(`/api/admin/users?userId=${userId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setDeleteConfirm(null);
+        setSelectedUser(null);
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete user");
+      }
+    } catch (error) {
+      console.error("Failed to delete user:", error);
     } finally {
       setActionLoading(null);
     }
@@ -282,6 +305,14 @@ export default function AdminUsersPage() {
                         >
                           <Ban className={`h-3.5 w-3.5 ${user.is_suspended ? "text-destructive" : "text-muted-foreground hover:text-destructive"}`} />
                         </button>
+                        <button
+                          title="Delete user"
+                          onClick={() => setDeleteConfirm(user.id)}
+                          disabled={actionLoading === user.id}
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </button>
                       </>
                     )}
                   </div>
@@ -430,6 +461,13 @@ export default function AdminUsersPage() {
                         <Ban className="h-3.5 w-3.5" />
                         {selectedUser.is_suspended ? "Unsuspend" : "Suspend"}
                       </button>
+                      <button
+                        onClick={() => setDeleteConfirm(selectedUser.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
                     </>
                   )}
                 </div>
@@ -502,6 +540,59 @@ export default function AdminUsersPage() {
                     </>
                   )}
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl bg-card border border-destructive/30 p-6 shadow-xl"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="h-6 w-6 text-destructive" />
+                </div>
+                <h3 className="font-heading text-lg font-bold mb-2">Delete User?</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  This will permanently delete the user and all their data including trades, assessments, challenges, and subscriptions. This action cannot be undone.
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => deleteUser(deleteConfirm)}
+                    disabled={actionLoading === deleteConfirm}
+                    className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {actionLoading === deleteConfirm ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

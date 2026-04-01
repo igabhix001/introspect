@@ -130,3 +130,81 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
 }
+
+// DELETE: Delete user and all associated data (admin only)
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const admin = await verifyAdmin(supabase);
+    if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    }
+
+    const adminDb = createAdminClient();
+
+    // Check if user exists and is not an admin
+    const { data: userProfile } = await adminDb
+      .from("profiles")
+      .select("role, email")
+      .eq("id", userId)
+      .single();
+
+    if (!userProfile) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (userProfile.role === "admin") {
+      return NextResponse.json({ error: "Cannot delete admin users" }, { status: 403 });
+    }
+
+    // Delete user data in order (respecting foreign key constraints)
+    // 1. Delete trades
+    await adminDb.from("trades").delete().eq("user_id", userId);
+    
+    // 2. Delete assessments
+    await adminDb.from("assessments").delete().eq("user_id", userId);
+    
+    // 3. Delete personalized rules
+    await adminDb.from("personalized_rules").delete().eq("user_id", userId);
+    
+    // 4. Delete challenges
+    await adminDb.from("challenges").delete().eq("user_id", userId);
+    
+    // 5. Delete loyalty points
+    await adminDb.from("loyalty_points").delete().eq("user_id", userId);
+    
+    // 6. Delete subscriptions
+    await adminDb.from("subscriptions").delete().eq("user_id", userId);
+    
+    // 7. Delete referrals (where user is referrer or referred)
+    await adminDb.from("referrals").delete().eq("referrer_id", userId);
+    await adminDb.from("referrals").delete().eq("referred_id", userId);
+    
+    // 8. Delete profile
+    const { error: profileError } = await adminDb
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+
+    if (profileError) throw profileError;
+
+    // 9. Delete auth user (using Supabase Admin API)
+    // Note: This requires service_role key which adminDb should have
+    const { error: authError } = await adminDb.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      console.error("Failed to delete auth user:", authError);
+      // Profile already deleted, log but don't fail
+    }
+
+    return NextResponse.json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Admin delete error:", error);
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+  }
+}
