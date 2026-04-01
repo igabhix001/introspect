@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-import { trackSubscribeClick, trackSubscriptionSuccess } from "@/components/analytics";
 
 declare global {
   interface Window {
@@ -120,10 +119,6 @@ export default function PaymentsPage() {
   const handleSubscribe = async () => {
     if (!user) return;
     setProcessing(true);
-    
-    // Track subscribe button click in GA4
-    trackSubscribeClick("dashboard_payments", selectedPlan);
-    
     try {
       const plan = plans.find((p) => p.id === selectedPlan)!;
       const res = await fetch("/api/payments", {
@@ -170,10 +165,6 @@ export default function PaymentsPage() {
               plan: selectedPlan,
             }),
           });
-          
-          // Track successful subscription in GA4
-          trackSubscriptionSuccess(selectedPlan, plan.priceINR);
-          
           // Hard refresh to pick up new subscription
           window.location.href = "/dashboard?payment=success";
         },

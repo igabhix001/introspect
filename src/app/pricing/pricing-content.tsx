@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
-import { trackSubscribeClick, trackSubscriptionSuccess } from "@/components/analytics";
 
 const allFeatures = [
   { name: "Full Risk Assessment & Scoring", monthly: true, sixMonth: true, yearly: true },
@@ -126,9 +125,6 @@ export function PricingContent() {
 
   const handleSubscribe = async (plan: "monthly" | "6-month" | "yearly") => {
     setLoadingPlan(plan);
-    
-    // Track subscribe button click in GA4
-    trackSubscribeClick("pricing_page", plan);
 
     try {
       // Get referral code from localStorage if present
@@ -196,11 +192,6 @@ export function PricingContent() {
               referral_code: referralCode,
             }),
           });
-          
-          // Track successful subscription in GA4
-          const amountMap = { monthly: 333, "6-month": 1836, yearly: 3654 };
-          trackSubscriptionSuccess(plan, amountMap[plan]);
-          
           // Clear referral code after successful payment
           try {
             localStorage.removeItem("introspect_referral");
