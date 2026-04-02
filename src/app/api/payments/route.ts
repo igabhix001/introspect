@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Razorpay from "razorpay";
 import { awardPoints, POINTS_CONFIG } from "@/lib/services/loyalty-service";
+import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
 // POST /api/payments — Handle Razorpay order creation and verification
 export async function POST(request: NextRequest) {
@@ -11,6 +12,16 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Rate limiting
+    const identifier = getRateLimitIdentifier(request, user.id);
+    const rateLimitResult = await apiRateLimit(identifier);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
 
     // Parse body ONCE - request.json() can only be called once
     const body = await request.json();

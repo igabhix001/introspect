@@ -65,7 +65,7 @@ export default function RiskReportPage() {
     { category: "Rule Consistency", score: 50, fullMark: 100 },
   ];
 
-  const overallScore = assessment?.discipline_score || 50;
+  const overallScore = assessment?.discipline_score ?? 50;
   const riskLvl = assessment?.risk_level || "medium";
   
   const riskLevel = riskLvl === "low" 

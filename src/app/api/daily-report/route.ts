@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
 /**
  * INTROSPECT™ Behavioral Audit Engine — 4-Pillar Discipline Score
@@ -188,6 +189,16 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Rate limiting
+    const identifier = getRateLimitIdentifier(request, user.id);
+    const rateLimitResult = await apiRateLimit(identifier);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
 
     const { date } = await request.json();
     const reportDate = date || new Date().toISOString().split("T")[0];

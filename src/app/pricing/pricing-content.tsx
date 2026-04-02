@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
+import { trackSubscribeClick, trackPaymentInitiated, trackPurchase } from "@/lib/analytics";
 
 const allFeatures = [
   { name: "Full Risk Assessment & Scoring", monthly: true, sixMonth: true, yearly: true },
@@ -126,6 +127,9 @@ export function PricingContent() {
   const handleSubscribe = async (plan: "monthly" | "6-month" | "yearly") => {
     setLoadingPlan(plan);
 
+    // Track subscribe button click in GA4
+    trackSubscribeClick('pricing_page', plan);
+
     try {
       // Get referral code from localStorage if present
       let referralCode: string | null = null;
@@ -170,6 +174,10 @@ export function PricingContent() {
         await new Promise((resolve) => { script.onload = resolve; });
       }
 
+      // Track payment initiation in GA4
+      const amountInRupees = data.order.amount / 100; // Convert paise to rupees
+      trackPaymentInitiated(plan, amountInRupees);
+
       // Step 3: Open Razorpay checkout
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -179,6 +187,9 @@ export function PricingContent() {
         description: `${plan === "monthly" ? "Monthly" : plan === "6-month" ? "6-Month" : "Yearly"} Subscription`,
         order_id: data.order.id,
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+          // Track successful purchase in GA4
+          trackPurchase(response.razorpay_order_id, plan, amountInRupees);
+
           // Step 4: Verify payment
           await fetch("/api/payments", {
             method: "POST",
