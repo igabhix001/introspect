@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, Sun, Moon, ChevronRight, LayoutDashboard } from "lucide-react";
+import { Menu, Sun, Moon, ChevronRight, LayoutDashboard, LogOut } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -195,14 +195,28 @@ export function Navbar() {
               {!authChecked ? (
                 <div className="h-9 w-24 bg-muted animate-pulse rounded-lg" />
               ) : user ? (
-                <Link
-                  href={isAdmin ? "/dashboard/admin" : "/dashboard"}
-                  className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold text-sm px-5 py-2 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.15)] hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all duration-200 cursor-pointer group"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                <>
+                  <Link
+                    href={isAdmin ? "/dashboard/admin" : "/dashboard"}
+                    className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold text-sm px-5 py-2 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.15)] hover:shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all duration-200 cursor-pointer group"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      const supabase = createClient();
+                      await supabase.auth.signOut();
+                      window.location.href = "/";
+                    }}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                    title="Sign out"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden md:inline">Logout</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <Link
@@ -247,14 +261,28 @@ export function Navbar() {
                   
                   <div className="mt-6 flex flex-col gap-3 px-4 pt-6 border-t border-border">
                     {user ? (
-                      <Link
-                        href={isAdmin ? "/dashboard/admin" : "/dashboard"}
-                        onClick={() => setMobileOpen(false)}
-                        className="flex items-center justify-center gap-2 w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-3 rounded-lg cursor-pointer transition-colors"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        Go to Dashboard
-                      </Link>
+                      <>
+                        <Link
+                          href={isAdmin ? "/dashboard/admin" : "/dashboard"}
+                          onClick={() => setMobileOpen(false)}
+                          className="flex items-center justify-center gap-2 w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-3 rounded-lg cursor-pointer transition-colors"
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                          Go to Dashboard
+                        </Link>
+                        <button
+                          onClick={async () => {
+                            setMobileOpen(false);
+                            const supabase = createClient();
+                            await supabase.auth.signOut();
+                            window.location.href = "/";
+                          }}
+                          className="flex items-center justify-center gap-2 w-full bg-muted/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive font-medium py-3 rounded-lg cursor-pointer transition-colors"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Sign Out
+                        </button>
+                      </>
                     ) : (
                       <>
                         <Link

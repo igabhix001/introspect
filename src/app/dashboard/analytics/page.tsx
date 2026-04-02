@@ -35,8 +35,8 @@ export default function AnalyticsPage() {
   const { data, isLoading } = useAnalyticsQuery();
   const [dateFilter, setDateFilter] = useState<string>("today");
 
-  // Show loading only on initial load
-  if (isLoading && !data) {
+  // Show loading only on initial load or during auth transitions
+  if ((isLoading && !data) || authLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

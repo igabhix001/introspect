@@ -24,6 +24,7 @@ import {
   Target,
 } from "lucide-react";
 import { useMarketQuery } from "@/lib/hooks/use-queries";
+import { useAuth } from "@/lib/auth/auth-context";
 
 // ──── Market Intelligence Object (user-facing fields only per client doc) ────
 interface MarketIntelligence {
@@ -116,13 +117,14 @@ const regimeLabels = {
 
 export default function SentimentEnginePage() {
   const { data: rawData, isLoading, isError, refetch } = useMarketQuery();
+  const { loading: authLoading } = useAuth();
   const [isLive, setIsLive] = useState(true);
 
   // Cast to proper type
   const data = rawData as MarketIntelligence | null;
 
-  // Show loading state
-  if (isLoading && !data) {
+  // Show loading state (including auth transitions)
+  if ((isLoading && !data) || authLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center max-w-5xl mx-auto">
         <div className="rounded-2xl border border-border bg-card/50 p-8 max-w-lg w-full flex flex-col items-center">

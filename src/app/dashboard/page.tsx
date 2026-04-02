@@ -112,7 +112,8 @@ export default function DashboardPage() {
   const { user, profile, isAdmin, hasActiveSubscription, loading: authLoading } = useAuth();
 
   // Show loading only during initial load, not during background refetches
-  if (isLoading && !data) {
+  // Also check authLoading to prevent infinite loading when switching dashboards
+  if ((isLoading && !data) || authLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

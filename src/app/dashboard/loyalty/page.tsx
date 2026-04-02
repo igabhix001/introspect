@@ -50,7 +50,8 @@ export default function LoyaltyPage() {
   const tier = loyaltyData?.tier || "Bronze";
   const transactions = loyaltyData?.transactions || [];
 
-  const loading = isLoading && !loyaltyData;
+  // Show loading during initial load or auth transitions
+  const loading = (isLoading && !loyaltyData) || authLoading;
 
   if (loading) {
     return (

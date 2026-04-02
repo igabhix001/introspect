@@ -7,6 +7,23 @@ import { useAuth } from "@/lib/auth/auth-context";
 // Singleton Supabase client — shared across all hooks, never recreated per render
 const supabase = createClient();
 
+/**
+ * Helper to get stable user ID that doesn't cause query key changes during auth loading
+ * Returns cached userId if auth is still loading to prevent query restarts
+ */
+let cachedUserId: string | null = null;
+function getStableUserId(user: { id: string } | null, loading: boolean): string | null {
+  if (user?.id) {
+    cachedUserId = user.id;
+    return user.id;
+  }
+  // If loading, return cached ID to prevent query key changes
+  if (loading && cachedUserId) {
+    return cachedUserId;
+  }
+  return null;
+}
+
 // ─── Query Keys (centralized for cache invalidation) ───
 export const queryKeys = {
   dashboard: (userId: string) => ["dashboard", userId] as const,
@@ -21,8 +38,8 @@ export const queryKeys = {
 
 // ─── Dashboard Overview Data ───
 export function useDashboardQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.dashboard(userId || ""),
@@ -176,8 +193,8 @@ export function useDashboardQuery() {
 
 // ─── Trade Journal Data ───
 export function useTradesQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.trades(userId || ""),
@@ -201,8 +218,8 @@ export function useTradesQuery() {
 
 // ─── Assessment Data ───
 export function useAssessmentQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.assessment(userId || ""),
@@ -227,8 +244,8 @@ export function useAssessmentQuery() {
 
 // ─── Challenges Data ───
 export function useChallengesQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.challenges(userId || ""),
@@ -288,8 +305,8 @@ export function useMarketQuery() {
 
 // ─── Loyalty Points Data ───
 export function useLoyaltyQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.loyalty(userId || ""),
@@ -312,8 +329,8 @@ export function useLoyaltyQuery() {
 
 // ─── Daily Reports Data ───
 export function useDailyReportsQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: queryKeys.dailyReports(userId || ""),
@@ -337,8 +354,8 @@ export function useDailyReportsQuery() {
 
 // ─── Loyalty Data with Transactions ───
 export function useLoyaltyWithTransactionsQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: ["loyaltyFull", userId || ""] as const,
@@ -375,8 +392,8 @@ export function useLoyaltyWithTransactionsQuery() {
 
 // ─── Daily Report Data ───
 export function useDailyReportQuery(date: string) {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: ["dailyReport", userId || "", date] as const,
@@ -400,8 +417,8 @@ export function useDailyReportQuery(date: string) {
 
 // ─── Recent Daily Reports ───
 export function useRecentDailyReportsQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: ["recentDailyReports", userId || ""] as const,
@@ -428,8 +445,8 @@ export function useRecentDailyReportsQuery() {
 
 // ─── Analytics Data ───
 export function useAnalyticsQuery() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, loading: authLoading } = useAuth();
+  const userId = getStableUserId(user, authLoading);
 
   return useQuery({
     queryKey: ["analytics", userId || ""] as const,

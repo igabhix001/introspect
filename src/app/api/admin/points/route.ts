@@ -10,14 +10,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is admin
+    // Check if user is admin (by role or email)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("is_admin")
+      .select("role")
       .eq("id", user.id)
       .single();
 
-    if (!profile?.is_admin) {
+    const isAdmin = profile?.role === "admin" || user.email === "intradaymindview@gmail.com";
+    if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -98,13 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading > 3s no matter what (reduced from 5s)
+    // Safety net: never stay loading > 2s no matter what (reduced for faster navigation)
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current && loading) {
         console.warn("[AuthProvider] Safety timer fired — forcing loading=false");
         setLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     /**
      * Helper: given a valid user, hydrate profile + subscription in parallel.
