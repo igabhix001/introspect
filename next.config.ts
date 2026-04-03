@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // Scripts: Allow Google Analytics, Hotjar, Razorpay, and Vercel
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://static.hotjar.com https://script.hotjar.com https://vercel.live",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://static.hotjar.com https://script.hotjar.com https://*.contentsquare.net https://vercel.live https://va.vercel-scripts.com",
               // Styles: Allow inline styles and Google Fonts
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // Fonts: Allow Google Fonts
@@ -61,7 +61,7 @@ const nextConfig: NextConfig = {
               // Images: Allow various sources
               "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com https://www.google-analytics.com https://www.googletagmanager.com https://*.hotjar.com https://*.razorpay.com",
               // Connections: Allow API calls to all required services
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://api-t1.fyers.in https://api.fyers.in https://www.google-analytics.com https://analytics.google.com https://*.hotjar.com https://*.hotjar.io wss://*.hotjar.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://api-t1.fyers.in https://api.fyers.in https://www.google-analytics.com https://analytics.google.com https://*.hotjar.com https://*.hotjar.io wss://*.hotjar.com https://*.contentsquare.net https://va.vercel-scripts.com https://vitals.vercel-insights.com",
               // Frames: Allow Razorpay checkout and YouTube embeds
               "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com https://vars.hotjar.com",
               // Workers: Allow Hotjar service workers
