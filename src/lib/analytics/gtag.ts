@@ -35,7 +35,12 @@ export function trackEvent(
   }
 
   if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', eventName, eventParams);
+    // Send event with debug_mode for DebugView visibility
+    window.gtag('event', eventName, {
+      ...eventParams,
+      debug_mode: true,
+      send_to: ANALYTICS_CONFIG.ga4.measurementId,
+    });
     console.log('[GA4 Event Sent]', eventName);
   } else {
     console.warn('[GA4] gtag not available - script may not have loaded');
