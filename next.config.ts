@@ -50,8 +50,23 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://api-t1.fyers.in https://api.fyers.in; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com;",
+            value: [
+              "default-src 'self'",
+              // Scripts: Allow Google Analytics, Hotjar, Razorpay, and Vercel
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://static.hotjar.com https://script.hotjar.com https://vercel.live",
+              // Styles: Allow inline styles and Google Fonts
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              // Fonts: Allow Google Fonts
+              "font-src 'self' https://fonts.gstatic.com data:",
+              // Images: Allow various sources
+              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com https://www.google-analytics.com https://www.googletagmanager.com https://*.hotjar.com https://*.razorpay.com",
+              // Connections: Allow API calls to all required services
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://api-t1.fyers.in https://api.fyers.in https://www.google-analytics.com https://analytics.google.com https://*.hotjar.com https://*.hotjar.io wss://*.hotjar.com",
+              // Frames: Allow Razorpay checkout and YouTube embeds
+              "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com https://vars.hotjar.com",
+              // Workers: Allow Hotjar service workers
+              "worker-src 'self' blob:",
+            ].join("; "),
           },
         ],
       },

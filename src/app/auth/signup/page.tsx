@@ -68,11 +68,16 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient();
+      // Get the production URL for email redirect
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                      (typeof window !== 'undefined' ? window.location.origin : 'https://www.intradaymindview.com');
+      
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { full_name: name },
+          emailRedirectTo: `${siteUrl}/auth/login?verified=true`,
         },
       });
 
