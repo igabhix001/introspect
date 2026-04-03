@@ -24,13 +24,21 @@ export function trackEvent(
   eventName: string,
   eventParams?: Record<string, any>
 ): void {
+  // Always log for debugging
+  console.log('[GA4 Event]', eventName, eventParams, {
+    enabled: ANALYTICS_CONFIG.ga4.enabled,
+    gtagExists: typeof window !== 'undefined' && !!window.gtag,
+  });
+
   if (!ANALYTICS_CONFIG.ga4.enabled) {
-    console.log('[Analytics - Dev]', eventName, eventParams);
     return;
   }
 
   if (typeof window !== 'undefined' && window.gtag) {
     window.gtag('event', eventName, eventParams);
+    console.log('[GA4 Event Sent]', eventName);
+  } else {
+    console.warn('[GA4] gtag not available - script may not have loaded');
   }
 }
 

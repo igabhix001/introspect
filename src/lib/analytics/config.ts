@@ -7,7 +7,8 @@ export const ANALYTICS_CONFIG = {
   // Google Analytics 4
   ga4: {
     measurementId: 'G-GHXF5V689T',
-    enabled: process.env.NODE_ENV === 'production',
+    // Enable in production OR when explicitly set via env var for testing
+    enabled: process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === 'true',
   },
   
   // Hotjar
