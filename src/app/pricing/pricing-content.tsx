@@ -87,11 +87,34 @@ declare global {
   }
 }
 
+interface PricingData {
+  monthly: { amount: number; amount_paise: number };
+  "6-month": { amount: number; amount_paise: number };
+  yearly: { amount: number; amount_paise: number };
+}
+
+const DEFAULT_PRICES: PricingData = {
+  monthly: { amount: 333, amount_paise: 33300 },
+  "6-month": { amount: 1836, amount_paise: 183600 },
+  yearly: { amount: 3654, amount_paise: 365400 },
+};
+
 export function PricingContent() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
+  const [prices, setPrices] = useState<PricingData>(DEFAULT_PRICES);
   const router = useRouter();
   const { showToast } = useToast();
+
+  // Fetch dynamic pricing from admin settings
+  useEffect(() => {
+    fetch("/api/pricing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.pricing) setPrices(data.pricing);
+      })
+      .catch(() => { /* use defaults */ });
+  }, []);
 
   // Check subscription status on mount
   useEffect(() => {
@@ -263,7 +286,7 @@ export function PricingContent() {
               </p>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-sm text-muted-foreground">₹</span>
-                <span className="font-heading text-5xl font-extrabold">333</span>
+                <span className="font-heading text-5xl font-extrabold">{prices.monthly.amount.toLocaleString("en-IN")}</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
 
@@ -303,7 +326,7 @@ export function PricingContent() {
               </p>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-sm text-muted-foreground">₹</span>
-                <span className="font-heading text-5xl font-extrabold">1,836</span>
+                <span className="font-heading text-5xl font-extrabold">{prices["6-month"].amount.toLocaleString("en-IN")}</span>
                 <span className="text-muted-foreground">/6 mo</span>
               </div>
 
@@ -348,12 +371,12 @@ export function PricingContent() {
                   Best Value
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  Only ₹304/mo
+                  Only ₹{Math.round(prices.yearly.amount / 12).toLocaleString("en-IN")}/mo
                 </span>
               </div>
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-sm text-muted-foreground">₹</span>
-                <span className="font-heading text-5xl font-extrabold">3,654</span>
+                <span className="font-heading text-5xl font-extrabold">{prices.yearly.amount.toLocaleString("en-IN")}</span>
                 <span className="text-muted-foreground">/year</span>
               </div>
 

@@ -14,7 +14,7 @@ import {
   Flame,
   Loader2,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -174,10 +174,12 @@ const questions: Question[] = [
 export default function AssessmentPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [completed, setCompleted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const [result, setResult] = useState<{
     discipline_score: number;
     risk_level: string;
@@ -227,9 +229,10 @@ export default function AssessmentPage() {
             personalized_rules: data.categories_analysis?.categories?.flatMap((c: any) => c.recommendations).slice(0, 5) || [],
           });
           
-          // Invalidate assessment cache so Risk Report page shows fresh data
+          // Invalidate assessment cache and wait for refetch before navigating
           if (user?.id) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+            await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
           }
         }
       } catch (err) {
@@ -295,13 +298,25 @@ export default function AssessmentPage() {
             </div>
           </div>
         )}
-        <Link
-          href="/dashboard/risk-report"
-          className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.2)] hover:shadow-[0_0_30px_rgba(34,197,94,0.3)] transition-all cursor-pointer"
+        <button
+          onClick={async () => {
+            setNavigating(true);
+            // Ensure cache is fresh before navigating
+            if (user?.id) {
+              await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+              await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
+            }
+            router.push("/dashboard/risk-report");
+          }}
+          disabled={navigating}
+          className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.2)] hover:shadow-[0_0_30px_rgba(34,197,94,0.3)] transition-all cursor-pointer disabled:opacity-70"
         >
-          View Your Risk Report
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+          {navigating ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Loading Report...</>
+          ) : (
+            <>View Your Risk Report<ArrowRight className="h-4 w-4" /></>
+          )}
+        </button>
       </motion.div>
     );
   }

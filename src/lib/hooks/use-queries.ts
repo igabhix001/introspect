@@ -238,7 +238,7 @@ export function useAssessmentQuery() {
       return data;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Always fetch fresh assessment data - no stale cache
   });
 }
 
