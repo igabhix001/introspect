@@ -52,19 +52,19 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts: Allow Google Analytics, Hotjar, Razorpay, and Vercel
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://static.hotjar.com https://script.hotjar.com https://*.contentsquare.net https://vercel.live https://va.vercel-scripts.com",
+              // Scripts: Allow Google Analytics, Microsoft Clarity, Razorpay, Google OAuth, and Vercel
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms https://accounts.google.com https://apis.google.com https://vercel.live https://va.vercel-scripts.com",
               // Styles: Allow inline styles and Google Fonts
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
               // Fonts: Allow Google Fonts
               "font-src 'self' https://fonts.gstatic.com data:",
-              // Images: Allow various sources
-              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com https://www.google-analytics.com https://www.googletagmanager.com https://*.hotjar.com https://*.razorpay.com",
+              // Images: Allow various sources including Google avatars
+              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com https://www.google-analytics.com https://www.googletagmanager.com https://*.razorpay.com https://lh3.googleusercontent.com https://*.clarity.ms",
               // Connections: Allow API calls to all required services
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://api-t1.fyers.in https://api.fyers.in https://www.google-analytics.com https://analytics.google.com https://*.hotjar.com https://*.hotjar.io wss://*.hotjar.com https://*.contentsquare.net https://*.contentsquare.com https://va.vercel-scripts.com https://vitals.vercel-insights.com",
-              // Frames: Allow Razorpay checkout and YouTube embeds
-              "frame-src 'self' about: https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com https://vars.hotjar.com https://*.contentsquare.net https://*.contentsquare.com",
-              // Workers: Allow Hotjar service workers
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lux.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://api-t1.fyers.in https://api.fyers.in https://www.google-analytics.com https://analytics.google.com https://www.clarity.ms https://*.clarity.ms https://accounts.google.com https://oauth2.googleapis.com https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+              // Frames: Allow Razorpay checkout, YouTube embeds, and Google OAuth
+              "frame-src 'self' about: https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com https://accounts.google.com",
+              // Workers: Allow service workers
               "worker-src 'self' blob:",
             ].join("; "),
           },

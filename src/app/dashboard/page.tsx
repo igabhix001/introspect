@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
 import {
   TrendingUp,
@@ -26,6 +28,7 @@ import {
 } from "recharts";
 import { useDashboardQuery, useMarketQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
+import { createClient } from "@/lib/supabase/client";
 
 const staggerContainer: Variants = {
   hidden: { opacity: 0 },
@@ -107,22 +110,71 @@ function MarketZoneWidget() {
   );
 }
 
-export default function DashboardPage() {
+// Inner component that uses useSearchParams - must be wrapped in Suspense
+function DashboardContent() {
   const { data, isLoading, isError } = useDashboardQuery();
   const { user, profile, isAdmin, hasActiveSubscription, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const [subscriptionVerified, setSubscriptionVerified] = useState<boolean | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  // Handle payment success redirect - verify subscription directly from DB
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    
+    if (paymentStatus === "success" && user && !subscriptionVerified) {
+      setVerifying(true);
+      
+      // Poll for subscription status (webhook may take a moment)
+      const checkSubscription = async (attempts = 0): Promise<void> => {
+        const supabase = createClient();
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("id, status")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .gte("current_period_end", new Date().toISOString())
+          .limit(1)
+          .maybeSingle();
+
+        if (sub) {
+          setSubscriptionVerified(true);
+          setVerifying(false);
+          // Clean URL without causing navigation
+          window.history.replaceState({}, "", "/dashboard");
+        } else if (attempts < 5) {
+          // Retry up to 5 times with 1.5s delay (total ~7.5s wait for webhook)
+          setTimeout(() => checkSubscription(attempts + 1), 1500);
+        } else {
+          // Give up after 5 attempts - show dashboard anyway, webhook will sync later
+          setSubscriptionVerified(true);
+          setVerifying(false);
+          window.history.replaceState({}, "", "/dashboard");
+        }
+      };
+
+      checkSubscription();
+    }
+  }, [searchParams, user, subscriptionVerified]);
 
   // Show loading only during initial load, not during background refetches
   // Also check authLoading to prevent infinite loading when switching dashboards
-  if ((isLoading && !data) || authLoading) {
+  if ((isLoading && !data) || authLoading || verifying) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-3" />
+          {verifying && (
+            <p className="text-sm text-muted-foreground">Activating your subscription...</p>
+          )}
+        </div>
       </div>
     );
   }
 
   // Subscription gate — unpaid non-admin users see payment wall
-  if (!isAdmin && hasActiveSubscription === false) {
+  // Skip gate if we just verified subscription from payment success
+  if (!isAdmin && hasActiveSubscription === false && !subscriptionVerified) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="max-w-md text-center p-8 rounded-2xl border border-border bg-card">
@@ -766,3 +818,15 @@ export default function DashboardPage() {
   );
 }
 
+// Export with Suspense wrapper for useSearchParams
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}

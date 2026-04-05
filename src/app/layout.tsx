@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MarketingShell } from "@/components/layout/marketing-shell";
@@ -27,6 +27,17 @@ const jakarta = Plus_Jakarta_Sans({
   fallback: ["system-ui", "sans-serif"],
   adjustFontFallback: true,
 });
+
+// Viewport configuration for mobile optimization
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.intradaymindview.com"),
@@ -96,12 +107,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Preconnect to critical domains for faster loading */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.intradaymindview.com" />
+        <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        <link rel="dns-prefetch" href="https://www.clarity.ms" />
         <link rel="canonical" href="https://www.intradaymindview.com" />
         <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE" />
         <script

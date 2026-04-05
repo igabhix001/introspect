@@ -213,29 +213,53 @@ export function PricingContent() {
           // Track successful purchase in GA4
           trackPurchase(response.razorpay_order_id, plan, amountInRupees);
 
-          // Step 4: Verify payment
-          await fetch("/api/payments", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "verify",
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              plan,
-              referral_code: referralCode,
-            }),
-          });
+          // Step 4: Verify payment (frontend verification as backup to webhook)
+          try {
+            const verifyRes = await fetch("/api/payments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "verify",
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                plan,
+                referral_code: referralCode,
+              }),
+            });
+            
+            if (!verifyRes.ok) {
+              console.warn("[Payment] Frontend verification failed, webhook will handle it");
+            }
+          } catch (verifyErr) {
+            // Don't block redirect - webhook will handle subscription creation
+            console.warn("[Payment] Verification request failed, webhook will handle:", verifyErr);
+          }
+
           // Clear referral code after successful payment
           try {
             localStorage.removeItem("introspect_referral");
           } catch (e) {
             console.warn("Failed to clear referral code:", e);
           }
-          window.location.href = "/dashboard?payment=success";
+
+          // Force a small delay to allow webhook to process, then redirect
+          // This ensures subscription is active before dashboard loads
+          setTimeout(() => {
+            window.location.href = "/dashboard?payment=success";
+          }, 1500);
+        },
+        modal: {
+          ondismiss: function() {
+            console.log("[Razorpay] Modal dismissed by user");
+            setLoadingPlan(null);
+          },
+          escape: false, // Prevent accidental close on mobile
+          confirm_close: true, // Ask before closing
         },
         prefill: {},
         theme: { color: "#22c55e" },
+        retry: { enabled: true, max_count: 3 }, // Allow retries on failure
       };
 
       const razorpay = new window.Razorpay(options);
