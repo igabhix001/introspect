@@ -14,8 +14,8 @@
 import Script from 'next/script';
 import { ANALYTICS_CONFIG } from '@/lib/analytics/config';
 
-// Microsoft Clarity Project ID - set in environment or use default
-const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || 'your-clarity-id';
+// Microsoft Clarity Project ID - set in environment or use hardcoded production ID
+const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || 'w6qsn3he05';
 
 export function Hotjar() {
   const { enabled } = ANALYTICS_CONFIG.hotjar;
@@ -25,10 +25,7 @@ export function Hotjar() {
     return null;
   }
 
-  if (CLARITY_PROJECT_ID === 'your-clarity-id') {
-    console.warn('[Clarity] Project ID not configured. Set NEXT_PUBLIC_CLARITY_PROJECT_ID');
-    return null;
-  }
+  // Remove the check since we now have a hardcoded fallback
 
   return (
     <Script
