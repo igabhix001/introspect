@@ -10,6 +10,7 @@ const supabase = createClient();
 /**
  * Helper to get stable user ID that doesn't cause query key changes during auth loading
  * Returns cached userId if auth is still loading to prevent query restarts
+ * IMPORTANT: Clear cache when user is explicitly null (signed out) to prevent stale data
  */
 let cachedUserId: string | null = null;
 function getStableUserId(user: { id: string } | null, loading: boolean): string | null {
@@ -17,7 +18,13 @@ function getStableUserId(user: { id: string } | null, loading: boolean): string 
     cachedUserId = user.id;
     return user.id;
   }
+  // If NOT loading and user is null, clear cache (user signed out)
+  if (!loading && !user) {
+    cachedUserId = null;
+    return null;
+  }
   // If loading, return cached ID to prevent query key changes
+  // But only for a short time - if loading takes too long, return null
   if (loading && cachedUserId) {
     return cachedUserId;
   }

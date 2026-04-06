@@ -25,19 +25,44 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
+// Module-level cache for auth state to prevent loading flash on navigation
+let cachedAuthState: {
+  user: User | null;
+  profile: Profile | null;
+  hasActiveSubscription: boolean | null;
+  initialized: boolean;
+} = {
+  user: null,
+  profile: null,
+  hasActiveSubscription: null,
+  initialized: false,
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
+  // Initialize from cache to prevent loading flash on navigation within dashboard
+  const [user, setUser] = useState<User | null>(cachedAuthState.user);
+  const [profile, setProfile] = useState<Profile | null>(cachedAuthState.profile);
+  const [loading, setLoading] = useState(!cachedAuthState.initialized);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(cachedAuthState.hasActiveSubscription);
   
   // Use singleton Supabase client - memoized to prevent recreation
   const supabase = useMemo(() => createClient(), []);
 
   // Refs to prevent race conditions — NEVER put these in useEffect deps
   const mountedRef = useRef(true);
-  const initDoneRef = useRef(false);
+  const initDoneRef = useRef(cachedAuthState.initialized);
   const hydratingRef = useRef(false); // Prevent concurrent hydrations
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track loading timeout
+
+  // Update cache whenever state changes
+  useEffect(() => {
+    cachedAuthState = {
+      user,
+      profile,
+      hasActiveSubscription,
+      initialized: !loading,
+    };
+  }, [user, profile, hasActiveSubscription, loading]);
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
@@ -98,13 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading > 2s no matter what (reduced for faster navigation)
+    // Safety net: never stay loading > 1.5s no matter what (reduced for faster navigation)
+    // This is critical to prevent infinite loading when switching between admin/user dashboards
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current && loading) {
         console.warn("[AuthProvider] Safety timer fired — forcing loading=false");
         setLoading(false);
+        hydratingRef.current = false; // Also reset hydrating flag
       }
-    }, 2000);
+    }, 1500);
+    loadingTimeoutRef.current = safetyTimer;
 
     /**
      * Helper: given a valid user, hydrate profile + subscription in parallel.
@@ -243,6 +271,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mountedRef.current = false;
       clearTimeout(safetyTimer);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
       subscription.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

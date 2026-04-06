@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new subscription
+    const paymentId = `admin_${admin.id}_${Date.now()}`;
     const { error: insertError } = await adminDb
       .from("subscriptions")
       .insert({
@@ -111,13 +112,17 @@ export async function POST(request: NextRequest) {
         plan,
         status: "active",
         amount_paid: 0, // Admin-assigned, no payment
-        payment_id: `admin_${admin.id}_${Date.now()}`,
+        razorpay_order_id: paymentId,
+        razorpay_payment_id: paymentId,
+        currency: "INR",
         current_period_start: now.toISOString(),
         current_period_end: endDate.toISOString(),
-        created_at: now.toISOString(),
       });
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error("Insert error details:", insertError);
+      throw insertError;
+    }
 
     // Log admin action
     await adminDb.from("notifications").insert({
