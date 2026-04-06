@@ -1,27 +1,91 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowLeft, Shield, RefreshCw } from "lucide-react";
+import { ArrowRight, ArrowLeft, Shield, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ParticleField } from "@/components/ui/particle-field";
 
-export default function VerifyPage() {
+function VerifyContent() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [countdown, setCountdown] = useState(45);
   const [canResend, setCanResend] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
-    if (countdown > 0) {
+    // Check for error in URL (e.g., expired link)
+    const errorParam = searchParams.get("error");
+    const errorDesc = searchParams.get("error_description");
+    
+    if (errorParam) {
+      setError(errorDesc || "The link is invalid or has expired.");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (countdown > 0 && !error) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
-    } else {
+    } else if (countdown === 0) {
       setCanResend(true);
     }
-  }, [countdown]);
+  }, [countdown, error]);
+
+  // Show error state if link expired
+  if (error) {
+    return (
+      <AuroraBackground>
+        <div className="relative min-h-screen flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="relative z-10 w-full max-w-md"
+          >
+            <Link href="/" className="inline-flex items-center gap-2 mb-10">
+              <div className="relative w-9 h-9">
+                <Image src="/logo.png" alt="INTROSPECT™" fill className="object-contain" />
+              </div>
+              <span className="font-heading text-lg font-bold">
+                INTROSPECT<span className="text-xs align-super opacity-60">™</span>
+              </span>
+            </Link>
+
+            <div className="p-8 sm:p-10 rounded-2xl border border-border bg-card/80 backdrop-blur-xl shadow-2xl text-center">
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+              </div>
+              <h2 className="font-heading text-2xl font-bold mb-2">Link Expired</h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                {error}
+              </p>
+              <div className="space-y-3">
+                <Link
+                  href="/auth/forgot-password"
+                  className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl transition-all duration-300"
+                >
+                  Request New Link
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="w-full flex items-center justify-center gap-2 border border-border hover:bg-muted/50 font-medium py-3 rounded-xl transition-all duration-300"
+                >
+                  Back to Login
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </AuroraBackground>
+    );
+  }
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -185,5 +249,17 @@ export default function VerifyPage() {
         </motion.div>
       </div>
     </AuroraBackground>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <VerifyContent />
+    </Suspense>
   );
 }

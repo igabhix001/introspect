@@ -22,27 +22,27 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get("x-razorpay-signature");
 
-    // Verify webhook signature
+    // Verify webhook signature - REQUIRED in production
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
     
     if (!webhookSecret) {
       console.error("[WEBHOOK] RAZORPAY_WEBHOOK_SECRET not configured");
-      // In development, allow without signature verification
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
-      }
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
     }
 
-    if (webhookSecret && signature) {
-      const expectedSignature = crypto
-        .createHmac("sha256", webhookSecret)
-        .update(body)
-        .digest("hex");
+    if (!signature) {
+      console.error("[WEBHOOK] Missing signature header");
+      return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+    }
 
-      if (expectedSignature !== signature) {
-        console.error("[WEBHOOK] Invalid signature");
-        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-      }
+    const expectedSignature = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature !== signature) {
+      console.error("[WEBHOOK] Invalid signature");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     const event = JSON.parse(body);
