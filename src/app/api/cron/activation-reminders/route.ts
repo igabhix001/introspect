@@ -241,7 +241,24 @@ export async function GET(request: NextRequest) {
     const resend = getResendClient();
     const now = new Date();
 
-    // Find users who signed up but have NO active subscription
+    // Get all user IDs with ANY subscription (active, expired, or pending)
+    // This ensures we never email users who have ever subscribed
+    const { data: allSubs, error: subsError } = await adminDb
+      .from("subscriptions")
+      .select("user_id, status, current_period_end");
+
+    if (subsError) {
+      console.error("[REMINDERS] Failed to fetch subscriptions:", subsError);
+      return NextResponse.json({ error: "Failed to fetch subscriptions" }, { status: 500 });
+    }
+
+    // Create a set of ALL user IDs who have ever had a subscription
+    // This prevents sending activation emails to anyone who has subscribed (even if expired)
+    const subscribedUserIds = new Set((allSubs || []).map((s) => s.user_id));
+    
+    console.log(`[REMINDERS] Found ${subscribedUserIds.size} users with subscriptions (excluding from reminders)`);
+
+    // Find users who signed up but have NEVER had any subscription
     const { data: unactivatedUsers, error: usersError } = await adminDb
       .from("profiles")
       .select("id, email, full_name, created_at")
@@ -256,17 +273,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, sent: 0, message: "No users found" });
     }
 
-    // Get all user IDs with active subscriptions to exclude them
-    const { data: activeSubs } = await adminDb
-      .from("subscriptions")
-      .select("user_id")
-      .eq("status", "active")
-      .gt("current_period_end", now.toISOString());
-
-    const activeUserIds = new Set((activeSubs || []).map((s) => s.user_id));
-
-    // Filter to only unactivated users
-    const targets = unactivatedUsers.filter((u) => !activeUserIds.has(u.id) && u.email);
+    // Filter to only users who have NEVER subscribed (not just inactive)
+    const targets = unactivatedUsers.filter((u) => !subscribedUserIds.has(u.id) && u.email);
+    
+    console.log(`[REMINDERS] ${unactivatedUsers.length} total users, ${targets.length} never subscribed`);
 
     let sent = { welcome: 0, reminder: 0, urgency: 0, skipped: 0 };
 
