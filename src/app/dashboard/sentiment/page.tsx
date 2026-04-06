@@ -172,6 +172,21 @@ export default function SentimentEnginePage() {
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
+      {/* Smart Money Filter Message */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <Target className="h-4 w-4 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-500 mb-0.5">Smart Money Filter</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Stop chasing the 9:15 AM gamble. Professional trends form after 10:30 AM. Be patient—let the market prove its direction first.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Connection Status Bar - mobile responsive */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">

@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // Scripts: Allow Google Analytics, Microsoft Clarity, Razorpay, Google OAuth, and Vercel
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms https://accounts.google.com https://apis.google.com https://vercel.live https://va.vercel-scripts.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://*.razorpay.com https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://accounts.google.com https://apis.google.com https://vercel.live https://va.vercel-scripts.com",
               // Styles: Allow inline styles and Google Fonts
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
               // Fonts: Allow Google Fonts

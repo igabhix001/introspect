@@ -225,6 +225,24 @@ function DashboardContent() {
       animate="show"
       className="space-y-6"
     >
+      {/* Smart Money Filter Message */}
+      <motion.div
+        variants={staggerItem}
+        className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <Target className="h-4 w-4 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-500 mb-0.5">Smart Money Filter</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Stop chasing the 9:15 AM gamble. Professional trends form after 10:30 AM. Be patient—let the market prove its direction first.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Welcome Banner - shown when no assessment done yet */}
       {hasNoAssessment && (
         <motion.div

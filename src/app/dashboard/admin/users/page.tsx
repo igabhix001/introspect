@@ -17,6 +17,7 @@ import {
   Download,
   Loader2,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 
 interface AdminUser {
@@ -60,6 +61,9 @@ export default function AdminUsersPage() {
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [newAdminName, setNewAdminName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState<AdminUser | null>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>("monthly");
+  const [subscriptionDuration, setSubscriptionDuration] = useState<number>(30);
   const limit = 15;
 
   const fetchUsers = useCallback(async () => {
@@ -151,6 +155,37 @@ export default function AdminUsersPage() {
       }
     } catch (error) {
       console.error("Failed to delete user:", error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const assignSubscription = async () => {
+    if (!showSubscriptionModal) return;
+    setActionLoading("assign-subscription");
+    try {
+      const res = await fetch("/api/admin/subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "assign",
+          userId: showSubscriptionModal.id,
+          plan: subscriptionPlan,
+          durationDays: subscriptionDuration,
+        }),
+      });
+      if (res.ok) {
+        setShowSubscriptionModal(null);
+        setSelectedUser(null);
+        fetchUsers();
+        alert("Subscription assigned successfully!");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to assign subscription");
+      }
+    } catch (error) {
+      console.error("Failed to assign subscription:", error);
+      alert("Failed to assign subscription");
     } finally {
       setActionLoading(null);
     }
@@ -440,7 +475,18 @@ export default function AdminUsersPage() {
                     <p className="text-sm font-medium">{new Date(selectedUser.created_at).toLocaleDateString("en-IN")}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-4 border-t border-border/50">
+                <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-border/50">
+                  <button
+                    onClick={() => {
+                      setShowSubscriptionModal(selectedUser);
+                      setSubscriptionPlan("monthly");
+                      setSubscriptionDuration(30);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-success/10 text-success text-xs font-semibold hover:bg-success/20 transition-colors cursor-pointer"
+                  >
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Assign Subscription
+                  </button>
                   {selectedUser.role !== "admin" && (
                     <>
                       <button
@@ -593,6 +639,94 @@ export default function AdminUsersPage() {
                     )}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Assign Subscription Modal */}
+      <AnimatePresence>
+        {showSubscriptionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setShowSubscriptionModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-heading text-lg font-bold">Assign Subscription</h3>
+                <button onClick={() => setShowSubscriptionModal(null)} className="p-1 rounded-lg hover:bg-muted cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              
+              <div className="mb-4 p-3 rounded-xl bg-muted/30 border border-border/50">
+                <p className="text-xs text-muted-foreground">Assigning to:</p>
+                <p className="text-sm font-medium">{showSubscriptionModal.full_name || showSubscriptionModal.email}</p>
+                <p className="text-xs text-muted-foreground">{showSubscriptionModal.email}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-2 block">Subscription Plan</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["monthly", "6-month", "yearly"].map((plan) => (
+                      <button
+                        key={plan}
+                        onClick={() => {
+                          setSubscriptionPlan(plan);
+                          setSubscriptionDuration(plan === "monthly" ? 30 : plan === "6-month" ? 180 : 365);
+                        }}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                          subscriptionPlan === plan
+                            ? "bg-success text-success-foreground"
+                            : "bg-muted/50 hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {plan === "6-month" ? "6 Month" : plan.charAt(0).toUpperCase() + plan.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground mb-2 block">Duration (Days)</label>
+                  <input
+                    type="number"
+                    value={subscriptionDuration}
+                    onChange={(e) => setSubscriptionDuration(parseInt(e.target.value) || 30)}
+                    min={1}
+                    max={730}
+                    className="w-full px-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm focus:outline-none focus:border-success/40"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Subscription will be active for {subscriptionDuration} days from today
+                  </p>
+                </div>
+
+                <button
+                  onClick={assignSubscription}
+                  disabled={actionLoading === "assign-subscription"}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-success hover:bg-success/90 text-success-foreground font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoading === "assign-subscription" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" />
+                      Assign Subscription
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           </motion.div>

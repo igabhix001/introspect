@@ -147,14 +147,7 @@ export default function SignupPage() {
         {/* Left: Branding */}
         <div className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12">
           <div className="relative z-10 max-w-md">
-            <Link href="/" className="inline-flex items-center gap-2 mb-12">
-              <div className="relative w-10 h-10">
-                <Image src="/logo.png" alt="INTROSPECT™" fill className="object-contain" />
-              </div>
-              <span className="font-heading text-xl font-bold">
-                INTROSPECT<span className="text-xs align-super opacity-60">™</span>
-              </span>
-            </Link>
+            
 
             <motion.h1
               initial={{ opacity: 0, y: 20 }}

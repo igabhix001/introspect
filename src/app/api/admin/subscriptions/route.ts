@@ -56,6 +56,83 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST: Assign subscription to user
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const admin = await verifyAdmin(supabase);
+    if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const adminDb = createAdminClient();
+    const { action, userId, plan, durationDays } = await request.json();
+
+    if (action !== "assign") {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    if (!userId || !plan || !durationDays) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Calculate subscription dates
+    const now = new Date();
+    const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    // Check if user already has an active subscription
+    const { data: existingSub } = await adminDb
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .gte("current_period_end", now.toISOString())
+      .maybeSingle();
+
+    if (existingSub) {
+      // Extend existing subscription
+      const { error: updateError } = await adminDb
+        .from("subscriptions")
+        .update({
+          plan,
+          current_period_end: endDate.toISOString(),
+          updated_at: now.toISOString(),
+        })
+        .eq("id", existingSub.id);
+
+      if (updateError) throw updateError;
+
+      return NextResponse.json({ success: true, message: "Subscription extended" });
+    }
+
+    // Create new subscription
+    const { error: insertError } = await adminDb
+      .from("subscriptions")
+      .insert({
+        user_id: userId,
+        plan,
+        status: "active",
+        amount_paid: 0, // Admin-assigned, no payment
+        payment_id: `admin_${admin.id}_${Date.now()}`,
+        current_period_start: now.toISOString(),
+        current_period_end: endDate.toISOString(),
+        created_at: now.toISOString(),
+      });
+
+    if (insertError) throw insertError;
+
+    // Log admin action
+    await adminDb.from("notifications").insert({
+      title: "Subscription Assigned",
+      message: `Admin assigned ${plan} subscription (${durationDays} days) to user ${userId}`,
+      type: "system",
+    });
+
+    return NextResponse.json({ success: true, message: "Subscription assigned" });
+  } catch (error) {
+    console.error("Admin assign subscription error:", error);
+    return NextResponse.json({ error: "Failed to assign subscription" }, { status: 500 });
+  }
+}
+
 // PATCH: Update subscription (cancel, extend, etc.)
 export async function PATCH(request: NextRequest) {
   try {
