@@ -9,6 +9,7 @@ import { Eye, EyeOff, Lock, Mail, User, ArrowRight, Shield, Check, Loader2 } fro
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ParticleField } from "@/components/ui/particle-field";
 import { createClient } from "@/lib/supabase/client";
+import { trackSignUp } from "@/lib/analytics/track-events";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -130,6 +131,8 @@ export default function SignupPage() {
       }
 
       if (data.user) {
+        // Track successful signup in GA4
+        trackSignUp('email');
         setSuccess(true);
       }
     } catch {

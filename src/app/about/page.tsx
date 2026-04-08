@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { AboutContent } from "./about-content";
 
 export const metadata: Metadata = {
-  title: "About Us",
+  title: "About – Why I Built This",
   description:
-    "Learn about Intraday MindView Learning and the INTROSPECT™ mission — helping intraday traders build discipline, manage risk, and protect capital.",
+    "I didn't struggle with finding a strategy. I struggled with following it. That's why I built INTROSPECT™ — to help traders stay disciplined.",
 };
 
 export default function AboutPage() {

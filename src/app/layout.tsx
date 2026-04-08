@@ -42,8 +42,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.intradaymindview.com"),
   title: {
-    default: "INTROSPECT™ – The Risk Guardian for Intraday Traders | Intraday MindView Learning",
-    template: "%s | INTROSPECT™ – Intraday MindView Learning",
+    default: "INTROSPECT™ – Build Trading Discipline, Not Just Strategy",
+    template: "%s | INTROSPECT™",
   },
   description:
     "90% of intraday traders lose money. INTROSPECT™ helps you build discipline, manage risk, and protect your capital with personalized rules and coaching. Start your 30-day discipline challenge today.",

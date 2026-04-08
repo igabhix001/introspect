@@ -6,8 +6,18 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error("[Admin Stats] Auth error:", authError);
+    }
+    
+    if (!user) {
+      console.log("[Admin Stats] No user found in session");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    console.log("[Admin Stats] User:", user.email);
 
     // Email-based admin check (avoids RLS)
     const isAdmin = user.email === "intradaymindview@gmail.com";

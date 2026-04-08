@@ -6,6 +6,7 @@ import { ArrowRight, Shield, TrendingUp, Target, Check, AlertTriangle, BarChart3
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ParticleField } from "@/components/ui/particle-field";
 import { TextReveal, TypewriterText } from "@/components/ui/text-animations";
+import { trackCtaClick } from "@/lib/analytics/track-events";
 
 const dashboardMetrics = [
   { label: "Discipline Score", value: "78", color: "text-success", trend: "+12%" },
@@ -50,12 +51,12 @@ export function Hero() {
                 </span>
               </motion.div>
 
-              {/* Heading with text reveal */}
+              {/* Heading with text reveal - New headline per client request */}
               <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight leading-[1.05] mt-8 mb-6">
-                <TextReveal text="Stop Blowing Accounts." delay={0.3} />
+                <TextReveal text="Traders Fail Due to Discipline," delay={0.3} />
                 <br />
                 <span className="gradient-text">
-                  <TextReveal text="Start Building Discipline." delay={0.6} />
+                  <TextReveal text="Not Strategy." delay={0.6} />
                 </span>
               </h1>
 
@@ -89,9 +90,10 @@ export function Hero() {
               >
                 <Link
                   href="/dashboard/assessment"
+                  onClick={() => trackCtaClick('hero_assessment')}
                   className="group inline-flex items-center justify-center bg-success hover:bg-success/90 text-success-foreground font-bold text-base px-8 py-4 rounded-xl shadow-[0_0_30px_rgba(34,197,94,0.3)] hover:shadow-[0_0_50px_rgba(34,197,94,0.4)] transition-all duration-300 cursor-pointer"
                 >
-                  Take Your Assessment
+                  Check Your Discipline Score
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <Link

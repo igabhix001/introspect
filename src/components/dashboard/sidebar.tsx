@@ -26,6 +26,7 @@ import {
   Wrench,
   Gift,
   FileText,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -110,6 +111,12 @@ const adminNavItems = [
     href: "/dashboard/admin/subscriptions",
     icon: Wallet,
     description: "Plans, revenue & billing",
+  },
+  {
+    label: "Messages",
+    href: "/dashboard/admin/messages",
+    icon: MessageSquare,
+    description: "Contact form submissions",
   },
   {
     label: "Notifications",

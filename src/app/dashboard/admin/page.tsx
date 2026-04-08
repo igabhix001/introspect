@@ -16,6 +16,8 @@ import {
   Wallet,
   Loader2,
   ShieldX,
+  MessageSquare,
+  Gift,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useAdminStatsQuery } from "@/lib/hooks/use-queries";
@@ -47,12 +49,28 @@ const adminNavItems = [
     bg: "bg-purple-500/10",
   },
   {
+    label: "Contact Messages",
+    href: "/dashboard/admin/messages",
+    icon: MessageSquare,
+    description: "View and respond to contact form submissions",
+    color: "text-cyan-500",
+    bg: "bg-cyan-500/10",
+  },
+  {
     label: "Notifications",
     href: "/dashboard/admin/notifications",
     icon: Bell,
     description: "Send and manage user notifications",
     color: "text-amber-500",
     bg: "bg-amber-500/10",
+  },
+  {
+    label: "Loyalty Points",
+    href: "/dashboard/admin/points",
+    icon: Gift,
+    description: "Manage user points and rewards",
+    color: "text-pink-500",
+    bg: "bg-pink-500/10",
   },
   {
     label: "System Settings",

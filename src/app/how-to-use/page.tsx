@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { ChallengeCTA } from "@/components/home/challenge-cta";
-import { BookOpen, Trophy, Star, Shield, Gift, Zap, Target, BarChart3, Calendar, Award, CheckCircle2 } from "lucide-react";
+import { BookOpen, Trophy, Star, Shield, Gift, Zap, Target, BarChart3, Calendar, Award, CheckCircle2, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+
+export const metadata: Metadata = {
+  title: "How to Use",
+  description:
+    "Learn how to use INTROSPECT™ in 3 simple steps. Start your assessment, get personalized rules, and track your discipline.",
+};
 
 const platformSteps = [
   { 
@@ -72,6 +80,28 @@ const loyaltyRewards = [
   { action: "Birthday Bonus", points: "10", icon: Star, color: "text-pink-500", bg: "bg-pink-500/10", why: "Celebrate journey" },
 ];
 
+// Quick start steps for new users
+const quickStartSteps = [
+  {
+    step: "1",
+    title: "Take the Assessment",
+    description: "Answer honest questions about your trading behavior. Takes 2 minutes.",
+    time: "2 min",
+  },
+  {
+    step: "2", 
+    title: "Get Your Rules",
+    description: "Receive personalized risk limits, position sizing, and daily loss caps.",
+    time: "Instant",
+  },
+  {
+    step: "3",
+    title: "Track & Improve",
+    description: "Log trades, follow rules, and watch your discipline score improve.",
+    time: "Daily",
+  },
+];
+
 export default function HowToUsePage() {
   return (
     <>
@@ -80,17 +110,61 @@ export default function HowToUsePage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-success/10 rounded-full blur-[100px] opacity-70 pointer-events-none" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          {/* Quick Start Section */}
+          <div className="text-center max-w-3xl mx-auto mb-12">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-success/10 border border-success/20 text-success text-xs font-semibold mb-6">
-              <BookOpen className="h-3.5 w-3.5" />
-              Platform Guide
+              <Zap className="h-3.5 w-3.5" />
+              Start in 2 Minutes
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6">
-              How to Master <br />
-              <span className="gradient-text">INTROSPECT™</span>
+              3 Simple Steps to <br />
+              <span className="gradient-text">Better Discipline</span>
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground">
-              A trading discipline platform designed to help you understand behavioral patterns, manage risk, and improve consistency.
+            <p className="text-lg sm:text-xl text-muted-foreground mb-8">
+              No complex setup. No learning curve. Just start.
+            </p>
+          </div>
+
+          {/* Quick Start Cards */}
+          <div className="grid md:grid-cols-3 gap-6 mb-12 max-w-4xl mx-auto">
+            {quickStartSteps.map((item) => (
+              <Card key={item.step} className="bg-gradient-to-br from-success/5 to-transparent border border-success/20 text-center">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-xl font-bold text-success">{item.step}</span>
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
+                  <span className="inline-block px-3 py-1 rounded-full bg-success/10 text-success text-xs font-semibold">
+                    {item.time}
+                  </span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="text-center mb-20">
+            <Link
+              href="/dashboard/assessment"
+              className="inline-flex items-center bg-success hover:bg-success/90 text-success-foreground font-bold px-8 py-4 rounded-xl shadow-lg shadow-success/20 transition-all cursor-pointer"
+            >
+              Check Your Discipline Score
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </div>
+
+          {/* Advanced Workflow Header */}
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-muted/50 border border-border text-muted-foreground text-xs font-semibold mb-6">
+              <BookOpen className="h-3.5 w-3.5" />
+              Advanced Workflow
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              Complete Platform Guide
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Once you&apos;re ready, explore all 8 features to maximize your discipline journey.
             </p>
           </div>
 

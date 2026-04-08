@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { ContactContent } from "./contact-content";
 
 export const metadata: Metadata = {
-  title: "Contact",
+  title: "Contact Us",
   description:
-    "Get in touch with the Intraday MindView Learning team. Questions about INTROSPECT™, coaching, or partnerships? We'd love to hear from you.",
+    "Questions about INTROSPECT™? Reach us on WhatsApp or email. We typically respond within 2-4 hours during market hours.",
 };
 
 export default function ContactPage() {

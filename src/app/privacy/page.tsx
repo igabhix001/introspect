@@ -4,7 +4,7 @@ import { PrivacyContent } from "./privacy-content";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "INTROSPECT™ Privacy Policy — how we collect, use, and protect your data. By Intraday MindView Learning.",
+    "INTROSPECT™ Privacy Policy — how we collect, use, and protect your data.",
 };
 
 export default function PrivacyPage() {

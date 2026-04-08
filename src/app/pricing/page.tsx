@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { PricingContent } from "./pricing-content";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Pricing – Less Than One Bad Trade",
   description:
-    "INTROSPECT™ pricing plans — ₹333/month, ₹1,836/6 months, or ₹3,654/year. All inclusive. Risk assessment, trade journal, position calculator, challenges, and more.",
+    "INTROSPECT™ costs less than one bad trade. ₹333/month for discipline, risk rules, and accountability. All inclusive.",
 };
 
 export default function PricingPage() {

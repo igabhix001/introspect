@@ -36,6 +36,11 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Debug logging for admin routes
+  if (pathname.startsWith("/dashboard/admin") || pathname.startsWith("/api/admin")) {
+    console.log(`[Middleware] ${pathname} - User: ${user?.email || 'none'}`);
+  }
+
   // Protect /dashboard routes: redirect unauthenticated users to login
   if (pathname.startsWith("/dashboard") && !user) {
     const url = request.nextUrl.clone();
@@ -46,17 +51,26 @@ export async function updateSession(request: NextRequest) {
 
   // Protect /dashboard/admin routes: redirect non-admin users to /dashboard
   if (pathname.startsWith("/dashboard/admin") && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // First check email-based admin (fastest, no DB call)
+    const isEmailAdmin = user.email === "intradaymindview@gmail.com";
+    
+    if (!isEmailAdmin) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
 
-    const isAdmin = profile?.role === "admin" || user.email === "intradaymindview@gmail.com";
-    if (!isAdmin) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      if (profileError) {
+        console.error("[Middleware] Profile fetch error:", profileError);
+      }
+
+      const isAdmin = profile?.role === "admin";
+      if (!isAdmin) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
     }
   }
 
