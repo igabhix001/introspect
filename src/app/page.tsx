@@ -27,6 +27,12 @@ const ServicesSection = dynamic(() => import("@/components/home/services-section
 const VideoSection = dynamic(() => import("@/components/home/video-section").then(m => m.VideoSection), {
   loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
 });
+const ReportPreview = dynamic(() => import("@/components/home/report-preview").then(m => m.ReportPreview), {
+  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
+});
+const YouTubeChannel = dynamic(() => import("@/components/home/youtube-channel").then(m => m.YouTubeChannel), {
+  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
+});
 
 export default function HomePage() {
   return (
@@ -34,6 +40,7 @@ export default function HomePage() {
       <Hero />
       <Stats />
       <VideoSection />
+      <ReportPreview />
       <section className="py-24 bg-background relative overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
           <Features8 />
@@ -41,6 +48,7 @@ export default function HomePage() {
       </section>
       <CyberneticBentoGrid />
       <HowItWorks />
+      <YouTubeChannel />
       <Testimonials />
       <ServicesSection />
       <PricingSection />
