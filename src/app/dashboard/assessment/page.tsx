@@ -174,7 +174,7 @@ const questions: Question[] = [
 ];
 
 export default function AssessmentPage() {
-  const { user } = useAuth();
+  const { user, hasActiveSubscription } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
@@ -268,6 +268,9 @@ export default function AssessmentPage() {
         ? "border-destructive/30 bg-destructive/5"
         : "border-amber-500/30 bg-amber-500/5";
 
+    // Active subscribers see full results and can view report
+    const isActive = hasActiveSubscription === true;
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -285,7 +288,9 @@ export default function AssessmentPage() {
             <CheckCircle2 className="h-10 w-10 text-success" />
           </motion.div>
           <h2 className="font-heading text-2xl font-bold mb-2">Assessment Complete!</h2>
-          <p className="text-sm text-muted-foreground">Here&apos;s a preview of your results</p>
+          <p className="text-sm text-muted-foreground">
+            {isActive ? "Your full results are ready" : "Here's a preview of your results"}
+          </p>
         </div>
 
         {result && (
@@ -334,26 +339,31 @@ export default function AssessmentPage() {
               </div>
             </motion.div>
 
-            {/* LOCKED: Trader Level */}
+            {/* Trader Level - VISIBLE for active, LOCKED for non-active */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="relative rounded-xl border border-border bg-card p-5 overflow-hidden"
+              className={`relative rounded-xl border ${isActive ? "border-blue-500/30 bg-blue-500/5" : "border-border bg-card"} p-5 overflow-hidden`}
             >
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Trader Level</p>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
-                  <Lock className="h-2.5 w-2.5" /> Locked
-                </span>
+                {!isActive && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
+                    <Lock className="h-2.5 w-2.5" /> Locked
+                  </span>
+                )}
               </div>
-              {/* Blurred content */}
-              <div style={{ filter: "blur(6px)", userSelect: "none" }} aria-hidden="true" className="pointer-events-none">
+              {isActive ? (
                 <p className="text-xl font-heading font-bold capitalize text-blue-500">{result.trader_level}</p>
-              </div>
+              ) : (
+                <div style={{ filter: "blur(6px)", userSelect: "none" }} aria-hidden="true" className="pointer-events-none">
+                  <p className="text-xl font-heading font-bold capitalize text-blue-500">{result.trader_level}</p>
+                </div>
+              )}
             </motion.div>
 
-            {/* LOCKED: Personalized Rules */}
+            {/* Personalized Rules - VISIBLE for active, LOCKED for non-active */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -362,38 +372,57 @@ export default function AssessmentPage() {
             >
               <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-border/50">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Your Personalized Rules</p>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
-                  <Lock className="h-2.5 w-2.5" /> Locked
-                </span>
+                {!isActive && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
+                    <Lock className="h-2.5 w-2.5" /> Locked
+                  </span>
+                )}
               </div>
-              {/* Blurred rules */}
-              <div className="p-4 space-y-2" style={{ filter: "blur(5px)", userSelect: "none" }} aria-hidden="true">
-                {(result.personalized_rules.length > 0 ? result.personalized_rules : [
-                  "Maximum 1% risk per trade at all times",
-                  "Mandatory stop-loss before every entry",
-                  "10-minute cooldown after any losing trade",
-                  "Maximum 5 high-conviction trades per day",
-                  "Journal emotional state for every trade",
-                ]).map((rule, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
-                    <span className="text-xs text-muted-foreground">{rule}</span>
-                  </div>
-                ))}
-              </div>
-              {/* Lock overlay */}
-              <div className="absolute inset-0 top-[44px] flex flex-col items-center justify-center bg-background/70 backdrop-blur-[2px]">
-                <div className="w-10 h-10 rounded-full bg-muted/80 border border-border flex items-center justify-center mb-2">
-                  <Lock className="h-4.5 w-4.5 text-muted-foreground" />
+              {isActive ? (
+                <div className="p-4 space-y-2">
+                  {(result.personalized_rules.length > 0 ? result.personalized_rules : [
+                    "Maximum 1% risk per trade at all times",
+                    "Mandatory stop-loss before every entry",
+                    "10-minute cooldown after any losing trade",
+                    "Maximum 5 high-conviction trades per day",
+                    "Journal emotional state for every trade",
+                  ]).map((rule, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+                      <span className="text-xs text-foreground">{rule}</span>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-xs font-semibold text-foreground mb-0.5">Subscribe to unlock your rules</p>
-                <p className="text-[11px] text-muted-foreground">100+ personalized rules generated for you</p>
-              </div>
+              ) : (
+                <>
+                  <div className="p-4 space-y-2" style={{ filter: "blur(5px)", userSelect: "none" }} aria-hidden="true">
+                    {(result.personalized_rules.length > 0 ? result.personalized_rules : [
+                      "Maximum 1% risk per trade at all times",
+                      "Mandatory stop-loss before every entry",
+                      "10-minute cooldown after any losing trade",
+                      "Maximum 5 high-conviction trades per day",
+                      "Journal emotional state for every trade",
+                    ]).map((rule, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+                        <span className="text-xs text-muted-foreground">{rule}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 top-[44px] flex flex-col items-center justify-center bg-background/70 backdrop-blur-[2px]">
+                    <div className="w-10 h-10 rounded-full bg-muted/80 border border-border flex items-center justify-center mb-2">
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs font-semibold text-foreground mb-0.5">Subscribe to unlock your rules</p>
+                    <p className="text-[11px] text-muted-foreground">100+ personalized rules generated for you</p>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}
 
-        {/* Subscribe CTA */}
+        {/* CTA Section - Different for active vs non-active */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -402,50 +431,63 @@ export default function AssessmentPage() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-success/20 via-success/10 to-blue-500/10" />
           <div className="relative px-6 py-7 text-center">
-            <div className="flex items-center justify-center gap-1 mb-3">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-              ))}
-            </div>
-            <h3 className="font-heading text-lg font-bold mb-2">Unlock Your Full Risk Report</h3>
-            <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
-              Get your complete category breakdown, all personalized rules, and your radar profile — built just for you.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                onClick={async () => {
-                  setNavigating(true);
-                  if (user?.id) {
-                    await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
-                    await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
-                  }
-                  router.push("/dashboard/payments");
-                }}
-                disabled={navigating}
-                className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-bold px-7 py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all cursor-pointer disabled:opacity-70 text-sm"
-              >
-                {navigating ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Please wait...</>
-                ) : (
-                  <><Star className="h-4 w-4" /> Subscribe to Unlock Full Report</>
-                )}
-              </button>
-              <button
-                onClick={async () => {
-                  setNavigating(true);
-                  if (user?.id) {
-                    await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
-                    await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
-                  }
-                  router.push("/dashboard/risk-report");
-                }}
-                disabled={navigating}
-                className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:border-border/80 px-5 py-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-70"
-              >
-                Preview Report <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-4">Cancel anytime · Instant access · No hidden fees</p>
+            {isActive ? (
+              <>
+                <h3 className="font-heading text-lg font-bold mb-2">Your Full Report is Ready!</h3>
+                <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+                  View your complete category breakdown, radar profile, and all personalized trading rules.
+                </p>
+                <button
+                  onClick={async () => {
+                    setNavigating(true);
+                    if (user?.id) {
+                      await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+                      await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
+                    }
+                    router.push("/dashboard/risk-report");
+                  }}
+                  disabled={navigating}
+                  className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-bold px-7 py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all cursor-pointer disabled:opacity-70 text-sm"
+                >
+                  {navigating ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Loading Report...</>
+                  ) : (
+                    <>View Your Risk Report <ArrowRight className="h-4 w-4" /></>
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-center gap-1 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                  ))}
+                </div>
+                <h3 className="font-heading text-lg font-bold mb-2">Unlock Your Full Risk Report</h3>
+                <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+                  Get your complete category breakdown, all personalized rules, and your radar profile — built just for you.
+                </p>
+                <button
+                  onClick={async () => {
+                    setNavigating(true);
+                    if (user?.id) {
+                      await queryClient.invalidateQueries({ queryKey: queryKeys.assessment(user.id) });
+                      await queryClient.refetchQueries({ queryKey: queryKeys.assessment(user.id) });
+                    }
+                    router.push("/dashboard/payments");
+                  }}
+                  disabled={navigating}
+                  className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-bold px-7 py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all cursor-pointer disabled:opacity-70 text-sm"
+                >
+                  {navigating ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Please wait...</>
+                  ) : (
+                    <><Star className="h-4 w-4" /> Subscribe to Unlock Full Report</>
+                  )}
+                </button>
+                <p className="text-[11px] text-muted-foreground mt-4">Cancel anytime · Instant access · No hidden fees</p>
+              </>
+            )}
           </div>
         </motion.div>
       </motion.div>

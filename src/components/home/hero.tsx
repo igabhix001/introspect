@@ -86,7 +86,7 @@ export function Hero() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 1.2 }}
-                className="flex flex-col sm:flex-row items-start gap-4 mb-12"
+                className="flex flex-col sm:flex-row items-start gap-4 mb-4"
               >
                 <Link
                   href="/dashboard/assessment"
@@ -103,6 +103,16 @@ export function Hero() {
                   Watch Demo
                 </Link>
               </motion.div>
+
+              {/* Free trial note */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 1.3 }}
+                className="text-xs text-muted-foreground mb-8"
+              >
+                ✨ <span className="text-success font-medium">One free assessment</span> to check your Discipline Score — no signup required
+              </motion.p>
 
               {/* Universal Trading Psychology Message */}
               <motion.div
