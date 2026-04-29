@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Flame,
   Loader2,
+  Lock,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -44,10 +46,65 @@ const categoryIcons: Record<string, typeof Shield> = {
 };
 
 export default function RiskReportPage() {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, hasActiveSubscription } = useAuth();
   const { data: assessment, isLoading: assessmentLoading } = useAssessmentQuery();
 
   const loading = assessmentLoading && !assessment;
+
+  // Non-subscribers cannot view full report - redirect to subscribe
+  if (!loading && !hasActiveSubscription) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-lg mx-auto text-center py-16"
+      >
+        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+          <Lock className="h-10 w-10 text-amber-500" />
+        </div>
+        <h2 className="font-heading text-2xl font-bold mb-3">
+          Full Report Locked
+        </h2>
+        <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+          Subscribe to unlock your complete risk report with detailed category breakdown, radar profile, and all personalized trading rules.
+        </p>
+        
+        {/* Show preview of score if available */}
+        {assessment && (
+          <div className="rounded-xl border border-border bg-card p-4 mb-6 max-w-xs mx-auto">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Your Score Preview</p>
+            <div className="flex items-center justify-center gap-4">
+              <div>
+                <p className="text-3xl font-bold text-success">{assessment.discipline_score}</p>
+                <p className="text-[10px] text-muted-foreground">Discipline Score</p>
+              </div>
+              <div className="h-10 w-px bg-border" />
+              <div>
+                <p className="text-lg font-bold text-amber-500 capitalize">{assessment.risk_level}</p>
+                <p className="text-[10px] text-muted-foreground">Risk Level</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link
+            href="/dashboard/payments"
+            className="inline-flex items-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-bold px-7 py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all cursor-pointer text-sm"
+          >
+            <Star className="h-4 w-4" /> Subscribe to Unlock
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:border-border/80 px-5 py-3.5 rounded-xl transition-all cursor-pointer"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-4">Full report access · Unlimited assessments · Cancel anytime</p>
+      </motion.div>
+    );
+  }
 
   // Process assessment data
   const categoriesAnalysis = assessment?.categories_analysis || null;
