@@ -51,8 +51,9 @@ export default function RiskReportPage() {
 
   const loading = assessmentLoading && !assessment;
 
-  // Non-subscribers cannot view full report - redirect to subscribe
-  if (!loading && !hasActiveSubscription) {
+  // Non-subscribers cannot view full report - show subscribe prompt
+  // Only block if explicitly false (not undefined/loading)
+  if (!loading && !authLoading && hasActiveSubscription === false) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}

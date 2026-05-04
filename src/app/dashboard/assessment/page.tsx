@@ -174,7 +174,7 @@ const questions: Question[] = [
 ];
 
 export default function AssessmentPage() {
-  const { user, hasActiveSubscription } = useAuth();
+  const { user, hasActiveSubscription, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const { data: existingAssessment, isLoading: assessmentLoading } = useAssessmentQuery();
@@ -194,10 +194,12 @@ export default function AssessmentPage() {
   const progress = ((currentStep + 1) / questions.length) * 100;
 
   // Check if non-subscriber has already used their free assessment
-  const hasUsedFreeAssessment = !hasActiveSubscription && !!existingAssessment;
+  // Active subscribers can always retake assessments - no restriction for them
+  // Only check when auth is loaded and subscription status is explicitly false
+  const hasUsedFreeAssessment = !authLoading && hasActiveSubscription === false && !!existingAssessment;
 
-  // Show loading state while checking assessment status
-  if (assessmentLoading) {
+  // Show loading state while checking assessment status (only for non-subscribers when auth is loaded)
+  if (!authLoading && hasActiveSubscription === false && assessmentLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -206,6 +208,7 @@ export default function AssessmentPage() {
   }
 
   // If non-subscriber has already taken their free assessment, show subscribe prompt
+  // Active subscribers skip this check entirely
   if (hasUsedFreeAssessment) {
     return (
       <motion.div
