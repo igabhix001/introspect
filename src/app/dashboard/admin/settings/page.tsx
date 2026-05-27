@@ -24,7 +24,7 @@ import {
 
 export default function AdminSettingsPage() {
   const searchParams = useSearchParams();
-  const [pricing, setPricing] = useState({ monthly: 333, sixMonth: 1836, yearly: 3654 });
+  const [pricing, setPricing] = useState({ monthly: 499, sixMonth: 2499, yearly: 3999 });
   const [pricingSaved, setPricingSaved] = useState(false);
   const [pricingLoading, setPricingLoading] = useState(false);
 

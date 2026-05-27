@@ -1,0 +1,28 @@
+# INTROSPECT™ — System for Trading Discipline & Risk Management
+
+INTROSPECT™ is a SaaS platform designed by Intraday MindView Learning to solve the critical psychological and risk-management challenges faced by intraday traders. While 90% of traders lose money due to emotional trading, INTROSPECT™ provides the cognitive safeguards, strict rule validation, and analytical insights necessary to build long-term discipline and achieve consistent profitability.
+
+## Core Value Proposition
+
+- **The Problem**: Strategy is only 10% of trading success; 90% is execution, discipline, and risk management. Emotions like fear, greed, FOMO (Fear of Missing Out), and frustration lead to revenge trading, overtrading, and account-blowing losses.
+- **The Solution**: INTROSPECT™ acts as a "Risk Guardian" that forces traders to define their rules, analyze their emotional states, reflect on mistakes using Cognitive Behavioral Therapy (CBT), and maintain strict compliance with mathematical risk limits.
+- **Long-Run Profitability**: By limiting risk per trade (e.g., maximum 1-2%), enforcing daily max losses (e.g., 2% limit), and coaching traders through behavioral reframing, INTROSPECT™ transforms trading from a gamble into a structured business with a consistent mathematical edge.
+
+## Key Features & Tools
+
+- **Diagnostic Assessment**: A 12-question psychological evaluation that maps the user's risk tolerance, trader archetype, and emotional triggers.
+- **Trade Journal & Mistake Detector**: An advanced logbook that calculates P&L and risk percentages, automatically identifies behavioral mistakes (FOMO, Revenge Trade, Overtrading, No Stop-Loss, Over-leveraging), and tracks rule compliance.
+- **AI CBT Reflection Coach**: An interactive assistant that helps traders process their emotional triggers using Cognitive Behavioral Therapy after a rule violation or major loss, helping them reframe errors constructively.
+- **AI Psychological Profiler**: A profiling engine that analyzes trader assessments to outline behavioral Archetypes, emotional triggers, tail-risks, and personalized defense plans.
+- **Position Size Calculator**: A live tool that takes entry, stop-loss, and capital risk percentage parameters to compute the exact share quantity, integrated with Live Market Sentiment.
+- **Market Sentiment Engine**: An ATR-adaptive sentiment detector indicating whether market conditions are Bullish, Bearish, or Neutral (No-Trade zone) based on PCR, VIX, advances, and declines.
+- **Daily End-of-Day Reports**: Aggregated daily summaries showing total P&L, discipline scores, rules followed, holding time analysis, and automated feedback.
+- **Loyalty Rewards & Challenges**: 30, 60, and 90-day discipline challenges that reward consistent journaling and rule-following with loyalty points, redeemable for free subscription months.
+
+## High-Value Public Pages
+
+- **Home Page**: [https://www.intradaymindview.com/](https://www.intradaymindview.com/) — Main product showcase, modular feature walkthrough, and pricing options.
+- **About Page**: [https://www.intradaymindview.com/about](https://www.intradaymindview.com/about) — Intraday MindView's mission and trading philosophy.
+- **How to Use**: [https://www.intradaymindview.com/how-to-use](https://www.intradaymindview.com/how-to-use) — Practical guide to integrating INTROSPECT™ into your daily trading workflow.
+- **Pricing**: [https://www.intradaymindview.com/pricing](https://www.intradaymindview.com/pricing) — Plan comparison (Monthly, 6-Month, Yearly) and subscription details.
+- **Blog**: [https://www.intradaymindview.com/blog](https://www.intradaymindview.com/blog) — Educational resources on trading psychology, risk management, and market systems.

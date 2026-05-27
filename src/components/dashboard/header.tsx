@@ -42,8 +42,7 @@ const mobileNavItems = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Assessment", href: "/dashboard/assessment", icon: ClipboardCheck },
   { label: "Risk Report", href: "/dashboard/risk-report", icon: ShieldAlert },
-  { label: "Position Sizer", href: "/dashboard/calculator", icon: Calculator },
-  { label: "Market Sentiment", href: "/dashboard/sentiment", icon: Activity },
+  { label: "Sizer & Sentiment", href: "/dashboard/calculator", icon: Calculator },
   { label: "Trade Journal", href: "/dashboard/journal", icon: BookOpen },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { label: "Daily Report", href: "/dashboard/daily-report", icon: FileText },
@@ -75,8 +74,8 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Your personalized discipline rules",
   },
   "/dashboard/calculator": {
-    title: "Position Sizer",
-    subtitle: "Calculate risk-optimal trade sizes",
+    title: "Sizer & Sentiment",
+    subtitle: "Calculate risk-optimal trade sizes & monitor live market intelligence",
   },
   "/dashboard/journal": {
     title: "Trade Journal",

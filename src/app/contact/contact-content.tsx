@@ -93,11 +93,11 @@ export function ContactContent() {
             Contact
           </span>
           <h1 className="font-heading text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
-            Get in <span className="gradient-text">Touch</span>
+            Contact <span className="gradient-text">Support</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Have questions about INTROSPECT™, coaching, or partnerships?
-            We&apos;d love to hear from you.
+            Have a question about your subscription, platform features, or risk assessment?
+            Our team responds within 2–4 hours during market hours (9 AM – 4 PM IST).
           </p>
         </motion.div>
 
@@ -129,14 +129,14 @@ export function ContactContent() {
                   <div>
                     <label
                       htmlFor="name"
-                      className="text-sm font-medium mb-1.5 block"
+                      className="text-sm font-medium mb-1.5 block text-foreground/80"
                     >
                       Your Name
                     </label>
                     <Input
                       id="name"
                       placeholder="Enter your name"
-                      className="bg-background/50"
+                      className="bg-background/40 border-border/50 focus:border-success/50 focus:ring-2 focus:ring-success/20 transition-all duration-300"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
@@ -145,7 +145,7 @@ export function ContactContent() {
                   <div>
                     <label
                       htmlFor="email"
-                      className="text-sm font-medium mb-1.5 block"
+                      className="text-sm font-medium mb-1.5 block text-foreground/80"
                     >
                       Email Address
                     </label>
@@ -153,7 +153,7 @@ export function ContactContent() {
                       id="email"
                       type="email"
                       placeholder="you@example.com"
-                      className="bg-background/50"
+                      className="bg-background/40 border-border/50 focus:border-success/50 focus:ring-2 focus:ring-success/20 transition-all duration-300"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
@@ -164,14 +164,14 @@ export function ContactContent() {
                 <div>
                   <label
                     htmlFor="subject"
-                    className="text-sm font-medium mb-1.5 block"
+                    className="text-sm font-medium mb-1.5 block text-foreground/80"
                   >
                     Subject
                   </label>
                   <Input
                     id="subject"
                     placeholder="What is this regarding?"
-                    className="bg-background/50"
+                    className="bg-background/40 border-border/50 focus:border-success/50 focus:ring-2 focus:ring-success/20 transition-all duration-300"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     required
@@ -181,7 +181,7 @@ export function ContactContent() {
                 <div>
                   <label
                     htmlFor="message"
-                    className="text-sm font-medium mb-1.5 block"
+                    className="text-sm font-medium mb-1.5 block text-foreground/80"
                   >
                     Message
                   </label>
@@ -189,7 +189,7 @@ export function ContactContent() {
                     id="message"
                     placeholder="Tell us how we can help..."
                     rows={5}
-                    className="bg-background/50 resize-none"
+                    className="bg-background/40 border-border/50 focus:border-success/50 focus:ring-2 focus:ring-success/20 transition-all duration-300 resize-none"
                     value={formData.message}
                     onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     required
@@ -203,7 +203,7 @@ export function ContactContent() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-5 rounded-xl group cursor-pointer"
+                  className="w-full bg-success hover:bg-success/90 text-success-foreground font-bold py-5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.15)] hover:shadow-[0_0_30px_rgba(34,197,94,0.3)] hover:scale-[1.01] transition-all duration-300 group cursor-pointer"
                 >
                   {loading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -297,8 +297,8 @@ export function ContactContent() {
               {faqs.map((faq, i) => (
                 <AccordionItem
                   key={i}
-                  value={i}
-                  className="border border-border/50 rounded-xl px-5 data-[state=open]:bg-card/50 transition-colors"
+                  value={i.toString()}
+                  className="border border-border/50 rounded-xl px-5 data-[state=open]:bg-card/40 data-[state=open]:border-success/20 hover:border-success/20 transition-all duration-300"
                 >
                   <AccordionTrigger className="text-sm font-medium hover:no-underline cursor-pointer py-4">
                     {faq.question}

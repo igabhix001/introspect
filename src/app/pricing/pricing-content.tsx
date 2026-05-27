@@ -61,7 +61,7 @@ const referralBadges = [
 const pricingFAQs = [
   {
     q: "Is there a free trial?",
-    a: "We don't currently offer a free trial, but our monthly plan has no lock-in — you can cancel anytime after exploring the tool.",
+    a: "Yes! We offer a 7-day free trial on our Monthly plan. You can explore all our discipline systems, log trades, and get execution reports for 7 days. You can cancel anytime during the trial.",
   },
   {
     q: "How does the loyalty program work?",
@@ -94,9 +94,9 @@ interface PricingData {
 }
 
 const DEFAULT_PRICES: PricingData = {
-  monthly: { amount: 333, amount_paise: 33300 },
-  "6-month": { amount: 1836, amount_paise: 183600 },
-  yearly: { amount: 3654, amount_paise: 365400 },
+  monthly: { amount: 499, amount_paise: 49900 },
+  "6-month": { amount: 2499, amount_paise: 249900 },
+  yearly: { amount: 3999, amount_paise: 399900 },
 };
 
 export function PricingContent() {

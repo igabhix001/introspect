@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -15,6 +15,10 @@ import {
   BookOpen,
   Loader2,
   Trash2,
+  Brain,
+  Sparkles,
+  Upload,
+  Download,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -54,6 +58,11 @@ interface TradeRow {
   mistakes: string[];
   notes: string | null;
   created_at: string;
+  reflection_text?: string | null;
+  reflection_feedback?: string | null;
+  market_sentiment?: string | null;
+  entry_time?: string | null;
+  exit_time?: string | null;
 }
 
 export default function JournalPage() {
@@ -91,6 +100,13 @@ export default function JournalPage() {
   const [resultFilter, setResultFilter] = useState<string>("all"); // "all", "profit", "loss"
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [activeReflectionTrade, setActiveReflectionTrade] = useState<TradeRow | null>(null);
+  const [userReflection, setUserReflection] = useState("");
+  const [submittingReflection, setSubmittingReflection] = useState(false);
+  
+  // Bulk upload state
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -104,6 +120,9 @@ export default function JournalPage() {
     emotion_before: "Calm",
     notes: "",
     mistake: "",
+    market_sentiment: "Neutral",
+    entry_time: "",
+    exit_time: "",
   });
 
   const supabase = createClient();
@@ -133,6 +152,9 @@ export default function JournalPage() {
           followed_plan: formData.followed_plan,
           emotion_before: formData.emotion_before,
           notes: formData.notes || null,
+          market_sentiment: formData.market_sentiment || "Neutral",
+          entry_time: formData.entry_time || null,
+          exit_time: formData.exit_time || null,
         }),
       });
 
@@ -169,6 +191,9 @@ export default function JournalPage() {
           emotion_before: "Calm",
           notes: "",
           mistake: "",
+          market_sentiment: "Neutral",
+          entry_time: "",
+          exit_time: "",
         });
       }
     } catch (err) {
@@ -179,6 +204,47 @@ export default function JournalPage() {
     }
   };
 
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setImporting(true);
+
+    const fData = new FormData();
+    fData.append("file", file);
+
+    try {
+      const response = await fetch("/api/journal/import", {
+        method: "POST",
+        body: fData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to import trades. Please check your CSV format.");
+      } else {
+        let msg = `Successfully imported ${data.insertedCount} trades!`;
+        if (data.failedCount > 0) {
+          msg += `\nSkipped ${data.failedCount} rows due to errors. Check console for details.`;
+          console.warn("Import errors:", data.errors);
+        }
+        alert(msg);
+        queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+      }
+    } catch (err) {
+      console.error("Error importing CSV:", err);
+      alert("An error occurred during import.");
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleExportCSV = () => {
+    window.location.href = `/api/journal/export?format=csv`;
+  };
+
   const handleDeleteTrade = async (tradeId: string) => {
     if (!user) return;
     setDeleting(tradeId);
@@ -187,6 +253,45 @@ export default function JournalPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
     setDeleting(null);
+  };
+
+  const handleSubmitReflection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !activeReflectionTrade) return;
+    setSubmittingReflection(true);
+
+    try {
+      const response = await fetch("/api/journal/reflection-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradeId: activeReflectionTrade.id,
+          userReflection: userReflection,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to submit reflection. Please try again.");
+      } else {
+        // Invalidate queries to refetch updated trade data
+        queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+        
+        // Update local active trade view to immediately show AI feedback
+        setActiveReflectionTrade(prev => prev ? {
+          ...prev,
+          reflection_text: userReflection,
+          reflection_feedback: data.feedback
+        } : null);
+      }
+    } catch (err) {
+      console.error("Error submitting reflection:", err);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setSubmittingReflection(false);
+    }
   };
 
   // Apply all filters
@@ -343,7 +448,42 @@ export default function JournalPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleImportCSV}
+              disabled={importing}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer disabled:opacity-50"
+            >
+              {importing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {importing ? "Importing..." : "Import CSV"}
+            </button>
+            <a
+              href="/api/journal/template"
+              download="introspect_journal_template.csv"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV Template
+            </a>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success/90 text-success-foreground text-xs font-semibold shadow-[0_0_15px_rgba(34,197,94,0.15)] transition-all cursor-pointer"
@@ -436,26 +576,48 @@ export default function JournalPage() {
               <div className="hidden md:grid grid-cols-12 gap-2 items-center px-5 py-3.5 text-sm">
                 <div className="col-span-2">
                   <p className="font-medium text-foreground">{trade.stock}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {new Date(trade.created_at).toLocaleDateString("en-IN")} •{" "}
-                    {new Date(trade.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  <p className="text-[10px] text-muted-foreground mt-0.5 flex flex-col gap-0.5">
+                    <span>
+                      {new Date(trade.created_at).toLocaleDateString("en-IN")} •{" "}
+                      {new Date(trade.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {(trade.entry_time || trade.exit_time) && (
+                      <span className="font-mono text-foreground/75 text-[9px]">
+                        🕒 {trade.entry_time || "--:--"} - {trade.exit_time || "--:--"}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="col-span-1">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                      trade.direction === "long"
-                        ? "bg-success/10 text-success"
-                        : "bg-destructive/10 text-destructive"
-                    }`}
-                  >
-                    {trade.direction === "long" ? (
-                      <ArrowUpRight className="h-3 w-3" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3" />
+                  <div className="flex flex-col gap-1 items-start">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                        trade.direction === "long"
+                          ? "bg-success/10 text-success"
+                          : "bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {trade.direction === "long" ? (
+                        <ArrowUpRight className="h-3 w-3" />
+                      ) : (
+                        <ArrowDownRight className="h-3 w-3" />
+                      )}
+                      {trade.direction === "long" ? "BUY" : "SELL"}
+                    </span>
+                    {trade.market_sentiment && (
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-medium ${
+                          trade.market_sentiment === "Bullish"
+                            ? "bg-success/10 text-success"
+                            : trade.market_sentiment === "Bearish"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {trade.market_sentiment}
+                      </span>
                     )}
-                    {trade.direction === "long" ? "BUY" : "SELL"}
-                  </span>
+                  </div>
                 </div>
                 <div className="col-span-1 text-right font-mono text-xs text-muted-foreground">
                   ₹{trade.entry_price.toLocaleString("en-IN")}
@@ -524,6 +686,27 @@ export default function JournalPage() {
                     }
                     return <span className="text-xs text-muted-foreground/40">—</span>;
                   })()}
+
+                  {(() => {
+                    const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0);
+                    if (!hasMistake) return null;
+                    return (
+                      <button
+                        onClick={() => {
+                          setActiveReflectionTrade(trade);
+                          setUserReflection(trade.reflection_text || "");
+                        }}
+                        className={`px-2 py-0.5 rounded border text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                          trade.reflection_text
+                            ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20"
+                        }`}
+                      >
+                        {trade.reflection_text ? "💡 CBT" : "💬 AI Coach"}
+                      </button>
+                    );
+                  })()}
+
                   <button
                     onClick={() => handleDeleteTrade(trade.id)}
                     className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-all cursor-pointer"
@@ -561,37 +744,84 @@ export default function JournalPage() {
                     {Math.abs(trade.pnl).toLocaleString("en-IN")}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                   <span>₹{trade.entry_price.toLocaleString("en-IN")} → ₹{(trade.exit_price || 0).toLocaleString("en-IN")}</span>
                   <span>•</span>
                   <span>{trade.quantity} qty</span>
+                  {trade.market_sentiment && (
+                    <>
+                      <span>•</span>
+                      <span className={`font-semibold ${
+                        trade.market_sentiment === "Bullish" ? "text-success" :
+                        trade.market_sentiment === "Bearish" ? "text-destructive" :
+                        "text-muted-foreground"
+                      }`}>
+                        {trade.market_sentiment}
+                      </span>
+                    </>
+                  )}
                 </div>
-                {/* Mobile mistake tag */}
+                {(trade.entry_time || trade.exit_time) && (
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    🕒 {trade.entry_time || "--:--"} - {trade.exit_time || "--:--"}
+                  </p>
+                )}
+                {/* Mobile mistake tag & AI Coach */}
                 {(() => {
                   const reportMistake = mistakeTags.find(
                     (mt) => mt.stock.toLowerCase() === trade.stock.toLowerCase()
                   );
                   const isClean = reportMistake?.tag.startsWith("✅");
                   const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
-                  
-                  if (reportMistake && !isClean) {
-                    return (
-                      <div className="pt-1">
+                  const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (reportMistake && !isClean);
+
+                  return (
+                    <div className="pt-1 flex items-center justify-between gap-2">
+                      {reportMistake && !isClean ? (
                         <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
                           ⚠️ {mistakeText?.split(" (")[0] || "Violation"}
                         </span>
-                      </div>
-                    );
-                  } else if (reportMistake && isClean) {
-                    return (
-                      <div className="pt-1">
+                      ) : reportMistake && isClean ? (
                         <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
                           ✓ Clean Trade
                         </span>
+                      ) : trade.mistakes && trade.mistakes.length > 0 ? (
+                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${mistakeBadges[trade.mistakes[0]] || "bg-muted text-foreground border-border"}`}>
+                          {trade.mistakes[0]}
+                        </span>
+                      ) : (
+                        <div />
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        {hasMistake && (
+                          <button
+                            onClick={() => {
+                              setActiveReflectionTrade(trade);
+                              setUserReflection(trade.reflection_text || "");
+                            }}
+                            className={`px-2.5 py-1 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                              trade.reflection_text
+                                ? "bg-primary/10 text-primary border-primary/20"
+                                : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                            }`}
+                          >
+                            {trade.reflection_text ? "💡 View CBT" : "💬 AI Coach"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteTrade(trade.id)}
+                          className="p-1 rounded hover:bg-destructive/10 transition-all text-destructive cursor-pointer"
+                        >
+                          {deleting === trade.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       </div>
-                    );
-                  }
-                  return null;
+                    </div>
+                  );
                 })()}
               </div>
             </div>
@@ -714,16 +944,38 @@ export default function JournalPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Stop-Loss (Optional)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.stop_loss}
-                    onChange={(e) => setFormData((p) => ({ ...p, stop_loss: e.target.value }))}
-                    placeholder="₹ Stop-loss price"
-                    className="w-full px-3 py-2.5 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Stop-Loss (Optional)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.stop_loss}
+                      onChange={(e) => setFormData((p) => ({ ...p, stop_loss: e.target.value }))}
+                      placeholder="₹ Stop-loss price"
+                      className="w-full px-3 py-2.5 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block truncate">Entry Time</label>
+                      <input
+                        type="time"
+                        value={formData.entry_time}
+                        onChange={(e) => setFormData((p) => ({ ...p, entry_time: e.target.value }))}
+                        className="w-full px-2 py-2 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block truncate">Exit Time</label>
+                      <input
+                        type="time"
+                        value={formData.exit_time}
+                        onChange={(e) => setFormData((p) => ({ ...p, exit_time: e.target.value }))}
+                        className="w-full px-2 py-2 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* INTROSPECT™ special fields */}
@@ -761,6 +1013,32 @@ export default function JournalPage() {
                         <AlertTriangle className="h-3.5 w-3.5" />
                         No
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="text-xs font-medium mb-1.5 block">
+                      Market Sentiment
+                    </label>
+                    <div className="flex gap-2">
+                      {["Bullish", "Bearish", "Neutral"].map((sentiment) => (
+                        <button
+                          key={sentiment}
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, market_sentiment: sentiment }))}
+                          className={`flex-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+                            formData.market_sentiment === sentiment
+                              ? sentiment === "Bullish"
+                                ? "border-success bg-success/[0.06] text-success"
+                                : sentiment === "Bearish"
+                                ? "border-destructive bg-destructive/[0.06] text-destructive"
+                                : "border-muted-foreground bg-muted text-foreground"
+                              : "border-border text-muted-foreground hover:bg-muted/30"
+                          }`}
+                        >
+                          {sentiment}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -841,6 +1119,144 @@ export default function JournalPage() {
                   {saving ? "Saving..." : "Save Trade Entry"}
                 </button>
               </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* AI Reflection Coach Modal */}
+      <AnimatePresence>
+        {activeReflectionTrade && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => {
+                if (!submittingReflection) {
+                  setActiveReflectionTrade(null);
+                  setUserReflection("");
+                }
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <div>
+                    <h3 className="font-heading text-base font-bold text-foreground">
+                      INTROSPECT™ Reflection Coach
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                      Cognitive Behavioral Therapy (CBT)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  disabled={submittingReflection}
+                  onClick={() => {
+                    setActiveReflectionTrade(null);
+                    setUserReflection("");
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="bg-muted/30 rounded-xl p-3 text-xs border border-border/50">
+                <span className="font-semibold block text-foreground mb-1">
+                  Trade details:
+                </span>
+                <span className="font-mono text-muted-foreground">
+                  {activeReflectionTrade.stock} • {activeReflectionTrade.direction === "long" ? "LONG" : "SHORT"} • P&L: ₹{activeReflectionTrade.pnl.toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              {activeReflectionTrade.reflection_feedback ? (
+                // Show existing reflection and feedback
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Your Reflection
+                    </span>
+                    <div className="p-3 bg-muted/40 rounded-xl text-sm italic text-foreground leading-relaxed border border-border/40">
+                      "{activeReflectionTrade.reflection_text}"
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border/50 pt-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-primary uppercase tracking-wider">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI Coach Feedback
+                    </div>
+                    <div className="p-4 bg-primary/[0.03] border border-primary/20 rounded-xl text-sm text-foreground leading-relaxed">
+                      {activeReflectionTrade.reflection_feedback}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      // Allow re-reflecting if desired
+                      setActiveReflectionTrade(prev => prev ? {
+                        ...prev,
+                        reflection_text: null,
+                        reflection_feedback: null
+                      } : null);
+                      setUserReflection("");
+                    }}
+                    className="w-full py-2.5 rounded-xl border border-border hover:bg-muted/50 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Reflect Again
+                  </button>
+                </div>
+              ) : (
+                // Prompt user to write reflection
+                <form onSubmit={handleSubmitReflection} className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.04] border border-primary/10">
+                      <Brain className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <strong className="text-foreground">CBT Trigger Analysis:</strong> You logged a mistake on this trade. To construct a cognitive reframe and avoid repeating it, explain: What triggered the urge to deviate from your plan? What emotions or physical sensations were you experiencing right before clicking buy/sell?
+                      </p>
+                    </div>
+
+                    <textarea
+                      rows={4}
+                      required
+                      disabled={submittingReflection}
+                      value={userReflection}
+                      onChange={(e) => setUserReflection(e.target.value)}
+                      placeholder="e.g., I saw the price moving fast and felt anxious about missing the move. I entered without waiting for my 5-minute candle to close..."
+                      className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm resize-none focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all leading-relaxed"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingReflection || !userReflection.trim()}
+                    className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 rounded-xl shadow-lg shadow-primary/15 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingReflection ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing triggers...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Analyze Trigger & Get CBT Feedback
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
             </motion.div>
           </>
         )}

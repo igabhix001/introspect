@@ -58,7 +58,7 @@ function MarketZoneWidget() {
   return (
     <motion.div
       variants={staggerItem}
-      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
     >
       <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${z?.bg || "bg-muted/30"}`} />
       <div className="relative">
@@ -88,15 +88,20 @@ function MarketZoneWidget() {
               </span>
             )}
           </div>
-          <Link href="/dashboard/sentiment" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/dashboard/calculator" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
             Details →
           </Link>
         </div>
         {z ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-2xl">{z.emoji}</span>
               <span className={`text-3xl font-bold font-heading ${z.color}`}>{z.label}</span>
+              {marketData?.zone_status === "WATCH" && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-500 uppercase tracking-wider animate-pulse border border-amber-500/20">
+                  STABILIZING ({marketData?.confirmation_count}/3)
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
               Market zone • <span className="text-foreground font-medium">Nifty 50 (India)</span>
@@ -105,6 +110,156 @@ function MarketZoneWidget() {
         ) : (
           <span className="text-sm text-muted-foreground">Loading...</span>
         )}
+      </div>
+    </motion.div>
+  );
+}
+
+
+
+function DisciplineGauge({ score }: { score: number }) {
+  const radius = 36;
+  const strokeWidth = 6;
+  const circumference = 2 * Math.PI * radius; // Full circle
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const color = score >= 75 ? "#22c55e" : score >= 55 ? "#eab308" : "#ef4444";
+
+  return (
+    <div className="relative flex items-center justify-center w-24 h-24">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.05)"
+          strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          strokeLinecap="round"
+          style={{
+            stroke: color,
+            filter: `drop-shadow(0 0 4px ${color}80)`
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-bold font-heading text-foreground leading-none">{score}</span>
+        <span className="text-[8px] text-muted-foreground uppercase font-semibold tracking-wider mt-1 scale-90">Score</span>
+      </div>
+    </div>
+  );
+}
+
+function RiskLimitStatusBar({ todayTradeCount, todayPnl, capitalUsed }: { todayTradeCount: number; todayPnl: number; capitalUsed: number }) {
+  const maxTrades = 5;
+  const maxDrawdownPct = 2; // 2% daily limit
+  
+  // Daily Trades progress
+  const tradePercent = Math.min(100, (todayTradeCount / maxTrades) * 100);
+  
+  // Drawdown exposure
+  const currentDrawdownPct = todayPnl < 0 ? Math.min(100, (Math.abs(todayPnl) / capitalUsed) * 100) : 0;
+  const drawdownLimitProgress = Math.min(100, (currentDrawdownPct / maxDrawdownPct) * 100);
+  
+  // Capital at risk
+  const capitalAtRiskPct = Math.round((todayTradeCount > 0 ? 1.2 : 0) * 10) / 10;
+
+  return (
+    <motion.div
+      variants={staggerItem}
+      className="rounded-2xl border border-border bg-card p-5 space-y-4"
+    >
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center gap-2">
+          <Shield className="h-4.5 w-4.5 text-success" />
+          <h3 className="font-heading text-xs font-bold uppercase tracking-wider">
+            Risk Limit Status Controls
+          </h3>
+        </div>
+        <span className="text-[10px] text-muted-foreground font-mono">Capital: ₹{capitalUsed.toLocaleString("en-IN")}</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Daily Trades Tracker */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground font-medium">Daily Trades Limit</span>
+            <span className="font-mono text-foreground font-semibold">{todayTradeCount} / {maxTrades} trades</span>
+          </div>
+          <div className="flex gap-1.5 h-2">
+            {Array.from({ length: maxTrades }).map((_, i) => (
+              <div
+                key={i}
+                className={`flex-1 rounded-sm transition-all duration-300 ${
+                  i < todayTradeCount
+                    ? todayTradeCount > maxTrades
+                      ? "bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                      : "bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                    : "bg-white/5"
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-[9px] text-muted-foreground">
+            <span>Safe Zone</span>
+            {todayTradeCount > maxTrades && <span className="text-destructive font-semibold">Limit Exceeded!</span>}
+          </div>
+        </div>
+
+        {/* Drawdown Exposure */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground font-medium">Daily Drawdown (Max {maxDrawdownPct}%)</span>
+            <span className="font-mono text-foreground font-semibold">
+              {todayPnl < 0 ? `-₹${Math.abs(todayPnl).toLocaleString("en-IN")}` : "₹0"} ({currentDrawdownPct.toFixed(2)}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden relative">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                currentDrawdownPct >= maxDrawdownPct
+                  ? "bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                  : currentDrawdownPct >= maxDrawdownPct * 0.8
+                  ? "bg-amber-500"
+                  : "bg-success"
+              }`}
+              style={{ width: `${drawdownLimitProgress}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[9px] text-muted-foreground">
+            <span>0% Exposure</span>
+            <span>{maxDrawdownPct}% Cap</span>
+          </div>
+        </div>
+
+        {/* Capital at Risk */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground font-medium">Active SL Capital-at-Risk</span>
+            <span className="font-mono text-foreground font-semibold">{capitalAtRiskPct}% of capital</span>
+          </div>
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-500"
+              style={{ width: `${(capitalAtRiskPct / 5) * 100}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[9px] text-muted-foreground">
+            <span>0% Locked</span>
+            <span>5% Hard Limit</span>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
@@ -172,31 +327,7 @@ function DashboardContent() {
     );
   }
 
-  // Subscription gate — unpaid non-admin users see payment wall
-  // Skip gate if we just verified subscription from payment success
-  if (!isAdmin && hasActiveSubscription === false && !subscriptionVerified) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="max-w-md text-center p-8 rounded-2xl border border-border bg-card">
-          <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-            <Shield className="h-8 w-8 text-success" />
-          </div>
-          <h2 className="font-heading text-2xl font-bold mb-3">Activate Your Account</h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Subscribe to INTROSPECT™ to unlock your personalized risk assessment, trading rules, journal, challenges, and more.
-          </p>
-          <Link
-            href="/dashboard/payments"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-success hover:bg-success/90 text-success-foreground font-semibold transition-colors shadow-lg shadow-success/20"
-          >
-            Choose a Plan
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-          <p className="text-xs text-muted-foreground mt-4">Starting at just ₹333/month • All inclusive</p>
-        </div>
-      </div>
-    );
-  }
+  // Dashboard is open to all users (subscribed and non-subscribed). Selected features like the detailed Risk Report are gated inside their respective pages.
 
   const disciplineScore = data?.disciplineScore || 0;
   const hasJournaledToday = data?.hasJournaledToday || false;
@@ -211,12 +342,24 @@ function DashboardContent() {
   const todaysRules = data?.tradingRules || [];
   const recentTrades = data?.recentTrades || [];
   const todayMistakesCount = data?.todayMistakesCount || 0;
-  const todayMistakeTags = data?.todayMistakeTags || [];
+  const todayMistakeTags = (data?.todayMistakeTags || []) as any[];
   const todayAreasToImprove = data?.todayAreasToImprove || [];
   const hasEverTraded = data?.hasEverTraded || false;
   const hasAssessment = data?.hasAssessment || false;
   // Show welcome banner only for truly new users who have never traded or done assessment
   const hasNoAssessment = !hasEverTraded && !hasAssessment;
+
+  // Calculate Cognitive Triggers from real trade records
+  const isRevenge = todayMistakeTags.some(t => t.tag?.includes("REVENGE") || t.tag?.includes("revenge"));
+  const isFOMO = todayMistakeTags.some(t => t.tag?.includes("FOMO") || t.tag?.includes("fomo"));
+  const isSizeViolation = todayMistakeTags.some(t => t.tag?.includes("SIZE") || t.tag?.includes("size"));
+
+  const triggers = {
+    frustration: isRevenge ? 100 : Math.min(100, todayMistakesCount * 25),
+    overconfidence: todayPnl > 0 && todayMistakesCount === 0 && todayTradeCount >= 3 ? 80 : todayPnl > 0 ? Math.min(100, todayTradeCount * 20) : 10,
+    boredom: todayMistakeTags.some(t => t.tag?.includes("Overtrading")) ? 70 : 10,
+    urgency: isFOMO || isSizeViolation ? 90 : 20,
+  };
 
   return (
     <motion.div
@@ -274,14 +417,14 @@ function DashboardContent() {
 
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Discipline Score + Share Card */}
+        {/* Discipline Score Card */}
         <motion.div
           variants={staggerItem}
-          className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
         >
           <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${hasJournaledToday ? "bg-success/[0.07] group-hover:bg-success/[0.12]" : "bg-muted/30"}`} />
-          <div className="relative">
-            <div className="flex items-center justify-between mb-3">
+          <div className="relative flex flex-col justify-between h-full min-h-[140px]">
+            <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Discipline Score
               </p>
@@ -293,75 +436,48 @@ function DashboardContent() {
               )}
             </div>
             {hasJournaledToday ? (
-              <>
-                <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold font-heading text-foreground">
-                    {disciplineScore}
-                  </span>
-                  <span className="text-sm text-muted-foreground mb-1">/100</span>
-                  {/* Mistakes count badge */}
-                  {hasTodayReport && (
-                    <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      todayMistakesCount === 0 
-                        ? "bg-success/10 text-success" 
-                        : "bg-destructive/10 text-destructive"
-                    }`}>
-                      {todayMistakesCount === 0 ? "0 mistakes" : `${todayMistakesCount} mistake${todayMistakesCount > 1 ? "s" : ""}`}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${disciplineScore >= 70 ? "bg-success" : disciplineScore >= 40 ? "bg-amber-500" : "bg-destructive"}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${disciplineScore}%` }}
-                    transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
-                  />
-                </div>
-                {/* Link to daily report for details */}
-                {hasTodayReport && (
-                  <Link 
-                    href="/dashboard/daily-report" 
-                    className="text-[10px] text-muted-foreground hover:text-success mt-2 inline-block transition-colors"
-                  >
-                    View Daily Report for details →
-                  </Link>
-                )}
-                {/* Share Card buttons per client share card doc */}
-                <div className="flex gap-2 mt-2">
+              <div className="flex items-center justify-between gap-4 mt-2">
+                <div className="flex-1">
+                  <div className="flex items-end gap-1">
+                    <span className="text-3xl font-bold font-heading text-foreground">{disciplineScore}</span>
+                    <span className="text-xs text-muted-foreground mb-1">/100</span>
+                  </div>
+                  {/* Share button */}
                   <button
                     onClick={() => {
                       const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
                       const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
                       navigator.clipboard.writeText(text);
                     }}
-                    className="text-[10px] font-medium text-muted-foreground hover:text-success px-2 py-1 rounded-md border border-border hover:border-success/30 transition-all cursor-pointer"
+                    className="text-[9px] font-semibold text-muted-foreground hover:text-success px-2 py-1 rounded border border-border hover:border-success/30 transition-all mt-2.5 block"
                   >
-                    Copy Share Text
+                    Copy Share Card
                   </button>
                 </div>
-              </>
+                <div className="shrink-0">
+                  <DisciplineGauge score={disciplineScore} />
+                </div>
+              </div>
             ) : (
               <div className="py-2">
-                <p className="text-sm text-muted-foreground mb-2">
-                  No trades logged today
-                </p>
+                <p className="text-xs text-muted-foreground mb-2">No trades logged today</p>
                 <Link
                   href="/dashboard/journal?new=true"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-success hover:text-success/80 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-success hover:text-success/80 transition-colors"
                 >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  Log a trade to get your score
+                  <BookOpen className="h-3 w-3" />
+                  Log trade to score
                 </Link>
               </div>
             )}
           </div>
         </motion.div>
 
+
         {/* Today's P&L */}
         <motion.div
           variants={staggerItem}
-          className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
         >
           <div
             className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${
@@ -407,7 +523,7 @@ function DashboardContent() {
         {/* Streak */}
         <motion.div
           variants={staggerItem}
-          className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
         >
           <div className="absolute -top-8 -right-8 w-24 h-24 bg-orange-500/[0.07] rounded-full blur-2xl transition-all group-hover:bg-orange-500/[0.12]" />
           <div className="relative">
@@ -429,6 +545,8 @@ function DashboardContent() {
           </div>
         </motion.div>
       </div>
+
+      <RiskLimitStatusBar todayTradeCount={todayTradeCount} todayPnl={todayPnl} capitalUsed={data?.capitalUsed || 100000} />
 
       {/* Middle Row: Chart + Rules */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -455,7 +573,7 @@ function DashboardContent() {
             </Link>
           </div>
 
-          <div className="h-[200px] -ml-2">
+          <div className="h-[260px] min-h-[260px] min-w-0 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={disciplineData}>
                 <defs>
@@ -669,159 +787,261 @@ function DashboardContent() {
           </div>
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div
-          variants={staggerItem}
-          className="rounded-2xl border border-border bg-card p-5 space-y-3"
-        >
-          <h3 className="font-heading text-sm font-semibold mb-4">
-            Quick Actions
-          </h3>
-
-          <Link
-            href="/dashboard/journal?new=true"
-            className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-success/30 hover:bg-success/[0.03] transition-all group"
+        <div className="space-y-4">
+          {/* Quick Actions */}
+          <motion.div
+            variants={staggerItem}
+            className="rounded-2xl border border-border bg-card p-5 space-y-3"
           >
-            <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0 group-hover:bg-success/20 transition-colors">
-              <BookOpen className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-sm font-medium group-hover:text-success transition-colors">
-                Log a Trade
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Record your latest entry
-              </p>
-            </div>
-          </Link>
+            <h3 className="font-heading text-sm font-semibold mb-4">
+              Quick Actions
+            </h3>
 
-          <Link
-            href="/dashboard/calculator"
-            className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-blue-500/30 hover:bg-blue-500/[0.03] transition-all group"
+            <Link
+              href="/dashboard/journal?new=true"
+              className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-success/30 hover:bg-success/[0.03] transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0 group-hover:bg-success/20 transition-colors">
+                <BookOpen className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="text-sm font-medium group-hover:text-success transition-colors">
+                  Log a Trade
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Record your latest entry
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/calculator"
+              className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-blue-500/30 hover:bg-blue-500/[0.03] transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 group-hover:bg-blue-500/20 transition-colors">
+                <Target className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium group-hover:text-blue-500 transition-colors">
+                  Position Calculator
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Size your next trade
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/assessment"
+              className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-purple-500/30 hover:bg-purple-500/[0.03] transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 group-hover:bg-purple-500/20 transition-colors">
+                <Zap className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium group-hover:text-purple-500 transition-colors">
+                  Take Assessment
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Update your risk profile
+                </p>
+              </div>
+            </Link>
+
+            {/* Mistake Detector Alert - Shows actual mistakes from today's report */}
+            {hasTodayReport && todayMistakesCount > 0 ? (
+              <div className="mt-2 p-3.5 rounded-xl border border-destructive/30 bg-destructive/[0.06]">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-destructive">
+                      Mistake Detector ({todayMistakesCount} issue{todayMistakesCount > 1 ? "s" : ""})
+                    </p>
+                    <ul className="text-[11px] text-muted-foreground mt-1.5 space-y-1">
+                      {todayAreasToImprove.slice(0, 3).map((area, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="text-destructive">•</span>
+                          <span>{area.replace(/^⚠️\s*/, "")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link 
+                      href="/dashboard/daily-report" 
+                      className="text-[10px] text-destructive hover:underline mt-2 inline-block"
+                    >
+                      View full report →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ) : hasTodayReport && todayMistakesCount === 0 ? (
+              <div className="mt-2 p-3.5 rounded-xl border border-success/30 bg-success/[0.06]">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-success">
+                      Clean Trading Day! ✓
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      No rule violations detected. Keep up the discipline!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : hasJournaledToday ? (
+              <div className="mt-2 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06]">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-500">
+                      Generate Report
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      Generate your daily report to see mistake analysis.
+                    </p>
+                    <Link 
+                      href="/dashboard/daily-report" 
+                      className="text-[10px] text-amber-500 hover:underline mt-1 inline-block"
+                    >
+                      Go to Daily Report →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Services & Enquiries */}
+            <div className="mt-4 relative rounded-xl border border-success/20 bg-success/[0.06] p-4 overflow-hidden group">
+              <div className="absolute -top-4 -right-4 w-20 h-20 bg-success/10 rounded-full blur-xl group-hover:bg-success/20 transition-colors" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="h-4 w-4 text-success" />
+                  <span className="text-xs font-semibold text-success">
+                    Services & Support
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+                  Click here for demat, automation, training, counseling and enquiries.
+                </p>
+                <a
+                  href="https://intradaymindview.com/contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-success hover:text-success/80 transition-colors"
+                >
+                  Contact Us
+                  <TrendingUp className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Cognitive Trigger Map */}
+          <motion.div
+            variants={staggerItem}
+            className="rounded-2xl border border-border bg-card p-5 space-y-4"
           >
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 group-hover:bg-blue-500/20 transition-colors">
-              <Target className="h-5 w-5 text-blue-500" />
-            </div>
             <div>
-              <p className="text-sm font-medium group-hover:text-blue-500 transition-colors">
-                Position Calculator
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Size your next trade
+              <h3 className="font-heading text-sm font-semibold">
+                Cognitive Trigger Map
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Real-time monitoring of trading bias risks
               </p>
             </div>
-          </Link>
 
-          <Link
-            href="/dashboard/assessment"
-            className="flex items-center gap-3 w-full p-3 rounded-xl border border-border hover:border-purple-500/30 hover:bg-purple-500/[0.03] transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 group-hover:bg-purple-500/20 transition-colors">
-              <Zap className="h-5 w-5 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium group-hover:text-purple-500 transition-colors">
-                Take Assessment
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Update your risk profile
-              </p>
-            </div>
-          </Link>
+            <div className="space-y-3.5">
+              {/* Urgency */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium flex items-center gap-1.5 text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                    Urgency (FOMO)
+                  </span>
+                  <span className="font-mono font-semibold text-muted-foreground">
+                    {triggers.urgency}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all duration-500"
+                    style={{ width: `${triggers.urgency}%` }}
+                  />
+                </div>
+              </div>
 
-          {/* Mistake Detector Alert - Shows actual mistakes from today's report */}
-          {hasTodayReport && todayMistakesCount > 0 ? (
-            <div className="mt-2 p-3.5 rounded-xl border border-destructive/30 bg-destructive/[0.06]">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-destructive">
-                    Mistake Detector ({todayMistakesCount} issue{todayMistakesCount > 1 ? "s" : ""})
-                  </p>
-                  <ul className="text-[11px] text-muted-foreground mt-1.5 space-y-1">
-                    {todayAreasToImprove.slice(0, 3).map((area, i) => (
-                      <li key={i} className="flex items-start gap-1.5">
-                        <span className="text-destructive">•</span>
-                        <span>{area.replace(/^⚠️\s*/, "")}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link 
-                    href="/dashboard/daily-report" 
-                    className="text-[10px] text-destructive hover:underline mt-2 inline-block"
-                  >
-                    View full report →
-                  </Link>
+              {/* Frustration */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium flex items-center gap-1.5 text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                    Frustration (Revenge)
+                  </span>
+                  <span className="font-mono font-semibold text-muted-foreground">
+                    {triggers.frustration}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-red-500 to-rose-600 transition-all duration-500"
+                    style={{ width: `${triggers.frustration}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Overconfidence */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium flex items-center gap-1.5 text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                    Overconfidence
+                  </span>
+                  <span className="font-mono font-semibold text-muted-foreground">
+                    {triggers.overconfidence}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                    style={{ width: `${triggers.overconfidence}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Boredom */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium flex items-center gap-1.5 text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+                    Boredom (Overtrading)
+                  </span>
+                  <span className="font-mono font-semibold text-muted-foreground">
+                    {triggers.boredom}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                    style={{ width: `${triggers.boredom}%` }}
+                  />
                 </div>
               </div>
             </div>
-          ) : hasTodayReport && todayMistakesCount === 0 ? (
-            <div className="mt-2 p-3.5 rounded-xl border border-success/30 bg-success/[0.06]">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-success">
-                    Clean Trading Day! ✓
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                    No rule violations detected. Keep up the discipline!
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : hasJournaledToday ? (
-            <div className="mt-2 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06]">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-amber-500">
-                    Generate Report
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                    Generate your daily report to see mistake analysis.
-                  </p>
-                  <Link 
-                    href="/dashboard/daily-report" 
-                    className="text-[10px] text-amber-500 hover:underline mt-1 inline-block"
-                  >
-                    Go to Daily Report →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
-          {/* Services & Enquiries */}
-          <div className="mt-4 relative rounded-xl border border-success/20 bg-success/[0.06] p-4 overflow-hidden group">
-            <div className="absolute -top-4 -right-4 w-20 h-20 bg-success/10 rounded-full blur-xl group-hover:bg-success/20 transition-colors" />
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-4 w-4 text-success" />
-                <span className="text-xs font-semibold text-success">
-                  Services & Support
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-                Click here for demat, automation, training, counseling and enquiries.
+            <div className="pt-2.5 border-t border-border flex items-start gap-2">
+              <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Triggers are calculated dynamically from your logged mistakes, trade count, and P&L activity today.
               </p>
-              <a
-                href="https://intradaymindview.com/contact"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-success hover:text-success/80 transition-colors"
-              >
-                Contact Us
-                <TrendingUp className="h-3 w-3" />
-              </a>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
 
       {/* Risk Management Disclaimer (Client requirement Sec 3.3.8) */}
       <motion.div
         variants={staggerItem}
-        className="rounded-2xl border border-border bg-card/50 p-4"
+        className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-4"
       >
         <div className="flex items-start gap-2.5">
           <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />

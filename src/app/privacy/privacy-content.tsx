@@ -41,7 +41,7 @@ const sections = [
     title: "Data Sharing",
     content: [
       "Razorpay: payment processing only — they don't receive your trading data",
-      "Fyers API: market data only (if you connect it) — your trades stay private",
+      "Third-party data provider APIs: market data only (if connected) — your trades stay private",
       "No data is shared with advertisers, brokers, or trading firms",
       "We may share anonymized, aggregate insights (e.g., '72% of users improved discipline in 30 days')",
     ],

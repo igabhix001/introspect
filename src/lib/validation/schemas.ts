@@ -5,14 +5,17 @@ export const tradeSchema = z.object({
   stock: z.string().min(1, "Stock/Index is required").max(20),
   direction: z.enum(["long", "short"]),
   entry_price: z.number().positive("Entry price must be positive"),
-  exit_price: z.number().positive("Exit price must be positive").optional(),
-  stop_loss: z.number().positive("Stop loss must be positive").optional(),
-  target_price: z.number().positive("Target must be positive").optional(),
+  exit_price: z.number().positive("Exit price must be positive").optional().nullable(),
+  stop_loss: z.number().positive("Stop loss must be positive").optional().nullable(),
+  target_price: z.number().positive("Target must be positive").optional().nullable(),
   quantity: z.number().int().positive("Quantity must be positive"),
-  emotion_before: z.string().max(50).optional(),
-  emotion_after: z.string().max(50).optional(),
+  emotion_before: z.string().max(50).optional().nullable(),
+  emotion_after: z.string().max(50).optional().nullable(),
   followed_plan: z.boolean().default(true),
-  notes: z.string().max(500).optional(),
+  notes: z.string().max(500).optional().nullable(),
+  market_sentiment: z.enum(["Bullish", "Bearish", "Neutral"]).optional().nullable(),
+  entry_time: z.string().optional().nullable(),
+  exit_time: z.string().optional().nullable(),
 });
 
 // Assessment Answer Validation

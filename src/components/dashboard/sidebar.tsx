@@ -50,16 +50,10 @@ const userNavItems = [
     description: "Your personalized rules",
   },
   {
-    label: "Position Sizer",
+    label: "Sizer & Sentiment",
     href: "/dashboard/calculator",
     icon: Calculator,
-    description: "Calculate optimal lot sizes",
-  },
-  {
-    label: "Sentiment",
-    href: "/dashboard/sentiment",
-    icon: Activity,
-    description: "Live market intelligence",
+    description: "Calculator & live market sentiment",
   },
   {
     label: "Trade Journal",
@@ -270,12 +264,13 @@ export function DashboardSidebar({
                 strokeWidth={active ? 2.2 : 1.8}
               />
 
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 {!collapsed && (
                   <motion.div
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: "auto" }}
-                    exit={{ opacity: 0, width: 0 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
                     className="flex flex-col overflow-hidden whitespace-nowrap"
                   >
                     <span>{item.label}</span>

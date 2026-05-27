@@ -181,13 +181,14 @@ export function AboutContent() {
             transition={{ duration: 0.6 }}
             className="flex justify-center"
           >
-            <div className="relative w-48 h-48 sm:w-64 sm:h-64">
-              <div className="absolute inset-0 bg-success/10 rounded-full blur-[60px] pointer-events-none" />
-              <Image
-                src="/logo.png"
-                alt="INTROSPECT™ Logo"
-                fill
-                className="object-contain relative z-10"
+            <div className="relative w-full max-w-[500px] aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(34,197,94,0.15)] bg-black/40">
+              <video
+                src="/Manage money.webm"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover relative z-10"
               />
             </div>
           </motion.div>
@@ -201,14 +202,20 @@ export function AboutContent() {
               Our Mission
             </h2>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              To empower intraday traders with the tools and discipline framework
-              they need to protect their capital, build consistency, and transform
-              their trading journey — one disciplined day at a time.
+              INTROSPECT™ exists for one reason: to give intraday traders the tools
+              and discipline framework they need to stop losing capital and start
+              trading with a clear system — one accountable session at a time.
+            </p>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              We started with the Indian market (Nifty 50, BankNifty) because the
+              data is stark. SEBI studies show 90%+ of retail F&O traders lose money,
+              with average losses of ₹1.1 Lakh. The problem is not strategy — it is
+              execution discipline. That is the gap we close.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-6">
-              We started with the Indian market (Nifty, BankNifty) and are expanding
-              globally (S&P 500, FTSE, and more). Our vision: every intraday trader,
-              everywhere, has access to a personal risk guardian.
+              Global markets (S&P 500, FTSE) are planned for future releases. Our
+              goal: every intraday trader, everywhere, has access to a personal
+              behavioral risk guardian.
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -258,7 +265,7 @@ export function AboutContent() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="p-6 sm:p-8 rounded-2xl bg-card/50 border border-border/50 glass-card hover:border-success/30 transition-all duration-300 group cursor-pointer"
+              className="p-6 sm:p-8 rounded-2xl bg-card/50 border border-border/50 glass-card hover:border-success/30 hover:shadow-[0_0_25px_rgba(34,197,94,0.08)] transition-all duration-300 group cursor-pointer"
             >
               <div className={`inline-flex p-3 rounded-xl ${value.bgColor} mb-4 transition-transform duration-300 group-hover:scale-110`}>
                 <value.icon className={`h-6 w-6 ${value.color}`} />
@@ -276,21 +283,35 @@ export function AboutContent() {
 
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-4">
-            Ready to transform your trading?
-          </h2>
-          <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-            Join INTROSPECT™ and start building the discipline that separates
-            consistent traders from the 90%.
-          </p>
-          <Link
-            href="/pricing"
-            className="inline-flex items-center bg-success hover:bg-success/90 text-success-foreground font-bold px-8 py-4 rounded-xl shadow-lg shadow-success/20 transition-all duration-300 group cursor-pointer"
-          >
-            Get Started
-            <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </Link>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-success/10 via-transparent to-blue-500/5 border border-success/20 p-10 sm:p-14 text-center">
+          <div className="absolute inset-0 grid-pattern opacity-10 pointer-events-none" />
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/10 border border-success/20 text-xs font-bold text-success uppercase tracking-wider mb-6">
+              Join the disciplined 10%
+            </div>
+            <h2 className="font-heading text-2xl sm:text-3xl font-extrabold mb-4">
+              Stop blowing accounts. Start building systems.
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-lg mx-auto text-sm leading-relaxed">
+              INTROSPECT™ gives you the behavioral mirror, risk framework, and accountability
+              system to stay in the profitable 10% that SEBI data confirms almost no one reaches.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/pricing"
+                className="inline-flex items-center bg-success hover:bg-success/90 text-success-foreground font-bold px-8 py-4 rounded-xl shadow-lg shadow-success/20 transition-all duration-300 group cursor-pointer"
+              >
+                View Pricing Plans
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/how-to-use"
+                className="inline-flex items-center font-medium px-8 py-4 rounded-xl border border-border/50 hover:border-success/30 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                See How It Works
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </div>

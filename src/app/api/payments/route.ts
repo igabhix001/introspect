@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
       const referralCode = body.referral_code || null;
 
       const pricingMap: Record<string, number> = {
-        "monthly": 33300,
-        "6-month": 183600,
-        "yearly": 365400
+        "monthly": 49900,
+        "6-month": 249900,
+        "yearly": 399900
       };
 
       // Try to fetch dynamic pricing from system settings
@@ -104,12 +104,27 @@ export async function POST(request: NextRequest) {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      // Save subscription with correct amounts
-      const amountPaidMap: Record<string, number> = {
-        "yearly": 3654,
-        "6-month": 1836,
-        "monthly": 333,
+      // Fetch dynamic pricing to save correct amount paid
+      const pricingMap: Record<string, number> = {
+        "monthly": 49900,
+        "6-month": 249900,
+        "yearly": 399900
       };
+      try {
+        const adminDb = createAdminClient();
+        const { data: settings } = await adminDb.from("system_settings").select("*").in("key", ["pricing_monthly", "pricing_6month", "pricing_yearly"]);
+        if (settings) {
+          settings.forEach((s) => {
+            if (s.key === "pricing_monthly" && s.value?.amount_paise) pricingMap["monthly"] = s.value.amount_paise;
+            if (s.key === "pricing_6month" && s.value?.amount_paise) pricingMap["6-month"] = s.value.amount_paise;
+            if (s.key === "pricing_yearly" && s.value?.amount_paise) pricingMap["yearly"] = s.value.amount_paise;
+          });
+        }
+      } catch {
+        // Use default pricing if settings fetch fails
+      }
+
+      const amountPaid = (pricingMap[plan as keyof typeof pricingMap] || pricingMap["monthly"]) / 100;
 
       const { data: subscription, error } = await supabase
         .from("subscriptions")
@@ -119,7 +134,7 @@ export async function POST(request: NextRequest) {
           status: "active",
           razorpay_order_id,
           razorpay_payment_id,
-          amount_paid: amountPaidMap[plan] || 333,
+          amount_paid: amountPaid,
           currency: "INR",
           current_period_start: now.toISOString(),
           current_period_end: periodEnd.toISOString(),
@@ -155,7 +170,7 @@ export async function POST(request: NextRequest) {
         
         const userName = profile?.full_name || profile?.email || user.email || "Unknown User";
         const userEmail = profile?.email || user.email || "N/A";
-        const amountDisplay = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
+        const amountDisplay = plan === "yearly" ? "₹3,999" : plan === "6-month" ? "₹2,499" : "₹499";
         
         const adminDb = createAdminClient();
         await adminDb.from("notifications").insert({

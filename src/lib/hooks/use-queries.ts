@@ -194,7 +194,7 @@ export function useDashboardQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -219,7 +219,7 @@ export function useTradesQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -285,7 +285,7 @@ export function useChallengesQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -330,7 +330,7 @@ export function useLoyaltyQuery() {
       return data;
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -355,7 +355,7 @@ export function useDailyReportsQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -393,7 +393,7 @@ export function useLoyaltyWithTransactionsQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -418,7 +418,7 @@ export function useDailyReportQuery(date: string) {
       return data;
     },
     enabled: !!userId && !!date,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -446,7 +446,7 @@ export function useRecentDailyReportsQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -460,18 +460,15 @@ export function useAnalyticsQuery() {
     queryFn: async ({ signal }) => {
       if (!userId) return null;
 
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      // Fetch trades and weekly reports in parallel
-      const [tradesRes, weeklyReportsRes] = await Promise.all([
+      // Fetch trades, weekly reports, and user profile in parallel
+      const [tradesRes, weeklyReportsRes, profileRes] = await Promise.all([
         supabase
           .from("trades")
           .select("*")
           .eq("user_id", userId)
-          .gte("created_at", thirtyDaysAgo.toISOString())
           .order("created_at", { ascending: true })
           .abortSignal(signal),
         supabase
@@ -481,6 +478,11 @@ export function useAnalyticsQuery() {
           .gte("date", sevenDaysAgo.toISOString().split("T")[0])
           .order("date", { ascending: false })
           .abortSignal(signal),
+        supabase
+          .from("profiles")
+          .select("trading_capital")
+          .eq("id", userId)
+          .single()
       ]);
 
       const allTrades = tradesRes.data || [];
@@ -594,10 +596,11 @@ export function useAnalyticsQuery() {
         weeklyMistakeData,
         weeklyAreasToImprove,
         weeklySuggestions,
+        tradingCapital: profileRes.data?.trading_capital || 100000,
       };
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 }
 
@@ -624,6 +627,10 @@ export function useAddTradeMutation() {
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dailyReports(user.id) });
+        queryClient.invalidateQueries({ queryKey: ["recentDailyReports", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["analytics", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["dailyReport", user.id] });
       }
     },
   });

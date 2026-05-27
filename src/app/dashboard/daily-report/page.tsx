@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
   CheckCircle2,
@@ -13,10 +13,29 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  AlertTriangle,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  Info,
+  X,
+  Brain,
+  Printer,
+  Loader2
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useDailyReportQuery, useRecentDailyReportsQuery } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  AreaChart,
+  Area,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from "recharts";
 
 interface DailyReport {
   id: string;
@@ -33,6 +52,27 @@ interface DailyReport {
     negative: string[];
     suggestions: string[];
     encouragement: string;
+    ai_narrative?: string;
+    ai_status?: string;
+    holdingTimes?: {
+      avgWinHoldTime: number;
+      avgLossHoldTime: number;
+      dispositionRatio: number;
+    };
+    tradeScorecard?: Array<{
+      id: string;
+      stock: string;
+      entry_time: string | null;
+      exit_time: string | null;
+      hold_time_minutes: number;
+      pnl: number;
+      direction: string;
+      followed_plan: boolean;
+      sl_followed: boolean;
+      mistakes: string[];
+      reflection_text?: string | null;
+      reflection_feedback?: string | null;
+    }>;
   };
 }
 
@@ -45,9 +85,51 @@ export default function DailyReportPage() {
   const { data: reportData, isLoading: reportLoading } = useDailyReportQuery(selectedDate);
   const { data: recentReportsData } = useRecentDailyReportsQuery();
 
+  const [activeReflectionTrade, setActiveReflectionTrade] = useState<any | null>(null);
+  const [userReflection, setUserReflection] = useState("");
+  const [submittingReflection, setSubmittingReflection] = useState(false);
+
   const report = reportData as DailyReport | null;
   const recentReports = (recentReportsData || []) as DailyReport[];
   const loading = reportLoading && !report;
+
+  const handleSubmitReflection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeReflectionTrade) return;
+    setSubmittingReflection(true);
+
+    try {
+      const response = await fetch("/api/journal/reflection-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradeId: activeReflectionTrade.id,
+          userReflection: userReflection,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to submit reflection. Please try again.");
+      } else {
+        // Invalidate dailyReport query to refetch fresh EOD report data
+        queryClient.invalidateQueries({ queryKey: ["dailyReport"] });
+        
+        // Update local active trade view to immediately show AI feedback
+        setActiveReflectionTrade((prev: any) => prev ? {
+          ...prev,
+          reflection_text: userReflection,
+          reflection_feedback: data.feedback
+        } : null);
+      }
+    } catch (err) {
+      console.error("Error submitting reflection:", err);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setSubmittingReflection(false);
+    }
+  };
 
   const generateReport = async () => {
     setGenerating(true);
@@ -128,6 +210,29 @@ export default function DailyReportPage() {
           >
             <ChevronRight className="h-4 w-4" />
           </button>
+
+          {report && (
+            <button
+              onClick={generateReport}
+              disabled={generating}
+              className="p-2 rounded-lg border border-border hover:bg-muted hover:border-success/40 hover:text-success transition-all text-muted-foreground flex items-center gap-1.5 no-print cursor-pointer disabled:opacity-50"
+              title="Regenerate EOD Analysis"
+            >
+              <RefreshCw className={`h-4 w-4 ${generating ? "animate-spin" : ""}`} />
+              <span className="text-xs font-semibold hidden sm:inline">
+                {generating ? "Regenerating..." : "Regenerate Analysis"}
+              </span>
+            </button>
+          )}
+
+          <button
+            onClick={() => window.print()}
+            className="p-2 rounded-lg border border-border hover:bg-muted hover:border-primary/40 hover:text-primary transition-all text-muted-foreground flex items-center gap-1.5 no-print cursor-pointer"
+            title="Print EOD Report"
+          >
+            <Printer className="h-4 w-4" />
+            <span className="text-xs font-semibold hidden sm:inline">Print / Save PDF</span>
+          </button>
         </div>
       </div>
 
@@ -159,6 +264,66 @@ export default function DailyReportPage() {
             </div>
           </div>
 
+          {/* AI Coaching Narrative */}
+          {report.feedback.ai_narrative && (
+            <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.03] via-transparent to-primary/[0.01] p-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                <Sparkles className="h-24 w-24 text-primary" />
+              </div>
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-4.5 w-4.5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      INTROSPECT™ AI Coaching Narrative
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                      INTROSPECT™ AI Behavioral Analysis
+                    </p>
+                  </div>
+                </div>
+
+                {report.feedback.ai_status === "paywall" ? (
+                  <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-center space-y-3">
+                    <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-500">Upgrade to Paid Subscription</p>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                        AI-powered cognitive bias identification, EOD narratives, and CBT coaching are premium features. Upgrade today to start trading with discipline!
+                      </p>
+                    </div>
+                    <a
+                      href="/dashboard/payments"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      Upgrade Plan
+                    </a>
+                  </div>
+                ) : report.feedback.ai_status === "limit_exceeded" ? (
+                  <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 text-center space-y-2">
+                    <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+                    <div>
+                      <p className="text-sm font-semibold text-destructive">Daily AI Review Limit Reached</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        You have reached your daily limit of 5 AI reviews. Your limit resets tomorrow.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground space-y-3 leading-relaxed">
+                    {report.feedback.ai_narrative.split("\n\n").map((para, i) => (
+                      <p key={i} className={i === 2 ? "pt-2.5 font-medium border-t border-border/40 text-foreground" : ""}>
+                        {para}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="rounded-xl border border-border bg-card p-4">
@@ -180,6 +345,204 @@ export default function DailyReportPage() {
               <p className="text-2xl font-bold">₹{report.updated_capital.toLocaleString("en-IN")}</p>
             </div>
           </div>
+
+          {/* Cumulative Daily P&L Curve */}
+          {report.feedback.tradeScorecard && report.feedback.tradeScorecard.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div>
+                  <h3 className="font-heading text-sm font-semibold">
+                    Cumulative Daily P&L Curve
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Your chronological equity path across today's trades
+                  </p>
+                </div>
+                {report.feedback.holdingTimes && (
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <div>
+                      Avg Win Hold: <span className="font-semibold text-success">{report.feedback.holdingTimes.avgWinHoldTime}m</span>
+                    </div>
+                    <div>
+                      Avg Loss Hold: <span className="font-semibold text-destructive">{report.feedback.holdingTimes.avgLossHoldTime}m</span>
+                    </div>
+                    <div className="px-1.5 py-0.5 rounded bg-muted font-semibold text-[10px] text-foreground">
+                      Disposition Ratio: {report.feedback.holdingTimes.dispositionRatio}x
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="h-[200px] min-h-[260px] min-w-0 -ml-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={[
+                      { tradeIndex: 0, time: "Start", pnl: 0 },
+                      ...(() => {
+                        let runningPnl = 0;
+                        return report.feedback.tradeScorecard.map((t, idx) => {
+                          runningPnl += t.pnl;
+                          return {
+                            tradeIndex: idx + 1,
+                            time: t.exit_time || t.entry_time || `T${idx + 1}`,
+                            pnl: runningPnl,
+                            symbol: t.stock
+                          };
+                        });
+                      })()
+                    ]}
+                  >
+                    <defs>
+                      <linearGradient id="pnlCurveGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                    <XAxis
+                      dataKey="time"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                      tickFormatter={(val) => `₹${val}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "var(--card)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                      }}
+                      formatter={(val: any, name, props) => {
+                        const symbol = props.payload.symbol ? ` (${props.payload.symbol})` : "";
+                        return [`₹${val.toLocaleString("en-IN")}${symbol}`, "Running P&L"];
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="pnl"
+                      stroke="var(--primary)"
+                      strokeWidth={2.5}
+                      fill="url(#pnlCurveGradient)"
+                      dot={{ r: 4, fill: "var(--card)", stroke: "var(--primary)", strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive EOD Scorecard Table */}
+          {report.feedback.tradeScorecard && report.feedback.tradeScorecard.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <div>
+                <h3 className="font-heading text-sm font-semibold mb-1">
+                  Interactive EOD Scorecard
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Symbol-by-symbol execution safety audit
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] uppercase text-muted-foreground font-semibold">
+                      <th className="pb-2">Symbol</th>
+                      <th className="pb-2">Type</th>
+                      <th className="pb-2">Entry/Exit</th>
+                      <th className="pb-2">Duration</th>
+                      <th className="pb-2 text-right">P&L</th>
+                      <th className="pb-2 text-center">Safety Status</th>
+                      <th className="pb-2">Mistakes / Violations</th>
+                      <th className="pb-2 text-center no-print">CBT Coach</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {report.feedback.tradeScorecard.map((trade) => {
+                      const hasViolations = !trade.followed_plan || !trade.sl_followed || trade.mistakes.length > 0;
+                      
+                      return (
+                        <tr key={trade.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="py-3 font-semibold text-foreground">{trade.stock}</td>
+                          <td className="py-3">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              trade.direction === "long" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                            }`}>
+                              {trade.direction.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-3 text-xs text-muted-foreground">
+                            {trade.entry_time || "N/A"} - {trade.exit_time || "N/A"}
+                          </td>
+                          <td className="py-3 text-xs text-muted-foreground">
+                            {trade.hold_time_minutes > 0 ? `${trade.hold_time_minutes} mins` : "Instant"}
+                          </td>
+                          <td className={`py-3 text-right font-mono font-bold ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                            {trade.pnl >= 0 ? "+" : ""}₹{trade.pnl.toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-3 text-center">
+                            {!hasViolations ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">
+                                🟢 Safe
+                              </span>
+                            ) : !trade.sl_followed || trade.mistakes.some(m => m.includes("SIZE") || m.includes("SL")) ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+                                🔴 Critical
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                🟡 Warning
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 text-xs">
+                            {trade.mistakes && trade.mistakes.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {trade.mistakes.map((m, idx) => (
+                                  <span key={idx} className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0.5 rounded">
+                                    {m}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-[10px] italic">No issues detected</span>
+                            )}
+                          </td>
+                          <td className="py-3 text-center no-print">
+                            {hasViolations ? (
+                              trade.reflection_feedback ? (
+                                <button
+                                  onClick={() => setActiveReflectionTrade(trade)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Brain className="h-3 w-3" /> View Feedback
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setActiveReflectionTrade(trade)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-success bg-success/15 hover:bg-success/25 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Sparkles className="h-3 w-3" /> Reflect
+                                </button>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground text-[10px] italic">N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Feedback Sections */}
           <div className="grid sm:grid-cols-2 gap-4">
@@ -321,6 +684,186 @@ export default function DailyReportPage() {
           </div>
         </div>
       )}
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          /* Hide sidebar, top navigation, and action buttons */
+          header, nav, aside, footer, .no-print, button, .no-print * {
+            display: none !important;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            font-size: 11pt;
+            margin: 0;
+            padding: 0;
+          }
+          main, .max-w-4xl {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          /* Ensure charts display well and text is readable */
+          .bg-card, .bg-muted {
+            background-color: #fafafa !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #000000 !important;
+          }
+          .text-muted-foreground {
+            color: #4a5568 !important;
+          }
+          /* Print backgrounds for charts/badges */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .rounded-2xl, .rounded-xl {
+            border: 1px solid #e2e8f0 !important;
+            break-inside: avoid;
+            background: transparent !important;
+          }
+        }
+      `}</style>
+
+      {/* AI Reflection Coach Modal */}
+      <AnimatePresence>
+        {activeReflectionTrade && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => {
+                if (!submittingReflection) {
+                  setActiveReflectionTrade(null);
+                  setUserReflection("");
+                }
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <div>
+                    <h3 className="font-heading text-base font-bold text-foreground">
+                      INTROSPECT™ Reflection Coach
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                      Cognitive Behavioral Therapy (CBT)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  disabled={submittingReflection}
+                  onClick={() => {
+                    setActiveReflectionTrade(null);
+                    setUserReflection("");
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="bg-muted/30 rounded-xl p-3 text-xs border border-border/50">
+                <span className="font-semibold block text-foreground mb-1">
+                  Trade details:
+                </span>
+                <span className="font-mono text-muted-foreground">
+                  {activeReflectionTrade.stock} • {activeReflectionTrade.direction === "long" ? "LONG" : "SHORT"} • P&L: ₹{activeReflectionTrade.pnl.toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              {activeReflectionTrade.reflection_feedback ? (
+                // Show existing reflection and feedback
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Your Reflection
+                    </span>
+                    <div className="p-3 bg-muted/40 rounded-xl text-sm italic text-foreground leading-relaxed border border-border/40">
+                      "{activeReflectionTrade.reflection_text}"
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border/50 pt-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-primary uppercase tracking-wider">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI Coach Feedback
+                    </div>
+                    <div className="p-4 bg-primary/[0.03] border border-primary/20 rounded-xl text-sm text-foreground leading-relaxed">
+                      {activeReflectionTrade.reflection_feedback}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      // Allow re-reflecting if desired
+                      setActiveReflectionTrade((prev: any) => prev ? {
+                        ...prev,
+                        reflection_text: null,
+                        reflection_feedback: null
+                      } : null);
+                      setUserReflection("");
+                    }}
+                    className="w-full py-2.5 rounded-xl border border-border hover:bg-muted/50 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Reflect Again
+                  </button>
+                </div>
+              ) : (
+                // Prompt user to write reflection
+                <form onSubmit={handleSubmitReflection} className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.04] border border-primary/10">
+                      <Brain className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <strong className="text-foreground">CBT Trigger Analysis:</strong> You logged a mistake on this trade. To construct a cognitive reframe and avoid repeating it, explain: What triggered the urge to deviate from your plan? What emotions or physical sensations were you experiencing right before clicking buy/sell?
+                      </p>
+                    </div>
+
+                    <textarea
+                      rows={4}
+                      required
+                      disabled={submittingReflection}
+                      value={userReflection}
+                      onChange={(e) => setUserReflection(e.target.value)}
+                      placeholder="e.g., I saw the price moving fast and felt anxious about missing the move. I entered without waiting for my 5-minute candle to close..."
+                      className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm resize-none focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all leading-relaxed"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingReflection || !userReflection.trim()}
+                    className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 rounded-xl shadow-lg shadow-primary/15 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingReflection ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing triggers...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Analyze Trigger & Get CBT Feedback
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

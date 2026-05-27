@@ -16,8 +16,8 @@ function getQueryClient() {
           staleTime: 30 * 1000, // 30 seconds
           // Keep cache longer to prevent refetching on navigation
           gcTime: 10 * 60 * 1000, // 10 minutes
-          // Only refetch stale queries on focus, not all
-          refetchOnWindowFocus: "always",
+          // Disable refetch on window focus to prevent page flashes and reduce query loads
+          refetchOnWindowFocus: false,
           refetchOnReconnect: "always",
           // Reduce retries to fail faster
           retry: 1,

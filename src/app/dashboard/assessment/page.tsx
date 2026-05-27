@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronRight,
@@ -15,6 +15,8 @@ import {
   Loader2,
   Lock,
   Star,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -189,6 +191,46 @@ export default function AssessmentPage() {
     trader_level: string;
     personalized_rules: string[];
   } | null>(null);
+
+  const [aiProfile, setAiProfile] = useState<{
+    archetype: string;
+    triggers: string[];
+    tailRiskScenario: string;
+    defensePlan: string[];
+  } | null>(null);
+  const [loadingAiProfile, setLoadingAiProfile] = useState(false);
+  const [aiProfileError, setAiProfileError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<string>("free"); // free, paywall, limit_exceeded, allowed
+
+  const fetchAiProfile = useCallback(async () => {
+    setLoadingAiProfile(true);
+    setAiProfileError(null);
+    try {
+      const response = await fetch("/api/assessment/ai-profile");
+      const data = await response.json();
+      if (data.profile) {
+        setAiProfile(data.profile);
+        setAiStatus("allowed");
+      } else if (data.aiStatus) {
+        setAiStatus(data.aiStatus);
+        if (data.message) {
+          setAiProfileError(data.message);
+        }
+      } else {
+        setAiProfileError(data.message || "Failed to load AI profile.");
+      }
+    } catch (err) {
+      console.error("Error fetching AI profile:", err);
+      setAiProfileError("An error occurred loading the AI profile.");
+    }
+    setLoadingAiProfile(false);
+  }, []);
+
+  useEffect(() => {
+    if (completed) {
+      fetchAiProfile();
+    }
+  }, [completed, fetchAiProfile]);
 
   const currentQuestion = questions[currentStep];
   const progress = ((currentStep + 1) / questions.length) * 100;
@@ -493,6 +535,113 @@ export default function AssessmentPage() {
                 </>
               )}
             </motion.div>
+
+            {/* AI Psychological Profiler Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65 }}
+              className="relative rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.03] via-transparent to-primary/[0.01] p-5 overflow-hidden"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-4.5 w-4.5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-heading text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    INTROSPECT™ AI Psychological Profiler
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                    INTROSPECT™ AI Cognitive Synthesis
+                  </p>
+                </div>
+              </div>
+
+              {loadingAiProfile ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
+                  <span className="text-xs text-muted-foreground">Synthesizing behavioral metrics...</span>
+                </div>
+              ) : aiStatus === "paywall" ? (
+                <div className="relative p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-muted/80 border border-border flex items-center justify-center mx-auto mb-2">
+                    <Lock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Unlock AI Psychological Profiling</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 max-w-xs mx-auto">
+                      Get a customized analysis of your trading personality archetype, tilt triggers, and a personalized defense plan.
+                    </p>
+                  </div>
+                  <Link
+                    href="/dashboard/payments"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-[10px] font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Upgrade Plan to Unlock
+                  </Link>
+                </div>
+              ) : aiStatus === "limit_exceeded" ? (
+                <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 text-center space-y-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive mx-auto" />
+                  <div>
+                    <p className="text-xs font-semibold text-destructive">Daily AI Review Limit Reached</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      You have reached your daily limit of 5 AI reviews. Your limit resets tomorrow.
+                    </p>
+                  </div>
+                </div>
+              ) : aiProfile ? (
+                <div className="space-y-4 text-xs text-left">
+                  {/* Archetype */}
+                  <div className="p-3.5 rounded-xl border border-border bg-card">
+                    <p className="text-[9px] text-primary uppercase font-bold tracking-wider mb-1">Archetype Personality</p>
+                    <p className="font-heading text-sm font-bold text-foreground mb-1">{aiProfile.archetype.split(" - ")[0]}</p>
+                    <p className="text-muted-foreground leading-relaxed">{aiProfile.archetype.split(" - ")[1] || aiProfile.archetype}</p>
+                  </div>
+
+                  {/* Triggers */}
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-amber-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Tilt Triggers
+                    </p>
+                    {aiProfile.triggers.map((t, idx) => (
+                      <div key={idx} className="flex items-start gap-2 p-2 rounded-lg border border-border/40 bg-card/40">
+                        <span className="text-amber-500 font-semibold">•</span>
+                        <span className="text-muted-foreground leading-relaxed">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tail Risk Scenario */}
+                  <div className="p-3.5 rounded-xl border border-destructive/20 bg-destructive/5 space-y-1">
+                    <p className="text-[9px] text-destructive uppercase font-bold tracking-wider flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Tail-Risk Scenario
+                    </p>
+                    <p className="text-muted-foreground leading-relaxed font-medium">{aiProfile.tailRiskScenario}</p>
+                  </div>
+
+                  {/* Defense Plan */}
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-success uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Customized Defense Plan
+                    </p>
+                    {aiProfile.defensePlan.map((d, idx) => (
+                      <div key={idx} className="flex items-start gap-2 p-2 rounded-lg border border-success/15 bg-success/[0.02]">
+                        <span className="text-success font-semibold">✓</span>
+                        <span className="text-muted-foreground leading-relaxed">{d}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-xs text-muted-foreground">
+                  {aiProfileError || "Unable to load AI profile."}
+                  <button onClick={fetchAiProfile} className="block mx-auto mt-2 text-primary font-semibold hover:underline">
+                    Retry
+                  </button>
+                </div>
+              )}
+            </motion.div>
           </div>
         )}
 
@@ -689,28 +838,34 @@ export default function AssessmentPage() {
           )}
 
           {currentQuestion.type === "scale" && (
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-center gap-4">
-                <input
-                  type="number"
-                  min={currentQuestion.min}
-                  max={currentQuestion.max}
-                  step={currentQuestion.step}
-                  value={
-                    (answers[currentQuestion.id] as number) ?? ""
-                  }
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (e.target.value === "") return;
-                    if (val >= (currentQuestion.min || 1) && val <= (currentQuestion.max || 5)) {
-                      handleAnswer(val);
-                    }
-                  }}
-                  placeholder={`${currentQuestion.min}–${currentQuestion.max}`}
-                  className="w-24 text-3xl font-bold font-heading text-center px-3 py-3 rounded-xl border border-border bg-background/50 focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
-                />
+            <div className="mt-8 space-y-6">
+              <div className="flex items-center justify-center gap-3 sm:gap-4">
+                {[1, 2, 3, 4, 5].map((num) => {
+                  const isSelected = answers[currentQuestion.id] === num;
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => {
+                        handleAnswer(num);
+                        if (currentStep < questions.length - 1) {
+                          setTimeout(() => {
+                            setCurrentStep((s) => s + 1);
+                          }, 200);
+                        }
+                      }}
+                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center font-heading text-lg sm:text-xl font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-success bg-success text-success-foreground scale-110 shadow-lg shadow-success/25"
+                          : "border-border hover:border-success/50 hover:bg-success/5 text-foreground hover:scale-105"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="grid grid-cols-5 gap-1 text-center text-[10px] text-muted-foreground">
+              <div className="grid grid-cols-5 gap-1 text-center text-[9px] sm:text-[10px] text-muted-foreground">
                 <span className="rounded-lg bg-success/10 py-1.5 font-medium">1<br/>Strong Discipline</span>
                 <span className="rounded-lg bg-success/5 py-1.5">2<br/>Mostly Disciplined</span>
                 <span className="rounded-lg bg-amber-500/10 py-1.5">3<br/>Situational Bias</span>

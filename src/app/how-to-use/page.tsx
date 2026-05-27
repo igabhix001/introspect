@@ -5,9 +5,9 @@ import { BookOpen, Trophy, Star, Shield, Gift, Zap, Target, BarChart3, Calendar,
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "How to Use",
+  title: "How to Use INTROSPECT™ | Trading Discipline Platform Guide",
   description:
-    "Learn how to use INTROSPECT™ in 3 simple steps. Start your assessment, get personalized rules, and track your discipline.",
+    "Step-by-step guide to using INTROSPECT™ — India's AI trading discipline platform. Complete risk assessments, calculate position sizes, log trades, and build 30-day discipline habits.",
 };
 
 const platformSteps = [

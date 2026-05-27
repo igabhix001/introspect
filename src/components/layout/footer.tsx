@@ -1,71 +1,33 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Mail, Shield } from "lucide-react";
+import { Mail, Shield } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const footerLinks = {
   product: [
-    { label: "INTROSPECT™ Tool", href: "/#features" },
-    { label: "Risk Assessment", href: "/#features" },
-    { label: "Trade Journal", href: "/#features" },
-    { label: "Market Sentiment", href: "/#features" },
     { label: "Pricing", href: "/pricing" },
+    { label: "How to Use", href: "/how-to-use" },
   ],
   company: [
     { label: "About Us", href: "/about" },
     { label: "Blog", href: "/blog" },
-    { label: "Contact", href: "/contact" },
-    { label: "Careers", href: "/contact" },
-  ],
-  resources: [
-    { label: "Discipline Guide", href: "/blog" },
-    { label: "Risk-First Fridays", href: "/blog" },
-    { label: "Discipline Mondays", href: "/blog" },
-    { label: "FAQ", href: "/pricing#faq" },
+    { label: "Contact Us", href: "/contact" },
   ],
   legal: [
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Terms of Service", href: "/terms" },
-    { label: "Cookie Policy", href: "/cookies" },
-    { label: "Disclaimer", href: "/disclaimer" },
   ],
 };
 
 export function Footer() {
   return (
-    <footer className="relative border-t border-border/50 bg-muted/30">
-      {/* Signature Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 grid-pattern opacity-40 pointer-events-none" />
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center max-w-2xl mx-auto">
-            <p className="text-sm font-semibold text-muted-foreground tracking-widest uppercase mb-3">
-              Intraday MindView Learning
-            </p>
-            <p className="text-xl sm:text-2xl font-heading font-bold mb-4">
-              90% lose. We fix the missing piece:{" "}
-              <span className="gradient-text">discipline</span>.
-            </p>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 text-success hover:text-success/80 font-semibold transition-colors group cursor-pointer"
-            >
-              Discover INTROSPECT™
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Links Grid */}
+    <footer className="relative border-t border-border/40 bg-muted/30 dark:bg-[#0A0B0D]/50 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Brand Column */}
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="relative w-8 h-8">
+          <div className="md:col-span-1 space-y-4">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative w-7 h-7">
                 <Image
                   src="/logo.png"
                   alt="INTROSPECT™"
@@ -73,16 +35,15 @@ export function Footer() {
                   className="object-contain"
                 />
               </div>
-              <span className="font-heading text-lg font-bold">
+              <span className="font-heading text-base font-bold text-foreground">
                 INTROSPECT
                 <span className="text-xs align-super ml-0.5 opacity-60">™</span>
               </span>
             </Link>
-            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              The Risk Guardian for Intraday Traders. Build discipline, protect
-              capital, trade consistently.
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
+              The Risk Guardian for Intraday Traders. Track psychological triggers, manage risk parameters, and protect capital.
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
               <Shield className="h-3.5 w-3.5 text-success" />
               <span>256-bit Encrypted</span>
             </div>
@@ -90,13 +51,13 @@ export function Footer() {
 
           {/* Product */}
           <div>
-            <h4 className="font-heading font-semibold text-sm mb-4">Product</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-heading font-bold text-xs text-foreground/90 uppercase tracking-wider mb-4">Product</h4>
+            <ul className="space-y-2">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}
                   </Link>
@@ -107,32 +68,13 @@ export function Footer() {
 
           {/* Company */}
           <div>
-            <h4 className="font-heading font-semibold text-sm mb-4">Company</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-heading font-bold text-xs text-foreground/90 uppercase tracking-wider mb-4">Company</h4>
+            <ul className="space-y-2">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h4 className="font-heading font-semibold text-sm mb-4">
-              Resources
-            </h4>
-            <ul className="space-y-2.5">
-              {footerLinks.resources.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}
                   </Link>
@@ -143,13 +85,13 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="font-heading font-semibold text-sm mb-4">Legal</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-heading font-bold text-xs text-foreground/90 uppercase tracking-wider mb-4">Legal</h4>
+            <ul className="space-y-2">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}
                   </Link>
@@ -158,37 +100,30 @@ export function Footer() {
             </ul>
           </div>
         </div>
-      </div>
 
-      <Separator />
+        <Separator className="opacity-20" />
 
-      {/* Bottom Bar */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Bottom Area */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground text-center sm:text-left">
-            © {new Date().getFullYear()} Intraday MindView Learning. All rights
-            reserved.
+            © {new Date().getFullYear()} Intraday MindView Learning. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            <Link
-              href="mailto:contact@intradaymindview.com"
-              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              aria-label="Email"
+            <a
+              href="mailto:intradaymindview@gmail.com"
+              className="text-xs text-muted-foreground hover:text-success transition-colors flex items-center gap-1.5"
+              aria-label="Email support"
             >
               <Mail className="h-4 w-4" />
-            </Link>
+              <span>intradaymindview@gmail.com</span>
+            </a>
           </div>
         </div>
 
         {/* Disclaimer */}
-        <div className="mt-6 pt-4 border-t border-border/50">
-          <p className="text-sm sm:text-base text-muted-foreground/80 text-center leading-relaxed max-w-4xl mx-auto font-medium">
-            INTROSPECT™ is a risk management tool, not a trading strategy. It
-            helps you protect capital, track discipline, and avoid common
-            mistakes. Your entry, exit, and strategy decisions are yours alone.
-            This tool does not constitute investment advice, financial advice, or
-            a recommendation to buy or sell any financial instrument. Users
-            should conduct their own research before making financial decisions.
+        <div className="mt-8 pt-6 border-t border-border/10">
+          <p className="text-[11px] text-muted-foreground/60 text-center leading-relaxed max-w-4xl mx-auto">
+            Disclaimer: INTROSPECT™ is a behavioral discipline and risk management tool designed for educational and self-tracking purposes. It does not provide financial advice, trading signals, or investment recommendations. All investment and trading decisions involve high risk and are the sole responsibility of the user. Past performance is not indicative of future results.
           </p>
         </div>
       </div>

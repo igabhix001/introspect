@@ -22,7 +22,7 @@ export default async function FyersCallbackPage({
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
         <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-6 max-w-md w-full">
-          <h2 className="text-destructive font-bold mb-2">Fyers Authorization Failed</h2>
+          <h2 className="text-destructive font-bold mb-2">Broker Authorization Failed</h2>
           <p className="text-sm text-muted-foreground">{errorMsg}</p>
         </div>
       </div>
@@ -32,10 +32,13 @@ export default async function FyersCallbackPage({
   if (!authCode) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-6">
-        <p className="animate-pulse text-muted-foreground">Waiting for Fyers response...</p>
+        <p className="animate-pulse text-muted-foreground">Waiting for response...</p>
       </div>
     );
   }
+
+  // Automatically redirect back to the admin settings page with the captured auth code
+  redirect(`/dashboard/admin/settings?auth_code=${authCode}&code=200`);
 
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
@@ -45,7 +48,7 @@ export default async function FyersCallbackPage({
         </div>
         <h1 className="font-heading text-2xl font-bold mb-2">Authorization Successful!</h1>
         <p className="text-sm text-muted-foreground mb-8">
-          You have successfully authenticated with Fyers. Please copy the auth code below and paste it into the Introspect system settings.
+          You have successfully authenticated. Please copy the auth code below and paste it into the system settings.
         </p>
         
         <div className="text-left">
@@ -55,7 +58,7 @@ export default async function FyersCallbackPage({
           <div className="relative group">
             <input 
               readOnly 
-              value={authCode} 
+              value={authCode || ""} 
               className="w-full rounded-xl border border-amber-500/30 bg-background/50 px-4 py-4 text-sm font-mono focus:border-amber-500 focus:outline-none"
             />
           </div>

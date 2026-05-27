@@ -1,58 +1,40 @@
 import dynamic from "next/dynamic";
-import { Hero } from "@/components/home/hero";
-import { Stats } from "@/components/home/stats";
+import { Metadata } from "next";
 
-// Lazy load below-the-fold components for faster initial load
-const Features8 = dynamic(() => import("@/components/home/features-8").then(m => m.Features8), {
-  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
-});
-const CyberneticBentoGrid = dynamic(() => import("@/components/ui/cybernetic-bento-grid").then(m => m.CyberneticBentoGrid), {
-  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
-});
-const HowItWorks = dynamic(() => import("@/components/home/how-it-works").then(m => m.HowItWorks), {
-  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
-});
-const PricingSection = dynamic(() => import("@/components/home/pricing-section").then(m => m.PricingSection), {
-  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
-});
-const Testimonials = dynamic(() => import("@/components/home/testimonials").then(m => m.Testimonials), {
-  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
-});
-const ChallengeCTA = dynamic(() => import("@/components/home/challenge-cta").then(m => m.ChallengeCTA), {
-  loading: () => <div className="h-48 animate-pulse bg-muted/10" />,
-});
-const ServicesSection = dynamic(() => import("@/components/home/services-section").then(m => m.ServicesSection), {
-  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
-});
-const VideoSection = dynamic(() => import("@/components/home/video-section").then(m => m.VideoSection), {
-  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
-});
-const ReportPreview = dynamic(() => import("@/components/home/report-preview").then(m => m.ReportPreview), {
-  loading: () => <div className="h-96 animate-pulse bg-muted/10" />,
-});
-const YouTubeChannel = dynamic(() => import("@/components/home/youtube-channel").then(m => m.YouTubeChannel), {
-  loading: () => <div className="h-64 animate-pulse bg-muted/10" />,
-});
+import TrustBarSection from "@/components/homepage/trust-bar";
+import RealProblemSection from "@/components/homepage/real-problem";
+import CoreSystemsSection from "@/components/homepage/core-systems";
+import BeforeAfterSection from "@/components/homepage/before-after";
+import WhoItIsForSection from "@/components/homepage/who-it-is-for";
+import SocialProofSection from "@/components/homepage/social-proof";
+import PricingSection from "@/components/homepage/pricing";
+import FinalCtaSection from "@/components/homepage/final-cta";
+
+// Dynamic imports for heavy dynamic/client-side animated elements
+const HeroSection = dynamic(() => import("@/components/homepage/hero"));
+const AiPsychologySection = dynamic(() => import("@/components/homepage/ai-psychology"));
+const VisualShowcaseSection = dynamic(() => import("@/components/homepage/visual-showcase"));
+
+export const metadata: Metadata = {
+  title: "Stop Blowing Accounts | INTROSPECT™ AI Trading Companion",
+  description: "Improve your trading discipline with INTROSPECT™. A behavioral trading companion that tracks execution habits, calculates ATR-based sizes, and prevents emotional errors.",
+  keywords: ["trading discipline", "trading psychology", "behavioral journal", "stop blowing accounts", "intraday options trading", "Nifty options", "capital protection"],
+};
 
 export default function HomePage() {
   return (
-    <>
-      <Hero />
-      <Stats />
-      <VideoSection />
-      <ReportPreview />
-      <section className="py-24 bg-background relative overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
-          <Features8 />
-        </div>
-      </section>
-      <CyberneticBentoGrid />
-      <HowItWorks />
-      <YouTubeChannel />
-      <Testimonials />
-      <ServicesSection />
+    <div className="overflow-hidden">
+      <HeroSection />
+      <TrustBarSection />
+      <RealProblemSection />
+      <CoreSystemsSection />
+      <AiPsychologySection />
+      <VisualShowcaseSection />
+      <BeforeAfterSection />
+      <WhoItIsForSection />
+      <SocialProofSection />
       <PricingSection />
-      <ChallengeCTA />
-    </>
+      <FinalCtaSection />
+    </div>
   );
 }

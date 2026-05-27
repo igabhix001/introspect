@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { generateCoachingNarrative } from "@/lib/ai/kimi-client";
+import { checkAndTrackAiUsage, commitAiUsage } from "@/lib/ai/ai-limiter";
 
 /**
  * INTROSPECT™ Behavioral Audit Engine — 4-Pillar Discipline Score
@@ -28,6 +30,33 @@ interface Trade {
   risk_pct: number | null;
   mistakes: string[] | null;
   emotion_before?: string | null;
+  entry_time?: string | null;
+  exit_time?: string | null;
+  notes?: string | null;
+  reflection_text?: string | null;
+  reflection_feedback?: string | null;
+}
+
+function calculateHoldTimeMinutes(entryStr?: string | null, exitStr?: string | null): number {
+  if (!entryStr || !exitStr) return 0;
+  
+  // Try parsing as ISO strings first
+  const entryDate = Date.parse(entryStr);
+  const exitDate = Date.parse(exitStr);
+  if (!isNaN(entryDate) && !isNaN(exitDate)) {
+    return Math.max(0, Math.round((exitDate - entryDate) / (1000 * 60)));
+  }
+
+  // Fallback to "HH:MM" format parsing
+  const entryParts = entryStr.split(":");
+  const exitParts = exitStr.split(":");
+  if (entryParts.length >= 2 && exitParts.length >= 2) {
+    const entryMin = parseInt(entryParts[0]) * 60 + parseInt(entryParts[1]);
+    const exitMin = parseInt(exitParts[0]) * 60 + parseInt(exitParts[1]);
+    return Math.max(0, exitMin - entryMin);
+  }
+  
+  return 0;
 }
 
 interface PillarResult {
@@ -226,6 +255,39 @@ export async function POST(request: NextRequest) {
     const tradesTaken = tradesList.length;
     const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
 
+    // Calculate holding times and stats for Disposition Effect
+    const winningHoldTimes: number[] = [];
+    const losingHoldTimes: number[] = [];
+    
+    const tradeScorecard = tradesList.map(t => {
+      const minutes = calculateHoldTimeMinutes(t.entry_time, t.exit_time);
+      const pnlVal = t.pnl || 0;
+      if (pnlVal > 0) {
+        winningHoldTimes.push(minutes);
+      } else if (pnlVal < 0) {
+        losingHoldTimes.push(minutes);
+      }
+      return {
+        id: t.id,
+        stock: t.stock || "Unknown",
+        entry_time: t.entry_time || null,
+        exit_time: t.exit_time || null,
+        hold_time_minutes: minutes,
+        pnl: pnlVal,
+        direction: t.direction || "long",
+        followed_plan: t.followed_plan ?? true,
+        sl_followed: t.sl_followed ?? true,
+        mistakes: t.mistakes || [],
+        reflection_text: t.reflection_text || null,
+        reflection_feedback: t.reflection_feedback || null,
+      };
+    });
+
+    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+    const avgWinHoldTime = winningHoldTimes.length > 0 ? Math.round(sum(winningHoldTimes) / winningHoldTimes.length) : 0;
+    const avgLossHoldTime = losingHoldTimes.length > 0 ? Math.round(sum(losingHoldTimes) / losingHoldTimes.length) : 0;
+    const dispositionRatio = avgWinHoldTime > 0 ? Math.round((avgLossHoldTime / avgWinHoldTime) * 100) / 100 : 0;
+
     // Run the 4-Pillar Behavioral Audit
     const audit = runBehavioralAudit(tradesList, capital, riskPc, plannedTrades);
 
@@ -252,6 +314,64 @@ export async function POST(request: NextRequest) {
     else if (audit.score >= 50) encouragement = "⚠️ Room for improvement. Focus on the flagged pillars.";
     else encouragement = "🔴 Systemic risk day. Reset, review your rules, and come back stronger.";
 
+    // ── AI Coaching Narrative Generation ──
+    const emotions = tradesList
+      .map(t => t.emotion_before)
+      .filter((e): e is string => typeof e === "string" && e !== "");
+    const notes = tradesList
+      .map(t => t.notes)
+      .filter((n): n is string => typeof n === "string" && n !== "");
+
+    // Deterministic state description for MD5 hashing
+    const stateText = JSON.stringify({
+      trades: tradesList.map(t => ({
+        id: t.id,
+        pnl: t.pnl,
+        direction: t.direction,
+        mistakes: t.mistakes,
+        sl_followed: t.sl_followed,
+        followed_plan: t.followed_plan,
+        entry_time: t.entry_time,
+        exit_time: t.exit_time
+      })),
+      date: reportDate
+    });
+
+    const aiCheck = await checkAndTrackAiUsage(user.id, stateText);
+    let aiNarrative = "";
+    let aiStatus = "free";
+
+    if (aiCheck.allowed) {
+      aiStatus = "allowed";
+      if (aiCheck.cachedResponse) {
+        aiNarrative = aiCheck.cachedResponse;
+      } else {
+        try {
+          const formattedMistakeTags = audit.mistakeTags.map(m => m.tag);
+          aiNarrative = await generateCoachingNarrative({
+            tradesCount: tradesTaken,
+            totalPnl: totalPnl,
+            rulesFollowed: [!audit.pillar1.breached, !audit.pillar2.breached, !audit.pillar3.breached, !audit.pillar4.breached].filter(Boolean).length,
+            totalRules: 4,
+            mistakesCount: audit.mistakeTags.filter(t => !t.tag.startsWith("✅")).length,
+            mistakeTags: formattedMistakeTags,
+            emotions,
+            notes
+          });
+          
+          await commitAiUsage(user.id, stateText, aiNarrative);
+        } catch (err: any) {
+          console.error("Failed to generate AI narrative:", err);
+          aiNarrative = "AI Coaching failed to compile today's analysis. Using rules-based fallback suggestions.";
+          aiStatus = "error";
+        }
+      }
+    } else {
+      aiStatus = aiCheck.error === "PAYWALL" ? "paywall" : 
+                 aiCheck.error === "LIMIT_EXCEEDED" ? "limit_exceeded" : "error";
+      aiNarrative = aiCheck.message || "AI Coaching is disabled for your subscription plan.";
+    }
+
     const report = {
       user_id: user.id,
       date: reportDate,
@@ -274,6 +394,14 @@ export async function POST(request: NextRequest) {
           pillar4: { name: "Realized R:R", penalty: audit.pillar4.penalty, breached: audit.pillar4.breached, avgRR: audit.pillar4.avgRR },
         },
         mistakeTags: audit.mistakeTags,
+        holdingTimes: {
+          avgWinHoldTime,
+          avgLossHoldTime,
+          dispositionRatio
+        },
+        tradeScorecard,
+        ai_narrative: aiNarrative,
+        ai_status: aiStatus
       },
     };
 

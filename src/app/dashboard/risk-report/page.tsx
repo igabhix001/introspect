@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock,
   Star,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -24,6 +25,14 @@ import {
 } from "recharts";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useAssessmentQuery } from "@/lib/hooks/use-queries";
+
+const DISTORTION_DESCRIPTIONS: Record<string, string> = {
+  "Stop-Loss & Loss Response": "Loss aversion asymmetry leading to deferred risk cut and revenge sizing.",
+  "Behaviour After Profits": "Euphoria and house-money bias causing excessive sizing after positive cycles.",
+  "Risk Planning & Positioning": "Planning fallacy and planning bias neglecting volatility scaling controls.",
+  "Impulse & Over-Participation": "Action bias and instant gratification triggers resulting in sub-optimal entries.",
+  "Rule Consistency": "Discipline fatigue causing systematic risk threshold overrides under execution stress.",
+};
 
 const stagger = {
   container: { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } },
@@ -154,6 +163,23 @@ export default function RiskReportPage() {
 
   return (
     <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-5 no-print">
+        <div>
+          <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Behavioural Risk Report</h1>
+          <p className="text-xs text-muted-foreground mt-1">Deep analysis of your trading patterns, risk personality, and personalized safeguards.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold transition-all cursor-pointer text-foreground"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Download PDF
+          </button>
+        </div>
+      </div>
+
       {/* Score Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Radar Chart */}
@@ -163,11 +189,11 @@ export default function RiskReportPage() {
               <h3 className="font-heading text-base font-bold">Risk Profile Analysis</h3>
               <p className="text-xs text-muted-foreground mt-0.5">Based on your diagnostic assessment</p>
             </div>
-            <Link href="/dashboard/assessment" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/dashboard/assessment" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors no-print">
               <RefreshCw className="h-3 w-3" /> Retake
             </Link>
           </div>
-          <div className="h-[300px]">
+          <div className="h-[300px] min-h-[260px] min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
                 <PolarGrid stroke="var(--border)" strokeDasharray="3 3" />
@@ -263,54 +289,87 @@ export default function RiskReportPage() {
               const colorClass = isHigh ? "text-destructive" : isMedium ? "text-amber-500" : "text-success";
               const bgClass = isHigh ? "bg-destructive/10" : isMedium ? "bg-amber-500/10" : "bg-success/10";
               const borderClass = isHigh ? "border-destructive/20" : isMedium ? "border-amber-500/20" : "border-success/20";
+              const distortionDesc = DISTORTION_DESCRIPTIONS[cat.name] || "Systemic execution risk under pressure.";
 
               return (
-                <div key={idx} className={`rounded-xl border ${borderClass} bg-card p-5`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-border/50">
+                <div key={idx} className={`rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-6`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-white/5">
                     <h4 className="font-heading font-bold text-base flex items-center gap-2">
                       <span className={`w-3 h-3 rounded-full ${bgClass} border ${borderClass}`} />
                       {cat.name}
                     </h4>
-                    <span className={`text-xs font-bold uppercase px-2 py-1 rounded w-fit ${bgClass} ${colorClass}`}>
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded w-fit ${bgClass} ${colorClass} border ${borderClass}`}>
                       {cat.risk_band} RISK
                     </span>
                   </div>
+
+                  {/* Risk Severity Slider */}
+                  <div className="space-y-2 mb-6 max-w-xl">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground font-medium">Risk Exposure Score</span>
+                      <span className={`font-mono font-bold ${colorClass}`}>{cat.percentage}%</span>
+                    </div>
+                    <div className="relative w-full h-2.5 bg-white/5 rounded-full overflow-hidden flex">
+                      {/* Low zone */}
+                      <div className="w-[40%] h-full bg-success/10 border-r border-black/40" />
+                      {/* Medium zone */}
+                      <div className="w-[30%] h-full bg-amber-500/10 border-r border-black/40" />
+                      {/* High zone */}
+                      <div className="w-[30%] h-full bg-destructive/10" />
+                      
+                      {/* Pointer */}
+                      <div 
+                        className={`absolute top-0 bottom-0 w-2.5 -ml-1.25 rounded-full border border-white shadow-[0_0_8px_rgba(255,255,255,0.8)] ${
+                          isHigh ? "bg-destructive" : isMedium ? "bg-amber-500" : "bg-success"
+                        }`}
+                        style={{ left: `${cat.percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] text-muted-foreground/60 font-semibold uppercase">
+                      <span>Low (0-40%)</span>
+                      <span>Medium (41-70%)</span>
+                      <span>High (71-100%)</span>
+                    </div>
+                  </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                     <div>
-                      <h5 className="text-xs font-bold text-muted-foreground mb-3 flex items-center gap-1.5 uppercase tracking-wider">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Issues Found
+                      <h5 className="text-xs font-bold text-muted-foreground mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
+                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Cognitive Distortions Identified
                       </h5>
+                      <p className="text-[11px] text-muted-foreground mb-3 leading-normal italic">
+                        {distortionDesc}
+                      </p>
                       {cat.issues?.length > 0 ? (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2 border-t border-white/5 pt-3">
                           {cat.issues.map((issue: string, i: number) => (
-                            <li key={i} className="text-sm text-foreground/90 flex items-start gap-2">
-                              <span className="text-muted-foreground mt-0.5">•</span>
+                            <li key={i} className="text-xs text-foreground/90 flex items-start gap-2 leading-relaxed">
+                              <span className="text-destructive mt-1 text-[10px]">•</span>
                               {issue}
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">No major issues identified.</p>
+                        <p className="text-xs text-muted-foreground italic border-t border-white/5 pt-3">No major distortions identified.</p>
                       )}
                     </div>
                     <div>
                       <h5 className="text-xs font-bold text-success mb-3 flex items-center gap-1.5 uppercase tracking-wider">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Mandatory Rules
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Personalized Safeguard Controls
                       </h5>
                       {cat.recommendations?.length > 0 ? (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2.5">
                           {cat.recommendations.map((rec: string, i: number) => (
-                            <li key={i} className="text-sm text-foreground/90 flex items-start gap-2">
-                              <div className="w-5 h-5 rounded-full bg-success/10 text-success border border-success/20 flex items-center justify-center shrink-0 mt-0 font-mono text-[10px] font-bold">
-                                {i + 1}
+                            <li key={i} className="text-xs text-foreground/90 flex items-start gap-2.5 leading-relaxed">
+                              <div className="flex items-center justify-center shrink-0 w-4.5 h-4.5 rounded border border-success/30 bg-success/15 text-success shadow-[0_0_6px_rgba(34,197,94,0.2)] mt-0.5">
+                                <CheckCircle2 className="w-3 w-3" />
                               </div>
-                              {rec}
+                              <span className="flex-1">{rec}</span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">Maintain current discipline.</p>
+                        <p className="text-xs text-muted-foreground italic">Maintain current discipline and rules.</p>
                       )}
                     </div>
                   </div>
@@ -355,6 +414,48 @@ export default function RiskReportPage() {
           </div>
         </motion.div>
       )}
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          /* Hide sidebar, top navigation, and action buttons */
+          header, nav, aside, footer, .no-print, button, .no-print * {
+            display: none !important;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            font-size: 11pt;
+            margin: 0;
+            padding: 0;
+          }
+          main, .max-w-4xl {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          /* Ensure charts display well and text is readable */
+          .bg-card, .bg-muted {
+            background-color: #fafafa !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #000000 !important;
+          }
+          .text-muted-foreground {
+            color: #4a5568 !important;
+          }
+          /* Print backgrounds for charts/badges */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .rounded-2xl, .rounded-xl {
+            border: 1px solid #e2e8f0 !important;
+            break-inside: avoid;
+            background: transparent !important;
+          }
+        }
+      `}</style>
     </motion.div>
   );
 }

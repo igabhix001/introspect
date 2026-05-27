@@ -12,14 +12,12 @@ import {
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import { useAuth } from "@/lib/auth/auth-context";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/how-to-use", label: "How to Use" },
-  { href: "/dashboard", label: "Launch Tool" },
   { href: "/blog", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
@@ -30,10 +28,8 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+
+  const { user, loading, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -42,73 +38,9 @@ export function Navbar() {
     };
     window.addEventListener("scroll", handleScroll);
 
-    const supabase = createClient();
-    let isMounted = true;
-    
-    // Auth check — no timeout, just handle errors gracefully
-    const checkAuth = async () => {
-      try {
-        // Use getSession first (cached, fast) then getUser (server validation)
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!isMounted) return;
-        
-        if (session?.user) {
-          setUser(session.user);
-          // Admin check by email immediately (no DB call needed for nav)
-          setIsAdmin(session.user.email === "intradaymindview@gmail.com");
-          
-          // Background DB check for admin role
-          supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single()
-            .then(({ data: profile }) => {
-              if (isMounted && profile?.role === "admin") {
-                setIsAdmin(true);
-              }
-            });
-        } else {
-          setUser(null);
-          setIsAdmin(false);
-        }
-      } catch {
-        if (isMounted) {
-          setUser(null);
-          setIsAdmin(false);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          setAuthChecked(true);
-        }
-      }
-    };
-    
-    checkAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setIsAdmin(session.user.email === "intradaymindview@gmail.com");
-        } else {
-          setIsAdmin(false);
-        }
-        setIsLoading(false);
-        setAuthChecked(true);
-      }
-    );
-
     return () => {
-      isMounted = false;
       window.removeEventListener("scroll", handleScroll);
-      subscription.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -192,7 +124,7 @@ export function Navbar() {
 
             {/* Desktop Auth/CTA — changes based on login state */}
             <div className="hidden sm:flex items-center gap-3 ml-2 border-l border-border pl-4">
-              {!authChecked ? (
+              {loading ? (
                 <div className="h-9 w-24 bg-muted animate-pulse rounded-lg" />
               ) : user ? (
                 <>
@@ -205,11 +137,7 @@ export function Navbar() {
                     <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                   <button
-                    onClick={async () => {
-                      const supabase = createClient();
-                      await supabase.auth.signOut();
-                      window.location.href = "/";
-                    }}
+                    onClick={signOut}
                     className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                     title="Sign out"
                   >
@@ -260,7 +188,9 @@ export function Navbar() {
                   ))}
                   
                   <div className="mt-6 flex flex-col gap-3 px-4 pt-6 border-t border-border">
-                    {user ? (
+                    {loading ? (
+                      <div className="h-10 w-full bg-muted animate-pulse rounded-lg" />
+                    ) : user ? (
                       <>
                         <Link
                           href={isAdmin ? "/dashboard/admin" : "/dashboard"}
@@ -273,9 +203,7 @@ export function Navbar() {
                         <button
                           onClick={async () => {
                             setMobileOpen(false);
-                            const supabase = createClient();
-                            await supabase.auth.signOut();
-                            window.location.href = "/";
+                            await signOut();
                           }}
                           className="flex items-center justify-center gap-2 w-full bg-muted/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive font-medium py-3 rounded-lg cursor-pointer transition-colors"
                         >

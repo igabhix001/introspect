@@ -102,40 +102,70 @@ const OVERALL_INTERPRETATION: Record<string, { interpretation: string; focus: st
 //   - All 5s → Risk% = 1 → HIGH
 //
 // Risk bands (from 99_Lookups): Low ≤ 0.40, Medium ≤ 0.70, High > 0.70
+// Multi-Trait Matrix mapping questions to categories
+const MULTI_TRAIT_MATRIX: Record<string, Record<string, number>> = {
+  q1: { "Stop-Loss & Loss Response": 0.5, "Rule Consistency": 0.3, "Risk Planning & Positioning": 0.2 },
+  q2: { "Stop-Loss & Loss Response": 0.4, "Impulse & Over-Participation": 0.3, "Rule Consistency": 0.2, "Risk Planning & Positioning": 0.1 },
+  q3: { "Stop-Loss & Loss Response": 0.6, "Rule Consistency": 0.4 },
+  q4: { "Behaviour After Profits": 0.5, "Rule Consistency": 0.3, "Impulse & Over-Participation": 0.2 },
+  q5: { "Behaviour After Profits": 0.6, "Rule Consistency": 0.2, "Risk Planning & Positioning": 0.2 },
+  q6: { "Behaviour After Profits": 0.4, "Stop-Loss & Loss Response": 0.3, "Rule Consistency": 0.3 },
+  q7: { "Risk Planning & Positioning": 0.7, "Stop-Loss & Loss Response": 0.3 },
+  q8: { "Risk Planning & Positioning": 0.8, "Rule Consistency": 0.2 },
+  q9: { "Impulse & Over-Participation": 0.7, "Rule Consistency": 0.3 },
+  q10: { "Impulse & Over-Participation": 0.6, "Behaviour After Profits": 0.25, "Risk Planning & Positioning": 0.15 },
+  q11: { "Rule Consistency": 0.6, "Stop-Loss & Loss Response": 0.2, "Impulse & Over-Participation": 0.2 },
+  q12: { "Rule Consistency": 0.7, "Risk Planning & Positioning": 0.3 }
+};
+
+// Nonlinear Severity Multipliers
+const SEVERITY_MULTIPLIERS: Record<number, number> = {
+  1: 0.5,
+  2: 1.0,
+  3: 1.5,
+  4: 2.2,
+  5: 3.5
+};
+
 function computeCategoriesAnalysis(answersArray: any[]) {
   const answers = answersArray.reduce((acc: Record<string, any>, curr: any) => {
-    acc[curr.question_id] = Number(curr.answer) || 0;
+    acc[curr.question_id] = Number(curr.answer) || 1;
     return acc;
   }, {} as Record<string, any>);
 
-  const MIN_RESPONSE = 1;
-  const MAX_RESPONSE = 5;
-
-  const categories = CATEGORIES.map(cat => {
-    // Calculate actual weighted score
-    let catWeightedScore = 0;
+  const categories = CATEGORIES.map((cat, catIdx) => {
+    let actualWeightedScore = 0;
     let minPossibleScore = 0;
     let maxPossibleScore = 0;
-    
-    cat.questions.forEach(qId => {
-      const response = answers[qId] || 1;
-      const weight = QUESTION_WEIGHTS[qId] || 1;
-      catWeightedScore += response * weight;
-      minPossibleScore += MIN_RESPONSE * weight;
-      maxPossibleScore += MAX_RESPONSE * weight;
+
+    // Check all questions for multi-trait influence on this category
+    Object.keys(MULTI_TRAIT_MATRIX).forEach(qId => {
+      const influence = MULTI_TRAIT_MATRIX[qId][cat.name];
+      if (influence !== undefined) {
+        const rating = answers[qId] || 1;
+        const weight = QUESTION_WEIGHTS[qId] || 1;
+        const multiplier = SEVERITY_MULTIPLIERS[rating] || 0.5;
+
+        actualWeightedScore += weight * influence * multiplier;
+        minPossibleScore += weight * influence * SEVERITY_MULTIPLIERS[1]; // 0.5
+        maxPossibleScore += weight * influence * SEVERITY_MULTIPLIERS[5]; // 3.5
+      }
     });
 
-    // Normalized Risk% = (Actual - Min) / (Max - Min)
-    // This gives 0 when all answers are 1, and 1 when all answers are 5
     const scoreRange = maxPossibleScore - minPossibleScore;
-    const riskPercent = scoreRange > 0 ? (catWeightedScore - minPossibleScore) / scoreRange : 0;
+    let riskPercent = scoreRange > 0 ? (actualWeightedScore - minPossibleScore) / scoreRange : 0;
+
+    // Add category-specific perturbation to remove score symmetry
+    const perturbation = ((catIdx % 3) - 1) * 0.02; // -0.02, 0.00, or 0.02
+    riskPercent = Math.max(0, Math.min(1, riskPercent + perturbation));
+
     const risk_band = getRiskBand(riskPercent);
     const catInfo = CATEGORY_INTERPRETATION[risk_band];
 
     return {
       name: cat.name,
-      score: catWeightedScore,
-      max_score: maxPossibleScore,
+      score: Math.round(actualWeightedScore * 10) / 10,
+      max_score: Math.round(maxPossibleScore * 10) / 10,
       percentage: Math.round(riskPercent * 100),
       risk_percent: riskPercent,
       risk_band,
@@ -145,12 +175,13 @@ function computeCategoriesAnalysis(answersArray: any[]) {
     };
   });
 
-  // OverallRisk = Average of all category risk percentages (now normalized 0-1)
+  // OverallRisk = Average of all category risk percentages (normalized 0-1)
   const overallRiskPercent = categories.reduce((sum, c) => sum + c.risk_percent, 0) / categories.length;
   const overallRiskBand = getRiskBand(overallRiskPercent);
 
-  // DisciplineScore = (1 - OverallRisk) × 100 (clamped to 0-100)
-  const disciplineScore = Math.max(0, Math.min(100, Math.round((1 - overallRiskPercent) * 100)));
+  // Clamp the final overall discipline score strictly to the 15-95 range
+  const rawDisciplineScore = Math.round((1 - overallRiskPercent) * 100);
+  const disciplineScore = Math.max(15, Math.min(95, rawDisciplineScore));
 
   const totalWeightedScore = categories.reduce((sum, c) => sum + c.score, 0);
 
@@ -158,6 +189,59 @@ function computeCategoriesAnalysis(answersArray: any[]) {
   let traderLevel = "beginner";
   if (disciplineScore >= 80) traderLevel = "advanced";
   else if (disciplineScore >= 55) traderLevel = "intermediate";
+
+  // Emotional triggers calculations
+  const qVal = (id: string) => answers[id] || 1;
+  const frustration = (qVal("q2") + qVal("q11")) / 2;
+  const overconfidence = (qVal("q4") + qVal("q5") + qVal("q6")) / 3;
+  const boredom = (qVal("q9") + qVal("q10")) / 2;
+  const urgency = (qVal("q2") + qVal("q9")) / 2;
+  const volatilityStress = qVal("q11");
+
+  // Contradiction detection
+  const contradiction_flags: string[] = [];
+  if (qVal("q11") <= 2 && qVal("q9") >= 4) {
+    contradiction_flags.push("Patience & Plan Adherence Conflict: You claim high rule consistency, yet report high levels of impulsive/over-participation entries.");
+  }
+  if (qVal("q1") <= 2 && qVal("q2") >= 4) {
+    contradiction_flags.push("Loss Acceptance & Revenge Trading Conflict: You reported high confidence in accepting losses, yet admitted to feeling strong emotional frustration and sizing up to recover losses.");
+  }
+
+  // Find highest category risk name
+  let highestCategory = categories[0];
+  categories.forEach(c => {
+    if (c.risk_percent > highestCategory.risk_percent) {
+      highestCategory = c;
+    }
+  });
+
+  // Archetypes
+  let trader_archetype = "Plateaued Operator";
+  if (disciplineScore >= 80) {
+    trader_archetype = highestCategory.risk_percent < 0.25 ? "Mechanical Operator" : "Structured Executor";
+  } else if (highestCategory.name === "Stop-Loss & Loss Response") {
+    trader_archetype = "Reactive Risk-Taker";
+  } else if (highestCategory.name === "Behaviour After Profits") {
+    trader_archetype = "Euphoric Size-Expander";
+  } else if (highestCategory.name === "Risk Planning & Positioning") {
+    trader_archetype = "The Blind Risk-Taker";
+  } else if (highestCategory.name === "Impulse & Over-Participation") {
+    trader_archetype = "Action-Addicted Scalper";
+  } else if (highestCategory.name === "Rule Consistency") {
+    trader_archetype = "Volatile Rule-Overrider";
+  }
+
+  // Predictive failure
+  let predictive_failure = "Risk of account drawdown during high-volatility market days due to reactive over-trading.";
+  if (frustration >= 3.5) {
+    predictive_failure = "High risk of hitting daily loss limits due to cascading revenge sizing and exit hesitation.";
+  } else if (overconfidence >= 3.5) {
+    predictive_failure = "High risk of profit erosion and rule slippage after achieving initial daily targets.";
+  } else if (boredom >= 3.5) {
+    predictive_failure = "High risk of capital leakage from commission drag and sub-optimal lunchtime setups.";
+  } else if (urgency >= 3.5) {
+    predictive_failure = "High risk of account slippage from entering breakouts early before confirmation.";
+  }
 
   return {
     disciplineScore,
@@ -167,6 +251,16 @@ function computeCategoriesAnalysis(answersArray: any[]) {
     totalMaxWeightedScore: categories.reduce((sum, c) => sum + c.max_score, 0),
     overallRiskPercent: Math.round(overallRiskPercent * 100),
     categories,
+    emotional_triggers: {
+      frustration,
+      overconfidence,
+      boredom,
+      urgency,
+      volatilityStress
+    },
+    contradiction_flags,
+    trader_archetype,
+    predictive_failure
   };
 }
 
@@ -278,7 +372,11 @@ export async function POST(request: NextRequest) {
 
     const categories_analysis = {
       overall: overallData,
-      categories: detailedCategories
+      categories: detailedCategories,
+      emotional_triggers: metrics.emotional_triggers,
+      contradiction_flags: metrics.contradiction_flags,
+      trader_archetype: metrics.trader_archetype,
+      predictive_failure: metrics.predictive_failure
     };
 
     // Save assessment to DB

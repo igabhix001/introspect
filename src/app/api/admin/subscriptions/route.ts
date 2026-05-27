@@ -94,7 +94,6 @@ export async function POST(request: NextRequest) {
         .update({
           plan,
           current_period_end: endDate.toISOString(),
-          updated_at: now.toISOString(),
         })
         .eq("id", existingSub.id);
 

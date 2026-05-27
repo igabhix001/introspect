@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 
 // Default pricing (fallback if DB not configured)
 const DEFAULT_PRICING = {
-  monthly: { amount: 333, amount_paise: 33300 },
-  "6-month": { amount: 1836, amount_paise: 183600 },
-  yearly: { amount: 3654, amount_paise: 365400 },
+  monthly: { amount: 499, amount_paise: 49900 },
+  "6-month": { amount: 2499, amount_paise: 249900 },
+  yearly: { amount: 3999, amount_paise: 399900 },
 };
 
 // GET /api/pricing — Public endpoint, no auth required

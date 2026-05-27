@@ -280,9 +280,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []); // ← EMPTY deps — runs once, never re-runs
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Supabase signOut error, forcing local logout:", err);
+    }
     setUser(null);
     setProfile(null);
+    setHasActiveSubscription(false);
+    if (typeof window !== "undefined") {
+      // Clear all supabase local storage keys
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    }
     window.location.href = "/";
   };
 

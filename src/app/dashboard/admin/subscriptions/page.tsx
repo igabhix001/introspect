@@ -54,7 +54,9 @@ export default function AdminSubscriptionsPage() {
 
   const planBadge: Record<string, string> = {
     monthly: "bg-blue-500/10 text-blue-500",
+    "6-month": "bg-amber-500/10 text-amber-500",
     yearly: "bg-purple-500/10 text-purple-500",
+    trial: "bg-success/10 text-success",
   };
 
   const statusBadge: Record<string, string> = {

@@ -22,11 +22,54 @@ interface FyersToken {
   token_expiry: string;
 }
 
+// Module-level token cache to eliminate DB query load on 5s sentiment polling loop
+let cachedToken: string | null = null;
+let cachedTokenExpiryTime: number = 0;
+let lastCacheCheck: number = 0;
+let hasCheckedToken: boolean = false;
+
+export function clearFyersTokenCache() {
+  cachedToken = null;
+  cachedTokenExpiryTime = 0;
+  lastCacheCheck = 0;
+  hasCheckedToken = false;
+}
+
 /**
  * Get active Fyers access token, auto-refreshing if needed.
  * Returns null if no token configured.
  */
 export async function getFyersToken(): Promise<string | null> {
+  const nowMs = Date.now();
+  const cacheStaleTimeMs = 5 * 60 * 1000; // Cache DB state for 5 minutes
+
+  // 1. Return cached token if we recently checked the DB (positive or negative result)
+  if (hasCheckedToken && nowMs - lastCacheCheck < cacheStaleTimeMs) {
+    if (cachedToken) {
+      const expiry = new Date(cachedTokenExpiryTime);
+      const now = new Date();
+      const bufferMs = 5 * 60 * 1000;
+      
+      const toIstDate = (d: Date) => new Date(d.getTime() + (d.getTimezoneOffset() * 60000) + (330 * 60000));
+      const nowIst = toIstDate(now);
+      const lastRefreshedIst = toIstDate(new Date(lastCacheCheck));
+      const isSameDay = 
+        lastRefreshedIst.getDate() === nowIst.getDate() && 
+        lastRefreshedIst.getMonth() === nowIst.getMonth() && 
+        lastRefreshedIst.getFullYear() === nowIst.getFullYear();
+
+      const isPastPreMarket = nowIst.getHours() > 8 || (nowIst.getHours() === 8 && nowIst.getMinutes() >= 30);
+      const forceDailyRefresh = !isSameDay && isPastPreMarket;
+
+      if (expiry.getTime() > now.getTime() + bufferMs && !forceDailyRefresh) {
+        return cachedToken;
+      }
+    } else {
+      // Negative cache hit - Fyers is not configured, don't query DB
+      return null;
+    }
+  }
+
   const adminDb = createAdminClient();
 
   const { data: tokenRow, error } = await adminDb
@@ -35,8 +78,12 @@ export async function getFyersToken(): Promise<string | null> {
     .eq("is_active", true)
     .single();
 
+  hasCheckedToken = true;
+  lastCacheCheck = nowMs;
+
   if (error || !tokenRow) {
     console.warn("No active Fyers token found");
+    cachedToken = null;
     return null;
   }
 
@@ -65,20 +112,36 @@ export async function getFyersToken(): Promise<string | null> {
 
   if (expiry.getTime() > now.getTime() + bufferMs && !forceDailyRefresh) {
     // Token is mathematically valid AND fresh for today's market session
+    cachedToken = tokenRow.access_token;
+    cachedTokenExpiryTime = expiry.getTime();
     return tokenRow.access_token;
   }
+
 
   // Token expired or needs daily refresh
   console.log("Fyers token expired or needs daily refresh, attempting...");
   try {
     const refreshed = await refreshFyersToken(tokenRow.app_id);
     if (refreshed) {
+      cachedToken = refreshed;
+      const { data: updatedRow } = await adminDb
+        .from("fyers_tokens")
+        .select("token_expiry")
+        .eq("is_active", true)
+        .single();
+      if (updatedRow) {
+        cachedTokenExpiryTime = new Date(updatedRow.token_expiry).getTime();
+      } else {
+        cachedTokenExpiryTime = Date.now() + 20 * 60 * 60 * 1000;
+      }
+      lastCacheCheck = nowMs;
       return refreshed;
     }
   } catch (err) {
     console.error("Fyers token refresh failed:", err);
   }
 
+  cachedToken = null;
   return null;
 }
 
@@ -192,6 +255,9 @@ export async function exchangeAuthCode(
       is_active: true,
       created_by: adminUserId,
     });
+
+    // Invalidate memory cache so background sentiment engine picks up fresh token
+    clearFyersTokenCache();
 
     return { success: true };
   } catch (err) {

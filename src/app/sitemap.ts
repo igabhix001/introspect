@@ -33,7 +33,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/dashboard/journal",
     "/dashboard/calculator",
     "/dashboard/challenges",
-    "/dashboard/sentiment",
     "/dashboard/analytics",
     "/dashboard/loyalty",
     "/dashboard/payments",
@@ -48,5 +47,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.5,
   }));
 
-  return [...staticRoutes, ...dashboardRoutes];
+  // Blog posts (local, SEO-optimized)
+  const blogPostSlugs = [
+    "revenge-trading-destruction",
+    "atr-position-sizing",
+    "nifty-breadth-sentiment",
+    "30-day-discipline-challenge",
+    "trading-journal-psychology",
+  ];
+
+  const blogRoutes = blogPostSlugs.map((slug) => ({
+    url: `${baseUrl}/blog/${slug}`,
+    lastModified: currentDate,
+    changeFrequency: "monthly" as const,
+    priority: 0.85,
+  }));
+
+  return [...staticRoutes, ...blogRoutes, ...dashboardRoutes];
 }

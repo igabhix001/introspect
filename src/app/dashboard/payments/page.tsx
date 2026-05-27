@@ -27,10 +27,11 @@ const plans = [
   {
     id: "monthly",
     name: "Monthly",
-    priceINR: 333,
-    priceUSD: 4,
+    priceINR: 499,
+    priceUSD: 6,
     period: "/month",
     features: [
+      "7-Day Free Trial",
       "Diagnostic Assessment & Risk Profile",
       "Personalized Trading Rules",
       "Position Sizing Calculator",
@@ -47,8 +48,8 @@ const plans = [
   {
     id: "6-month",
     name: "6 Months",
-    priceINR: 1836,
-    priceUSD: 22,
+    priceINR: 2499,
+    priceUSD: 30,
     period: "/6 mo",
     features: [
       "Everything in Monthly",
@@ -58,13 +59,13 @@ const plans = [
       "75 Loyalty Points on purchase",
     ],
     badge: "POPULAR",
-    savings: "₹306/month",
+    savings: "₹416/month",
   },
   {
     id: "yearly",
     name: "Yearly",
-    priceINR: 3654,
-    priceUSD: 44,
+    priceINR: 3999,
+    priceUSD: 48,
     period: "/year",
     features: [
       "Everything in 6-Month plan",
@@ -72,7 +73,7 @@ const plans = [
       "All Future Updates",
     ],
     badge: "BEST VALUE",
-    savings: "₹304/month",
+    savings: "₹333/month",
   },
 ];
 
@@ -89,6 +90,51 @@ export default function PaymentsPage() {
   const [processing, setProcessing] = useState(false);
   const [activeSub, setActiveSub] = useState<Record<string, unknown> | null>(null);
   const supabase = createClient();
+
+  // Dynamic pricing state loaded from /api/pricing
+  const [prices, setPrices] = useState({
+    monthly: 499,
+    "6-month": 2499,
+    yearly: 3999,
+  });
+
+  // Fetch prices from /api/pricing
+  useEffect(() => {
+    fetch("/api/pricing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.pricing) {
+          setPrices({
+            monthly: data.pricing.monthly?.amount || 499,
+            "6-month": data.pricing["6-month"]?.amount || 2499,
+            yearly: data.pricing.yearly?.amount || 3999,
+          });
+        }
+      })
+      .catch(() => { /* use fallback state */ });
+  }, []);
+
+  // Compute dynamic plans list
+  const dynamicPlans = plans.map((plan) => {
+    let price = plan.priceINR;
+    let savings = plan.savings;
+    if (plan.id === "monthly") {
+      price = prices.monthly;
+    } else if (plan.id === "6-month") {
+      price = prices["6-month"];
+      const perMonth = Math.round(prices["6-month"] / 6);
+      savings = `₹${perMonth}/month`;
+    } else if (plan.id === "yearly") {
+      price = prices.yearly;
+      const perMonth = Math.round(prices.yearly / 12);
+      savings = `₹${perMonth}/month`;
+    }
+    return {
+      ...plan,
+      priceINR: price,
+      savings,
+    };
+  });
 
   // Load Razorpay script
   useEffect(() => {
@@ -120,7 +166,7 @@ export default function PaymentsPage() {
     if (!user) return;
     setProcessing(true);
     try {
-      const plan = plans.find((p) => p.id === selectedPlan)!;
+      const plan = dynamicPlans.find((p) => p.id === selectedPlan)!;
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,13 +247,11 @@ export default function PaymentsPage() {
             bad trade pays for INTROSPECT™ many times over.
           </p>
         </motion.div>
-
-
       </div>
 
       {/* Plan Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {plans.map((plan) => {
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {dynamicPlans.map((plan) => {
           const isSelected = selectedPlan === plan.id;
           const price = plan.priceINR;
           const symbol = "₹";
@@ -310,7 +354,7 @@ export default function PaymentsPage() {
               <CreditCard className="h-4 w-4" />
             )}
             Subscribe to{" "}
-            {selectedPlan === "monthly" ? "Monthly" : "Yearly"} Plan
+            {plans.find((p) => p.id === selectedPlan)?.name || "Selected"} Plan
             <ArrowRight className="h-4 w-4" />
           </button>
           <p className="text-[10px] text-muted-foreground mt-3">
@@ -383,7 +427,7 @@ export default function PaymentsPage() {
       <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <p>
-          No free trial available. Points expire after 24 months. Maximum
+          7-day free trial available for new monthly subscriptions. Points expire after 24 months. Maximum
           1 free month redemption per renewal cycle. Referral rewards
           activate only after the referred user completes payment.
         </p>

@@ -1,0 +1,753 @@
+<!DOCTYPE html><html class="scroll-smooth" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>INTROSPECT™ | Master Your Trading Discipline</title>
+<meta content="Master your trading psychology. Track emotional mistakes, market sentiment alignment, and behavioral trading patterns." name="description">
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "inverse-on-surface": "#eff1f3",
+                "on-secondary-fixed": "#001c37",
+                "surface-variant": "#e0e3e5",
+                "secondary-fixed-dim": "#b0c8eb",
+                "on-error-container": "#93000a",
+                "secondary-container": "#c4dcff",
+                "surface-container-highest": "#e0e3e5",
+                "secondary-fixed": "#d2e4ff",
+                "tertiary": "#505f76",
+                "primary": "#006e2a",
+                "on-background": "#191c1e",
+                "primary-fixed": "#69ff87",
+                "on-secondary": "#ffffff",
+                "tertiary-fixed-dim": "#b7c8e1",
+                "background": "#f7f9fb",
+                "surface": "#f7f9fb",
+                "surface-container-low": "#f2f4f6",
+                "tertiary-fixed": "#d3e4fe",
+                "on-surface-variant": "#3c4a3c",
+                "secondary": "#49607e",
+                "on-secondary-container": "#49617f",
+                "surface-container-lowest": "#ffffff",
+                "error": "#ba1a1a",
+                "tertiary-container": "#9fafc8",
+                "outline": "#6c7b6a",
+                "on-surface": "#191c1e",
+                "on-primary-container": "#004c1b",
+                "on-primary-fixed-variant": "#00531e",
+                "primary-fixed-dim": "#3ce36a",
+                "on-tertiary": "#ffffff",
+                "on-error": "#ffffff",
+                "inverse-surface": "#2d3133",
+                "error-container": "#ffdad6",
+                "outline-variant": "#bbcbb8",
+                "on-tertiary-container": "#334257",
+                "surface-container": "#eceef0",
+                "on-secondary-fixed-variant": "#314865",
+                "surface-dim": "#d8dadc",
+                "primary-container": "#00c853",
+                "surface-tint": "#006e2a",
+                "inverse-primary": "#3ce36a",
+                "on-primary": "#ffffff",
+                "surface-container-high": "#e6e8ea",
+                "on-primary-fixed": "#002108",
+                "on-tertiary-fixed": "#0b1c30",
+                "on-tertiary-fixed-variant": "#38485d",
+                "surface-bright": "#f7f9fb",
+                "fintech-black": "#0A0B0D",
+                "neon-blue": "#00D1FF"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "section-gap": "80px",
+                "base": "8px",
+                "container-max": "1200px",
+                "margin-mobile": "16px",
+                "gutter": "24px",
+                "margin-desktop": "48px"
+            },
+            "fontFamily": {
+                "display-lg": ["Hanken Grotesk"],
+                "body-lg": ["Inter"],
+                "headline-lg-mobile": ["Hanken Grotesk"],
+                "label-sm": ["JetBrains Mono"],
+                "body-md": ["Inter"],
+                "headline-md": ["Hanken Grotesk"],
+                "headline-lg": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                "display-lg": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                "label-sm": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .card-shadow {
+            box-shadow: 0px 4px 20px rgba(10, 37, 64, 0.05);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #006e2a 0%, #00c853 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glow-effect {
+            box-shadow: 0 0 15px rgba(0, 200, 83, 0.2);
+        }
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(0, 209, 255, 0.3);
+        }
+        .dark-fintech-grid {
+            background-image: radial-gradient(#1a1d21 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 md:px-margin-desktop py-4 max-w-container-max mx-auto bg-surface/80 backdrop-blur-md border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="font-display-lg text-headline-md font-extrabold text-on-surface tracking-tighter">INTROSPECT™</span>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-primary border-b-2 border-primary pb-1 font-bold font-label-sm text-label-sm" href="#">Home</a>
+<a class="text-on-secondary-fixed-variant font-medium font-label-sm text-label-sm hover:text-primary transition-colors duration-200" href="#features">Systems</a>
+<a class="text-on-secondary-fixed-variant font-medium font-label-sm text-label-sm hover:text-primary transition-colors duration-200" href="#ai">AI Engine</a>
+<a class="text-on-secondary-fixed-variant font-medium font-label-sm text-label-sm hover:text-primary transition-colors duration-200" href="#pricing">Pricing</a>
+<a class="text-on-secondary-fixed-variant font-medium font-label-sm text-label-sm hover:text-primary transition-colors duration-200" href="#">Login</a>
+</nav>
+<button class="hidden lg:flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-lg font-bold hover:scale-105 transition-all duration-300">
+<span class="">Start Building Discipline</span>
+<span class="material-symbols-outlined">bolt</span>
+</button>
+<button class="md:hidden flex items-center p-2">
+<span class="material-symbols-outlined text-on-surface">menu</span>
+</button>
+</header>
+<main class="mt-[72px]">
+<!-- Hero Section -->
+<section class="relative min-h-[85vh] flex flex-col justify-center items-center py-section-gap px-4 md:px-margin-desktop overflow-hidden">
+<div class="absolute inset-0 z-0 pointer-events-none opacity-40 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="absolute top-0 right-0 w-[600px] h-[600px] bg-primary-container rounded-full blur-[120px] -mr-48 -mt-48"></div>
+<div class="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary-container rounded-full blur-[100px] -ml-24 -mb-24"></div>
+</div>
+<div class="relative z-10 w-full max-w-container-max mx-auto grid lg:grid-cols-2 gap-16 items-center transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="space-y-8">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">The Discipline Infrastructure for Intraday Traders</span>
+</div>
+<h1 class="font-display-lg text-display-lg lg:text-display-lg text-on-surface leading-tight">
+                    Build Discipline. <br>
+<span class="text-gradient">Protect Capital.</span> <br>
+                    Trade With Structure.
+                </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg">
+                    AI-powered behavioural trading system designed to detect emotional mistakes, improve execution discipline, manage trading risk, and help intraday traders protect capital consistently.
+                </p>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">shield_person</span>
+<span class="text-sm font-medium">Behavioural Risk Detection</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">psychology_alt</span>
+<span class="text-sm font-medium">Emotional Mistake Tracking</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">calculate</span>
+<span class="text-sm font-medium">Position Size Calculator</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">analytics</span>
+<span class="text-sm font-medium">Market Sentiment Engine</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">military_tech</span>
+<span class="text-sm font-medium">Discipline Challenges</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-xl">auto_graph</span>
+<span class="text-sm font-medium">Trade Journal &amp; Analytics</span>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row gap-4 pt-4">
+<button class="bg-primary text-on-primary px-8 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg active:scale-95">
+                        Start Building Discipline
+                    </button>
+<button class="bg-surface-container-lowest text-on-surface border border-outline-variant px-8 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 hover:bg-surface-container-low transition-all">
+                        See Behavioural Report
+                    </button>
+</div>
+</div>
+<!-- Hero Visual: Dark Fintech UI Component -->
+<div class="relative group">
+<div class="absolute -inset-4 bg-neon-blue/10 rounded-[2.5rem] blur-2xl group-hover:bg-neon-blue/20 transition-all"></div>
+<div class="relative bg-fintech-black border border-white/10 rounded-[2.5rem] p-6 shadow-2xl overflow-hidden aspect-[4/3] flex flex-col gap-4">
+<div class="flex justify-between items-center border-b border-white/5 pb-4">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-red-500"></div>
+<div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+<div class="w-3 h-3 rounded-full bg-green-500"></div>
+</div>
+<span class="text-[10px] font-label-sm text-white/40 uppercase tracking-widest">Introspect Dashboard v2.0</span>
+</div>
+<div class="grid grid-cols-2 gap-4 h-full">
+<div class="space-y-4">
+<!-- Risk Score -->
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2">
+<span class="text-[10px] text-white/60 font-label-sm">BEHAVIOURAL RISK SCORE</span>
+<div class="relative w-24 h-24 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-white/5" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-neon-blue" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="50.2" stroke-width="8"></circle>
+</svg>
+<span class="absolute text-xl font-bold text-white">82</span>
+</div>
+<span class="text-[10px] text-neon-blue font-bold">STABLE PROFILE</span>
+</div>
+<!-- Stability Meter -->
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+<span class="text-[10px] text-white/60 font-label-sm uppercase">Emotional Stability</span>
+<div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-green-500 to-neon-blue w-[75%]"></div>
+</div>
+<div class="flex justify-between text-[10px] text-white/40 font-bold">
+<span class="">ZEN</span>
+<span class="">TILTED</span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Nifty Sentiment -->
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-white/60 font-label-sm">NIFTY SENTIMENT</span>
+<span class="text-[10px] text-green-400 font-bold">+1.2%</span>
+</div>
+<div class="flex items-end gap-1 h-12">
+<div class="flex-1 bg-white/10 h-[40%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-[60%] rounded-t-sm"></div>
+<div class="flex-1 bg-neon-blue/40 h-[85%] rounded-t-sm"></div>
+<div class="flex-1 bg-neon-blue h-[70%] rounded-t-sm"></div>
+<div class="flex-1 bg-neon-blue/60 h-[100%] rounded-t-sm"></div>
+</div>
+</div>
+<!-- Risk Calculator & Streak -->
+<div class="grid grid-cols-2 gap-3 h-full">
+<div class="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+<span class="text-[9px] text-white/40">RISK/TRADE</span>
+<span class="text-sm font-bold text-white">₹5,000</span>
+</div>
+<div class="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col justify-between border-neon-blue/30">
+<span class="text-[9px] text-white/40">STREAK</span>
+<span class="text-sm font-bold text-neon-blue">12 DAYS</span>
+</div>
+</div>
+<!-- Mistake Detector -->
+<div class="bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-red-500 text-sm">warning</span>
+<span class="text-[10px] text-red-400 font-bold">MISTAKE ALERT</span>
+</div>
+<p class="text-[9px] text-white/60 mt-1 leading-tight">Position size exceeds daily limit (2.5x ATR). Reduce now.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust Bar -->
+<section class="py-12 border-y border-outline-variant/10 bg-surface">
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="flex flex-wrap justify-center md:justify-between items-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<span class="font-label-sm text-sm font-bold tracking-widest text-on-surface">BUILT FOR INTRADAY TRADERS</span>
+<span class="font-label-sm text-sm font-bold tracking-widest text-on-surface">DISCIPLINE-FIRST FRAMEWORK</span>
+<span class="font-label-sm text-sm font-bold tracking-widest text-on-surface">BEHAVIOURAL RISK ANALYTICS</span>
+<span class="font-label-sm text-sm font-bold tracking-widest text-on-surface">CAPITAL PROTECTION FOCUS</span>
+<span class="font-label-sm text-sm font-bold tracking-widest text-on-surface">AI-POWERED PSYCHOLOGY</span>
+</div>
+</div>
+</section>
+<!-- Section 2: The Real Problem -->
+<section class="py-section-gap px-4 md:px-margin-desktop">
+<div class="max-w-container-max mx-auto transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<div class="space-y-6">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">
+                        Most Traders Don’t Lose <br>
+<span class="text-error">Because of Strategy.</span>
+</h2>
+<p class="text-body-lg text-on-surface-variant">Strategy is only 20% of the game. The other 80% is the discipline to execute that strategy without emotional interference.</p>
+<div class="space-y-4 pt-4">
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-error bg-error/10 p-2 rounded-lg">error</span>
+<div>
+<h4 class="font-bold">Emotional execution</h4>
+<p class="text-sm text-on-surface-variant">Letting fear of missing out or fear of losing dictate your entries and exits.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-error bg-error/10 p-2 rounded-lg">straighten</span>
+<div>
+<h4 class="font-bold">Inconsistent position sizing</h4>
+<p class="text-sm text-on-surface-variant">Betting big when you feel "lucky" and small when you are scared, ruining your math.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-error bg-error/10 p-2 rounded-lg">sync_problem</span>
+<div>
+<h4 class="font-bold">Overtrading &amp; Revenge trading</h4>
+<p class="text-sm text-on-surface-variant">Trying to "make it back" after a loss or trading just to feel the rush.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-error bg-error/10 p-2 rounded-lg">gavel</span>
+<div>
+<h4 class="font-bold">Poor risk discipline</h4>
+<p class="text-sm text-on-surface-variant">Moving stop losses or averaging down on losing positions.</p>
+</div>
+</div>
+</div>
+<div class="mt-8 p-6 bg-surface-container-low rounded-xl border-l-4 border-primary">
+<p class="font-headline-md text-headline-md italic">"INTROSPECT helps identify and fix those behavioural leaks."</p>
+</div>
+</div>
+<div class="bg-surface-container-highest/30 rounded-[2.5rem] p-8 border border-outline-variant/20 relative">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-[2.5rem]"></div>
+<img alt="Behavioural Leaks Diagram" class="relative z-10 w-full rounded-2xl shadow-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR8FIsoY5UAp5gYYqJcw9LqPOYpP7SSNIk_U6wCkEd6bWjeCTJvGFB4r5ofXXc9FjuLhyd4z865TNDZ66HZx9bMo1LJt5I2JHY44CXy52f9xQXaHr1D2nBovW9Kx0W6xYc0MAu_0RgHVAW1AS7LB8ZHkSkTirWaXJNwan5XAM_0QyaAvhtlL3oYp_eVxnLvmWVAgHVubOPZbBADm6TB107KW_sA2dZyl20t2zs5AyXcRkAwoKm_6LHFpmpu5UQeFogb4GKK1YGSmfJXw">
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Core Systems -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-surface-container-low/30" id="features">
+<div class="max-w-container-max mx-auto space-y-16 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="text-center space-y-4">
+<span class="font-label-sm text-primary font-bold tracking-widest uppercase">Proprietary Infrastructure</span>
+<h2 class="font-headline-lg text-headline-lg">Five Systems. One Goal: Consistency.</h2>
+</div>
+<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- System 1 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl card-shadow border border-outline-variant/20 space-y-4 hover:border-primary/40 transition-all">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined">analytics</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Behavioural Risk Engine</h3>
+<p class="text-on-surface-variant">The heart of Introspect. It analyzes trade frequency, duration, and drawdown to calculate your real-time risk profile.</p>
+</div>
+<!-- System 2 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl card-shadow border border-outline-variant/20 space-y-4 hover:border-primary/40 transition-all">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined">calculate</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Position Size &amp; ATR Calculator</h3>
+<p class="text-on-surface-variant">Sync with <strong>Fyers API</strong> to auto-calculate dynamic position sizes based on current market volatility (ATR).</p>
+</div>
+<!-- System 3 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl card-shadow border border-outline-variant/20 space-y-4 hover:border-primary/40 transition-all">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined">show_chart</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Market Sentiment Engine</h3>
+<p class="text-on-surface-variant">Focus on <strong>NIFTY</strong> breadth and trend alignment. Know when you are trading against the heavy institutional flow.</p>
+</div>
+<!-- System 4 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl card-shadow border border-outline-variant/20 space-y-4 hover:border-primary/40 transition-all">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined">trophy</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Discipline Challenges</h3>
+<p class="text-on-surface-variant">Gamify your execution. Earn points for following rules, maintain streaks, and unlock "Elite Trader" badges.</p>
+</div>
+<!-- System 5 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl card-shadow border border-outline-variant/20 space-y-4 hover:border-primary/40 transition-all lg:col-span-2">
+<div class="flex flex-col md:flex-row gap-8">
+<div class="md:w-1/2 space-y-4">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined">history_edu</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Trading Journal + Mistake Tracker</h3>
+<p class="text-on-surface-variant">The fastest way to review. Tag emotional mistakes with one click and see which 'leak' is costing you the most money over 30 days.</p>
+</div>
+<div class="md:w-1/2 bg-surface-container-low rounded-xl p-4 flex flex-col justify-center gap-2">
+<div class="flex justify-between items-center bg-white p-2 rounded-lg text-sm border border-outline-variant/20">
+<span class="">Tag: <strong>FOMO Entry</strong></span>
+<span class="text-error font-bold">-$120</span>
+</div>
+<div class="flex justify-between items-center bg-white p-2 rounded-lg text-sm border border-outline-variant/20">
+<span class="">Tag: <strong>Late Exit</strong></span>
+<span class="text-error font-bold">-$85</span>
+</div>
+<div class="flex justify-between items-center bg-white p-2 rounded-lg text-sm border border-primary/20">
+<span class="text-primary">Discipline Bonus</span>
+<span class="text-primary font-bold">+50 pts</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: AI Positioning -->
+<section class="py-section-gap px-4 md:px-margin-desktop overflow-hidden" id="ai">
+<div class="max-w-container-max mx-auto space-y-16 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<div class="relative order-2 lg:order-1">
+<div class="absolute inset-0 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest p-6 rounded-2xl shadow-lg border border-primary/10 space-y-3 translate-y-4">
+<span class="material-symbols-outlined text-primary">psychology</span>
+<h5 class="font-bold text-sm">AI Behavioural Analysis</h5>
+<p class="text-xs text-on-surface-variant">Real-time monitoring of decision patterns.</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-2xl shadow-lg border border-primary/10 space-y-3">
+<span class="material-symbols-outlined text-primary">rate_review</span>
+<h5 class="font-bold text-sm">AI Trade Review</h5>
+<p class="text-xs text-on-surface-variant">Instant feedback on entry/exit quality.</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-2xl shadow-lg border border-primary/10 space-y-3 translate-y-4">
+<span class="material-symbols-outlined text-primary">assignment</span>
+<h5 class="font-bold text-sm">AI Discipline Reports</h5>
+<p class="text-xs text-on-surface-variant">Weekly deep-dives into psychological leaks.</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-2xl shadow-lg border border-primary/10 space-y-3">
+<span class="material-symbols-outlined text-primary">record_voice_over</span>
+<h5 class="font-bold text-sm">AI Execution Feedback</h5>
+<p class="text-xs text-on-surface-variant">Contextual voice alerts for rule violations.</p>
+</div>
+</div>
+</div>
+<div class="space-y-6 order-1 lg:order-2">
+<span class="bg-primary/10 text-primary px-4 py-1 rounded-full font-label-sm text-xs font-bold uppercase">The AI Advantage</span>
+<h2 class="font-headline-lg text-headline-lg">AI-Powered Trading Psychology</h2>
+<p class="text-body-lg text-on-surface-variant">Our AI doesn't just look at candles; it looks at <em>you</em>. By mapping your trade execution against market sentiment and your personal rules, Introspect acts as a digital trading coach that never sleeps.</p>
+<ul class="space-y-4 pt-4">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-weight="fill">check_circle</span>
+<span class="font-medium">Identifies "Tilt" before you do</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-weight="fill">check_circle</span>
+<span class="font-medium">Quantifies emotional cost of mistakes</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-weight="fill">check_circle</span>
+<span class="font-medium">Personalized "Discipline Improvement" roadmap</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 5: Visual Dashboard Showcase (Dark Fintech) -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-on-background overflow-hidden relative">
+<div class="absolute inset-0 dark-fintech-grid opacity-10 transition-all duration-700 ease-out opacity-100 translate-y-0"></div>
+<div class="max-w-container-max mx-auto relative z-10 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="text-center mb-16 space-y-4">
+<h2 class="font-headline-lg text-headline-lg text-white"></h2>
+<p class="text-white/60 max-w-2xl mx-auto">A Mirror For Intraday Traders</p>
+</div>
+<div class="bg-fintech-black rounded-[3rem] border border-white/10 p-4 md:p-12 shadow-2xl neon-glow">
+<div class="grid lg:grid-cols-12 gap-8">
+<!-- Main Chart Area -->
+<div class="lg:col-span-8 space-y-6">
+<div class="bg-white/5 border border-white/10 rounded-2xl p-6 h-[400px] flex flex-col">
+<div class="flex justify-between items-center mb-8">
+<h4 class="text-white font-bold">Discipline Heatmap</h4>
+<div class="flex gap-4">
+<span class="text-[10px] text-white/40 flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span> CONSISTENT</span>
+<span class="text-[10px] text-white/40 flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span> EMOTIONAL</span>
+</div>
+</div>
+<div class="flex-1 flex flex-wrap gap-2 content-start opacity-80"><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-primary rounded-sm transition-all hover:scale-110"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div><div class="w-4 h-4 md:w-6 md:h-6 bg-white/5 rounded-sm"></div></div><div class="mt-8 flex justify-between text-[10px] md:text-xs font-label-sm text-white/40 uppercase tracking-widest"><span class="">Last 30 Days</span><span class="">Consistency: 92%</span></div>
+</div>
+<div class="grid grid-cols-3 gap-6">
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+<p class="text-[10px] text-white/40 mb-1">EXECUTION QUALITY</p>
+<p class="text-xl font-bold text-white">A-</p>
+</div>
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+<p class="text-[10px] text-white/40 mb-1">REVENGE TRADES</p>
+<p class="text-xl font-bold text-red-400">0</p>
+</div>
+<div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+<p class="text-[10px] text-white/40 mb-1">STREAK</p>
+<p class="text-xl font-bold text-neon-blue">14D</p>
+</div>
+</div>
+</div>
+<!-- Sidebar Stats -->
+<div class="lg:col-span-4 space-y-6">
+<div class="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+<h4 class="text-white font-bold">Market Breadth</h4>
+<div class="space-y-4">
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-white/60"><span class="">Nifty Top 50</span><span class="">Bullish</span></div>
+<div class="h-1 bg-white/10 rounded-full"><div class="h-full bg-neon-blue w-[78%]"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-white/60"><span class="">Bank Nifty</span><span class="">Neutral</span></div>
+<div class="h-1 bg-white/10 rounded-full"><div class="h-full bg-white/40 w-[52%]"></div></div>
+</div>
+</div>
+<div class="pt-6 border-t border-white/5">
+<h4 class="text-white font-bold mb-4">Risk Threshold</h4>
+<div class="relative h-24 flex items-center justify-center">
+<div class="absolute inset-0 border-4 border-dashed border-white/10 rounded-full"></div>
+<span class="text-2xl font-bold text-white">₹12.5k</span>
+<p class="absolute bottom-0 text-[8px] text-white/40">MAX DAILY RISK</p>
+</div>
+</div>
+</div>
+<button class="w-full py-4 bg-neon-blue text-fintech-black font-extrabold rounded-xl hover:scale-[1.02] transition-all">
+                            UPGRADE TO ELITE
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 6: Before vs After -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-surface">
+<div class="max-w-container-max mx-auto space-y-16 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="text-center">
+<h2 class="font-headline-lg text-headline-lg">Transform Your Execution</h2>
+</div>
+<div class="grid md:grid-cols-2 gap-8">
+<!-- Before -->
+<div class="bg-error-container/5 border border-error/10 p-8 rounded-3xl space-y-6">
+<div class="flex items-center gap-3 text-error">
+<span class="material-symbols-outlined">sentiment_dissatisfied</span>
+<h4 class="font-bold text-xl uppercase tracking-wider">Before Introspect</h4>
+</div>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 opacity-60">
+<span class="material-symbols-outlined text-error mt-1">close</span>
+<p class="">Random position sizing based on intuition</p>
+</li>
+<li class="flex items-start gap-3 opacity-60">
+<span class="material-symbols-outlined text-error mt-1">close</span>
+<p class="">Entering trades because of "FOMO" or "boredom"</p>
+</li>
+<li class="flex items-start gap-3 opacity-60">
+<span class="material-symbols-outlined text-error mt-1">close</span>
+<p class="">No clear track of emotional triggers or mistakes</p>
+</li>
+<li class="flex items-start gap-3 opacity-60">
+<span class="material-symbols-outlined text-error mt-1">close</span>
+<p class="">Trading against the trend without realizing</p>
+</li>
+</ul>
+</div>
+<!-- After -->
+<div class="bg-primary/5 border border-primary/20 p-8 rounded-3xl space-y-6 shadow-xl relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4">
+<span class="bg-primary text-on-primary text-[10px] font-bold px-2 py-1 rounded">STRUCTURED</span>
+</div>
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined">sentiment_very_satisfied</span>
+<h4 class="font-bold text-xl uppercase tracking-wider">With Introspect</h4>
+</div>
+<ul class="space-y-4">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1">check</span>
+<p class="font-medium">ATR-based risk management on every trade</p>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1">check</span>
+<p class="font-medium">Rule-based entries with behavioral confirmation</p>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1">check</span>
+<p class="font-medium">Data-driven awareness of psychological leaks</p>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-1">check</span>
+<p class="font-medium">High-probability alignment with market flow</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 7: Who It Is For -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-surface-container-low/50">
+<div class="max-w-container-max mx-auto space-y-12 transition-all duration-700 ease-out opacity-100 translate-y-0">
+<h2 class="font-headline-lg text-headline-lg text-center">Built For Specialists</h2>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="bg-white p-6 rounded-2xl border border-outline-variant/30 text-center hover:scale-105 transition-all">
+<span class="material-symbols-outlined text-primary text-4xl mb-4">bolt</span>
+<h5 class="font-bold">Intraday Traders</h5>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-outline-variant/30 text-center hover:scale-105 transition-all">
+<span class="material-symbols-outlined text-primary text-4xl mb-4">layers</span>
+<h5 class="font-bold">Options Traders</h5>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-outline-variant/30 text-center hover:scale-105 transition-all">
+<span class="material-symbols-outlined text-primary text-4xl mb-4">timeline</span>
+<h5 class="font-bold">Futures Traders</h5>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-outline-variant/30 text-center hover:scale-105 transition-all">
+<span class="material-symbols-outlined text-primary text-4xl mb-4">account_balance_wallet</span>
+<h5 class="font-bold">Funded Traders</h5>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 8: Social Proof -->
+<section class="py-section-gap px-4 md:px-margin-desktop">
+<div class="max-w-container-max mx-auto transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="text-center mb-16">
+<h2 class="font-headline-lg text-headline-lg">Discipline is the Ultimate Edge</h2>
+<p class="text-on-surface-variant">Our users don't just brag about profits; they brag about execution.</p>
+</div>
+<div class="grid md:grid-cols-3 gap-8">
+<div class="bg-surface-container-low p-6 rounded-2xl space-y-4">
+<img alt="Discipline improvement graph" class="w-full rounded-lg mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2SIfylwztmy7UsDYcwyEBOZzKo_uq9cQ4gekFa5N665SZuwRqMLW2Tb8bGJW5ZvU5VLlgbS1Za7nE9A3JDmzhgyAOiXq8Thc6MT4nJCJt7h9PCxPpQpJ5eSnLKx_BBqUSqMFKVkB5ZAJOaMFOoqclb_I4kztZ3M6uMP7cIpuaSZC0cmq9_aYaHMzY27yE4HGx9nN4CvBcGHTlwpUmPgb-kiOaK7dEBQfot8CR67Z6J_2xPzh6xVw4-MjR_zScuLmo_gPcFxKc8sb5gg">
+<p class="text-sm italic">"Reduced my overtrading by 70% in the first 14 days using the risk engine."</p>
+<p class="font-bold text-sm">— Rahul M., Options Scalper</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-2xl space-y-4">
+<img alt="Case study screenshot" class="w-full rounded-lg mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXsrJzdTl7xdOgd2S_mQW7Iz_xbmPoOX0b71dRc28xnWBA45lCejOoAgmb4tprXE0DCtdhM-blr0YQiWsMEjA7MyOQ5fg3ZWNRkClKGTP2gRi0ZLjB3Ms9U-E4Z7uGmpkOqppUozUS_Y_UixnPucx7wOuUjap37mUfDEYI0nuRCZEQEOpBjRCc8Ppjp-VyNP94sujhLkKsSQ9WydCssdmWd8s2CkW4UQfpp7bov5gcsgO18t49iCa2VS-CeUaYczZTBzVlUlLAt3eAsg">
+<p class="text-sm italic">"The Fyers API position calculator is a game changer for my risk management."</p>
+<p class="font-bold text-sm">— Anita S., Intraday Equity</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-2xl space-y-4"><img alt="Discipline Streak Card" class="w-full rounded-lg mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmFMKxlffHyvpz0UByNcg3IzY1EyREnt1Fg1tPL26YGtLSdP1i1KOl2BHnBjNIfQjbIKqZIviT_P_Fq85p2R2r76pl3sJMNN0ptY71u8lyPy2Vp4HNBpOQAPWwAhvqfbsqXB_WkAz-pGhN_QMw3L0FadGeHtksQz4PhSrCtf1X2TPhRYwL7vgGT8ztudG7T8gfKUxdB9cDzXQx5wCBsPfAZtVcGed7H-D48VG_fOtPnGxn6m5cEnqipy2Mq6e2_v-KR6R3S3jN5mAklA"><p class="text-sm italic">"Finally stopped revenge trading after seeing the AI report on my mistakes."</p><p class="font-bold text-sm">— David K., Futures Trader</p></div>
+</div>
+</div>
+</section>
+<!-- Section 9: Pricing Positioning -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-on-background text-white" id="pricing">
+<div class="max-w-container-max mx-auto transition-all duration-700 ease-out opacity-100 translate-y-0">
+<div class="text-center mb-16 space-y-4">
+<span class="font-label-sm text-neon-blue font-bold tracking-widest uppercase">Pricing Models</span>
+<h2 class="font-headline-lg text-headline-lg">Daily Discipline Infrastructure</h2>
+<p class="text-white/60">Invest in your execution, not just your margin.</p>
+</div>
+<div class="grid md:grid-cols-3 gap-gutter">
+<!-- Core -->
+<div class="bg-white/5 border border-white/10 p-8 rounded-3xl space-y-8 flex flex-col">
+<div class="space-y-2">
+<h3 class="text-xl font-bold">INTROSPECT CORE</h3>
+<p class="text-white/40 text-sm">Essential behavioral tracking</p>
+</div>
+<div class="text-3xl font-bold">Free</div>
+<ul class="space-y-3 flex-1 text-sm text-white/60">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Manual Journaling</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Basic Risk Score</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> 3 Mistakes Tagging</li>
+</ul>
+<button class="w-full py-3 border border-white/20 rounded-xl hover:bg-white/10 transition-all font-bold">Get Started</button>
+</div>
+<!-- Pro -->
+<div class="bg-neon-blue/5 border-2 border-neon-blue p-8 rounded-3xl space-y-8 flex flex-col relative scale-105 z-10 shadow-2xl">
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-neon-blue text-fintech-black text-[10px] font-bold px-4 py-1 rounded-full">MOST POPULAR</div>
+<div class="space-y-2">
+<h3 class="text-xl font-bold">INTROSPECT PRO</h3>
+<p class="text-white/40 text-sm">Advanced AI behavioral analysis</p>
+</div>
+<div class="text-3xl font-bold">₹1,999<span class="text-sm font-normal text-white/40">/mo</span></div>
+<ul class="space-y-3 flex-1 text-sm text-white/80">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Fyers API Integration</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> ATR Risk Calculator</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> NIFTY Sentiment Engine</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> AI Execution Feedback</li>
+</ul>
+<button class="w-full py-4 bg-neon-blue text-fintech-black rounded-xl font-extrabold hover:scale-105 transition-all">Go Pro Now</button>
+</div>
+<!-- Elite -->
+<div class="bg-white/5 border border-white/10 p-8 rounded-3xl space-y-8 flex flex-col">
+<div class="space-y-2">
+<h3 class="text-xl font-bold">INTROSPECT ELITE</h3>
+<p class="text-white/40 text-sm">Full behavioral command center</p>
+</div>
+<div class="text-3xl font-bold">₹4,999<span class="text-sm font-normal text-white/40">/mo</span></div>
+<ul class="space-y-3 flex-1 text-sm text-white/60">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> 1-on-1 AI Coaching</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Custom Discipline Roadmap</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Multi-Broker Support</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-neon-blue text-sm">check</span> Weekly Behavioral Deep-dives</li>
+</ul>
+<button class="w-full py-3 border border-white/20 rounded-xl hover:bg-white/10 transition-all font-bold">Join Elite</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Final CTA -->
+<section class="py-section-gap px-4 md:px-margin-desktop bg-fintech-black relative overflow-hidden"><div class="absolute inset-0 dark-fintech-grid opacity-10 transition-all duration-700 ease-out opacity-100 translate-y-0"></div><div class="max-w-container-max mx-auto text-center space-y-10 relative z-10 transition-all duration-700 ease-out opacity-100 translate-y-0"><div class="space-y-4"><h2 class="font-display-lg text-headline-lg md:text-display-lg text-white max-w-4xl mx-auto leading-tight">The Market Exposes Every Emotional Weakness. <br><span class="text-[#00c853]">INTROSPECT™ Helps You See Them First.</span></h2></div><div class="flex flex-col items-center gap-8"><button class="bg-[#00c853] text-fintech-black px-10 py-5 rounded-lg font-bold text-xl hover:scale-105 transition-all shadow-lg neon-glow">Start Your Free Assessment</button><div class="flex flex-col items-center gap-4"><div class="flex items-center -space-x-3"><div class="w-10 h-10 rounded-full border-2 border-fintech-black bg-surface-container-high"></div><div class="w-10 h-10 rounded-full border-2 border-fintech-black bg-surface-container-high"></div><div class="w-10 h-10 rounded-full border-2 border-fintech-black bg-surface-container-high"></div><div class="w-10 h-10 rounded-full border-2 border-fintech-black bg-[#00c853] flex items-center justify-center text-[10px] font-bold text-fintech-black">+12k</div></div><div class="flex flex-col items-center"><div class="flex items-center gap-1 text-yellow-400"><span class="material-symbols-outlined text-sm" data-weight="fill">star</span><span class="material-symbols-outlined text-sm" data-weight="fill">star</span><span class="material-symbols-outlined text-sm" data-weight="fill">star</span><span class="material-symbols-outlined text-sm" data-weight="fill">star</span><span class="material-symbols-outlined text-sm" data-weight="fill">star_half</span><span class="text-white font-bold ml-1 text-sm">4.9/5</span></div><p class="text-white/70 font-label-sm text-[11px] uppercase tracking-widest mt-1">Join 12,000+ Disciplined Traders • Broker Independent</p></div></div></div></div></section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-section-gap px-4 md:px-margin-desktop flex flex-col items-center gap-base text-center bg-surface border-t border-outline-variant">
+<div class="w-full max-w-container-max flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
+<span class="font-display-lg text-headline-md font-bold text-on-surface">INTROSPECT™</span>
+<div class="flex flex-wrap justify-center gap-6">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface underline transition-all" href="#">About</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface underline transition-all" href="#">Systems</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface underline transition-all" href="#">Fyers Integration</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface underline transition-all" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface underline transition-all" href="#">Terms</a>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">© 2024 INTROSPECT™. Discipline is not a gift, it's a practice. 90% lose because discipline breaks before strategy does.</p>
+</footer>
+<!-- FAB (Contextual) -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group" id="fab">
+<span class="material-symbols-outlined text-[32px]">shield_person</span>
+<div class="absolute right-full mr-4 bg-on-surface text-surface px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none">Check Discipline Score</div>
+</button>
+<script>
+    // Intersection observer for scroll animations
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('opacity-100', 'translate-y-0');
+                entry.target.classList.remove('opacity-0', 'translate-y-10');
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('section > div').forEach(el => {
+        el.classList.add('transition-all', 'duration-700', 'ease-out', 'opacity-0', 'translate-y-10');
+        observer.observe(el);
+    });
+
+    window.addEventListener('scroll', () => {
+        const header = document.querySelector('header');
+        if (window.scrollY > 20) {
+            header.classList.add('bg-surface/95', 'shadow-md');
+        } else {
+            header.classList.remove('shadow-md');
+        }
+    });
+</script>
+
+
+
+
+
+
+</body></html>
