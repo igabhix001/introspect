@@ -31,14 +31,14 @@ export function GoogleAnalytics() {
 
   return (
     <>
-      {/* Google Analytics Script - loaded with afterInteractive strategy */}
+      {/* Google Analytics Script - loaded with lazyOnload strategy */}
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
-        strategy="afterInteractive"
+        strategy="lazyOnload"
         onLoad={() => console.log('[GA4] Script loaded successfully')}
         onError={() => console.error('[GA4] Script failed to load')}
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script id="google-analytics" strategy="lazyOnload">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
