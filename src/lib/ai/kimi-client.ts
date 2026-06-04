@@ -161,10 +161,19 @@ export async function generateAssessmentAiProfile(
   tailRiskScenario: string;
   defensePlan: string[];
 }> {
+  const overallAvg = answers.length > 0 ? answers.reduce((sum, a) => sum + a.answer, 0) / answers.length : 3;
+  const allIdentical = answers.every(a => a.answer === answers[0]?.answer);
+
+  if (overallAvg <= 2.2 || overallAvg >= 4.5 || allIdentical) {
+    console.log(`[AI Profiler] Edge case detected (avg: ${overallAvg.toFixed(2)}, identical: ${allIdentical}). Routing directly to fallback profile.`);
+    return getFallbackAiProfile(answers);
+  }
+
   // Prune prompt payload: group answers by category and format only trimmed category: score mappings
   const categoryScores: Record<string, number> = {};
   const categoryCounts: Record<string, number> = {};
   answers.forEach(a => {
+
     categoryScores[a.category] = (categoryScores[a.category] || 0) + a.answer;
     categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
   });
@@ -239,17 +248,92 @@ function getFallbackAiProfile(
     categoryScores[a.category].count += 1;
   });
 
+  // Calculate overall average score (1 to 5 scale)
+  const totalSum = answers.reduce((sum, a) => sum + a.answer, 0);
+  const overallAvg = answers.length > 0 ? totalSum / answers.length : 3;
+
+  // 1. High discipline case (overallAvg <= 1.5)
+  if (overallAvg <= 1.5) {
+    return {
+      archetype: "The Mechanical Operator - You execute trades with machine-like consistency, adhering strictly to stop-losses and position sizing. Your emotional state remains neutral, allowing you to accept losses as business expenses without tilt.",
+      triggers: [
+        "Slippage during extremely fast market news events.",
+        "A series of random scratches/flat exits that test your execution patience.",
+        "System or network issues that interrupt your automated execution path."
+      ],
+      tailRiskScenario: "You execute a series of perfect trades but get hit by consecutive slippage on flat exits. Frustrated by technical/broker latency rather than the market, you take a trade outside your setup to prove your edge, leading to a minor deviation from your plan.",
+      defensePlan: [
+        "Define strict maximum slippage limits for your entries and exits.",
+        "Have a secondary network/device backup ready for instant order execution.",
+        "Review weekly execution quality metrics rather than daily P&L outcomes."
+      ]
+    };
+  }
+
+  // 2. Mostly disciplined case (overallAvg <= 2.2)
+  if (overallAvg <= 2.2) {
+    return {
+      archetype: "The Structured Executor - You have a solid, rule-based approach to trading and respect your stops. You experience occasional emotional interference, but maintain control over execution.",
+      triggers: [
+        "A trade going slightly green and then reversing to hit your stop-loss.",
+        "Missing a major market rally because your entry trigger was not touched.",
+        "Entering a trade on a semi-plan setup during high morning volatility."
+      ],
+      tailRiskScenario: "After a winning trade, you take a slightly wider stop on the next trade because of high confidence. The trade is a loss, wiping out the first win. Stung by the regression, you hesitate on the next setup, missing a high-probability win and leading to minor frustration.",
+      defensePlan: [
+        "Write down your entry checklist and confirm all criteria before entering.",
+        "Enforce a strict maximum loss limit per trade that cannot be adjusted.",
+        "Journal your emotional state after any trade that reverses from green to red."
+      ]
+    };
+  }
+
+  // 2.5. Highly volatile case (overallAvg >= 4.5)
+  if (overallAvg >= 4.5) {
+    return {
+      archetype: "The Volatile Rule-Overrider - You have a solid theoretical understanding of risk but override your boundaries when under pressure. You repeatedly commit the same mistakes despite logging and reviewing them, indicating a breakdown in execution control.",
+      triggers: [
+        "Experiencing a slippage or execution delay that worsens your entry price.",
+        "A series of choppy market whipsaws that hit multiple stops in a row.",
+        "Trading while distracted by personal stress or fatigue."
+      ],
+      tailRiskScenario: "After a stop-loss is hit, you get angry at the broker or market. You immediately re-enter the same trade, violating your cooldown rule. The trade fails again. You override your sizing rule, double your position, and enter a third time. The market continues its move against you, resulting in a massive draw down from consecutive rule-breaking.",
+      defensePlan: [
+        "Create a physical checklist of your rules and check them off manually before every trade.",
+        "Establish a rule: if you violate any rule once, you must stop trading for the entire day.",
+        "Appoint a trading partner or use a platform lock to enforce discipline limits."
+      ]
+    };
+  }
+
+  // 3. Emotional/Vulnerable cases (overallAvg > 2.2) - Determine worst category
   let maxCategory = "";
   let maxAvg = 0;
-  Object.entries(categoryScores).forEach(([cat, data]) => {
-    const avg = data.total / data.count;
-    if (avg > maxAvg) {
-      maxAvg = avg;
-      maxCategory = cat;
-    }
-  });
+  
+  // Find if all category scores are equal (meaning they are tied)
+  const uniqueScores = new Set(Object.values(categoryScores).map(d => d.total / d.count));
+  const isTie = uniqueScores.size === 1;
 
-  // Default values
+  if (isTie) {
+    if (overallAvg >= 4.5) {
+      maxCategory = "Rule Consistency"; // Returns "The Volatile Rule-Overrider"
+    } else if (overallAvg >= 3.5) {
+      maxCategory = "Impulse & Over-Participation"; // Returns "The Action-Addicted Scalper"
+    } else {
+      maxCategory = "Risk Planning & Positioning"; // Returns "The Blind Risk Taker"
+    }
+  } else {
+    // To avoid bias from order of categories, we sort them or prioritize based on average score.
+    Object.entries(categoryScores).forEach(([cat, data]) => {
+      const avg = data.total / data.count;
+      if (avg > maxAvg) {
+        maxAvg = avg;
+        maxCategory = cat;
+      }
+    });
+  }
+
+  // Default fallback values
   let archetype = "The Balanced Performer - You maintain a highly disciplined profile with structured rules, but remain vulnerable to sudden market regime changes.";
   let triggers = [
     "Sudden volatility in the first 15 minutes of trading.",

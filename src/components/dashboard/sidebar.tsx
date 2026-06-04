@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -163,6 +163,7 @@ export function DashboardSidebar({
   const bottomItems = isOnAdminPage && isAdmin ? adminBottomItems : userBottomItems;
 
   return (
+    <LazyMotion features={domAnimation}>
     <aside
       className={`relative hidden lg:flex flex-col h-screen border-r border-border bg-card/50 backdrop-blur-sm transition-all duration-300 ease-in-out ${
         collapsed ? "w-[72px]" : "w-[260px]"
@@ -185,7 +186,7 @@ export function DashboardSidebar({
         </div>
         <AnimatePresence>
           {!collapsed && (
-            <motion.span
+            <m.span
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
@@ -193,7 +194,7 @@ export function DashboardSidebar({
             >
               INTROSPECT
               <span className="text-[9px] align-super opacity-50">™</span>
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </Link>
@@ -246,7 +247,7 @@ export function DashboardSidebar({
             >
               {/* Active indicator */}
               {active && (
-                <motion.div
+                <m.div
                   layoutId="sidebar-active"
                   className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full ${
                     isOnAdminPage ? "bg-amber-500" : "bg-success"
@@ -266,7 +267,7 @@ export function DashboardSidebar({
 
               <AnimatePresence mode="wait">
                 {!collapsed && (
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -279,7 +280,7 @@ export function DashboardSidebar({
                         {item.description}
                       </span>
                     )}
-                  </motion.div>
+                  </m.div>
                 )}
               </AnimatePresence>
             </Link>
@@ -287,7 +288,43 @@ export function DashboardSidebar({
         })}
       </nav>
 
-
+      {/* Psychology Learning Links - only show when not collapsed */}
+      {!collapsed && (
+        <div className="mx-3 my-4 p-4 rounded-xl border border-success/15 bg-success/[0.02] space-y-2 shrink-0">
+          <span className="text-[10px] text-success font-bold uppercase tracking-wider block">
+            Psychology Learning
+          </span>
+          <div className="space-y-1.5 text-xs">
+            <a
+              href="https://youtube.com/@intraday.mindview?sub_confirmation=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-muted-foreground hover:text-success transition-colors font-medium"
+            >
+              <TrendingUp className="h-3.5 w-3.5 text-success shrink-0" />
+              <span>YouTube (English)</span>
+            </a>
+            <a
+              href="https://www.youtube.com/channel/UCTMpGuxQcWKzDtA0TeQsdWQ?sub_confirmation=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-muted-foreground hover:text-success transition-colors font-medium"
+            >
+              <TrendingUp className="h-3.5 w-3.5 text-success shrink-0" />
+              <span>YouTube (Hindi)</span>
+            </a>
+            <a
+              href="https://www.linkedin.com/in/venkat-iyer-7839883b2"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-muted-foreground hover:text-success transition-colors font-medium"
+            >
+              <Users className="h-3.5 w-3.5 text-success shrink-0" />
+              <span>LinkedIn Profile</span>
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Bottom items - only show for admin */}
       {bottomItems.length > 0 && (
@@ -309,14 +346,14 @@ export function DashboardSidebar({
                 <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
                 <AnimatePresence>
                   {!collapsed && (
-                    <motion.span
+                    <m.span
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       className="whitespace-nowrap overflow-hidden"
                     >
                       {item.label}
-                    </motion.span>
+                    </m.span>
                   )}
                 </AnimatePresence>
               </Link>
@@ -338,5 +375,6 @@ export function DashboardSidebar({
         )}
       </button>
     </aside>
+    </LazyMotion>
   );
 }

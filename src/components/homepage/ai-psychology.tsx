@@ -54,7 +54,9 @@ export default function AiPsychologySection() {
                 src="/Lesson-bro.svg"
                 alt="AI Coach Learning"
                 fill
+                sizes="(max-width: 768px) 100vw, 320px"
                 className="object-contain"
+                loading="lazy"
               />
             </div>
           </div>

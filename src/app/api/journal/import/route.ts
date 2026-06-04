@@ -2,6 +2,98 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { tradeSchema } from "@/lib/validation/schemas";
 
+function detectMistakes(
+  trade: {
+    direction: string;
+    entry_price: number;
+    exit_price?: number | null;
+    stop_loss?: number | null;
+    followed_plan: boolean;
+    pnl: number;
+    risk_pct: number;
+    quantity: number;
+    entry_time?: string | null;
+    exit_time?: string | null;
+    notes?: string | null;
+    stock?: string | null;
+    date?: string | null;
+  },
+  context: {
+    capital: number;
+    todayTradeCount: number;
+    todayLosingTradesCount: number;
+    todayNetPnl: number;
+  }
+): string[] {
+  const mistakes: string[] = [];
+
+  // 1. Risk per trade breached: Trade risk > 1% of capital
+  if (trade.risk_pct > 1) {
+    mistakes.push("risk_breached");
+  }
+
+  // 2. Daily loss breached: Realized loss > 3% of capital
+  const netDailyPnl = context.todayNetPnl + trade.pnl;
+  if (netDailyPnl < -0.03 * context.capital) {
+    mistakes.push("daily_loss_breached");
+  }
+
+  // 3. No stop loss set: stop_set? = No
+  if (trade.stop_loss === null || trade.stop_loss === undefined) {
+    mistakes.push("no_stop_loss");
+  }
+
+  // 4. Revenge trading: (losses today >= 2) AND (daily loss > 3% of capital)
+  const isCurrentLoss = trade.exit_price !== null && trade.pnl < 0;
+  const totalLosingTrades = context.todayLosingTradesCount + (isCurrentLoss ? 1 : 0);
+  if (totalLosingTrades >= 2 && netDailyPnl < -0.03 * context.capital) {
+    mistakes.push("revenge_trading");
+  }
+
+  // 5. Overtrading: Trades > planned_trades_per_day (5)
+  const totalTradesCount = context.todayTradeCount + 1;
+  if (totalTradesCount > 5) {
+    mistakes.push("overtrading");
+  }
+
+  // 6. Missing critical fields: entry_time / exit_time / stop_set? / setup empty
+  const hasExit = trade.exit_price !== null && trade.exit_price !== undefined;
+  const isEntryTimeMissing = !trade.entry_time || trade.entry_time.trim() === "";
+  const isExitTimeMissing = hasExit && (!trade.exit_time || trade.exit_time.trim() === "");
+  const isStopLossMissing = trade.stop_loss === null || trade.stop_loss === undefined;
+  const isNotesMissing = !trade.notes || trade.notes.trim() === "";
+  if (isEntryTimeMissing || isExitTimeMissing || isStopLossMissing || isNotesMissing) {
+    mistakes.push("missing_fields");
+  }
+
+  // 7. Buy price > sell price (long): entry > exit for long direction
+  if (trade.direction === "long" && trade.exit_price !== null && trade.exit_price !== undefined) {
+    if (trade.entry_price > trade.exit_price) {
+      mistakes.push("data_integrity_buy_sell");
+    }
+  }
+
+  // 8. Missing/wrong symbol or date: symbol empty OR date invalid
+  const isSymbolEmpty = !trade.stock || trade.stock.trim() === "";
+  const isDateInvalid = !trade.date || isNaN(Date.parse(trade.date));
+  if (isSymbolEmpty || isDateInvalid) {
+    mistakes.push("data_integrity_symbol_date");
+  }
+
+  // Backward compatibility legacy rules
+  if (trade.risk_pct > 1) {
+    if (!mistakes.includes("over_risk")) mistakes.push("over_risk");
+  }
+  if (!trade.followed_plan) {
+    if (!mistakes.includes("plan_not_followed")) mistakes.push("plan_not_followed");
+  }
+  if (trade.pnl < 0 && trade.risk_pct > 1.5) {
+    if (!mistakes.includes("over_leveraged")) mistakes.push("over_leveraged");
+  }
+
+  return mistakes;
+}
+
 function parseCSV(text: string): string[][] {
   const lines: string[][] = [];
   let row: string[] = [];
@@ -93,6 +185,83 @@ export async function POST(request: NextRequest) {
       .single();
     const capital = profile?.trading_capital || 100000;
 
+    const cleanFloat = (val: string | undefined): string => {
+      if (!val) return "";
+      return val.replace(/["',\s]/g, "");
+    };
+
+    const cleanTime = (val: string | undefined): string | null => {
+      if (!val) return null;
+      const trimmed = val.trim();
+      const lower = trimmed.toLowerCase();
+      if (lower === "" || lower === "not required" || lower === "not_required" || lower === "null" || lower === "undefined" || lower === "not required?") {
+        return null;
+      }
+      return trimmed;
+    };
+
+    const parseYesNoOrNumber = (val: string | undefined, isStopLoss: boolean, entry: number, direction: string): number | null => {
+      if (!val) return null;
+      const cleaned = val.trim().toLowerCase();
+      if (cleaned === "" || cleaned === "not required" || cleaned === "not_required" || cleaned === "null" || cleaned === "undefined") return null;
+      if (cleaned === "yes" || cleaned === "y" || cleaned === "true") {
+        if (isStopLoss) {
+          return direction === "long" ? entry * 0.99 : entry * 1.01;
+        } else {
+          return direction === "long" ? entry * 1.02 : entry * 0.98;
+        }
+      }
+      if (cleaned === "no" || cleaned === "n" || cleaned === "false") {
+        return null;
+      }
+      const num = parseFloat(cleaned.replace(/["',\s]/g, ""));
+      return isNaN(num) ? null : num;
+    };
+
+    // Date context caching helper for multi-trade and revenge trading checks on imported rows
+    const dateContexts: Record<string, { dbTradeCount: number; dbLosingCount: number; dbNetPnl: number; importedList: any[] }> = {};
+
+    const getDateContext = async (dateStr: string) => {
+      if (!dateContexts[dateStr]) {
+        // Query DB for this date
+        const { count: dbTradeCount } = await supabase
+          .from("trades")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("date", dateStr);
+
+        const { data: dbTrades } = await supabase
+          .from("trades")
+          .select("pnl, exit_price")
+          .eq("user_id", user.id)
+          .eq("date", dateStr);
+
+        const losingCount = (dbTrades || []).filter(t => t.exit_price !== null && (t.pnl || 0) < 0).length;
+        const netPnl = (dbTrades || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+        dateContexts[dateStr] = {
+          dbTradeCount: dbTradeCount || 0,
+          dbLosingCount: losingCount,
+          dbNetPnl: netPnl,
+          importedList: []
+        };
+      }
+      
+      const ctx = dateContexts[dateStr];
+      const importedTradeCount = ctx.importedList.length;
+      const importedLosingCount = ctx.importedList.filter(t => t.exit_price !== null && t.pnl < 0).length;
+      const importedNetPnl = ctx.importedList.reduce((sum, t) => sum + t.pnl, 0);
+
+      return {
+        tradeCount: ctx.dbTradeCount + importedTradeCount,
+        losingCount: ctx.dbLosingCount + importedLosingCount,
+        netPnl: ctx.dbNetPnl + importedNetPnl,
+        addImportedTrade: (trade: any) => {
+          ctx.importedList.push(trade);
+        }
+      };
+    };
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       // Skip empty or spacer rows
@@ -103,22 +272,44 @@ export async function POST(request: NextRequest) {
       try {
         const rawStock = stockIdx !== -1 ? row[stockIdx] : "";
         const rawDirection = directionIdx !== -1 ? row[directionIdx]?.trim().toLowerCase() : "";
-        const rawEntryPrice = entryPriceIdx !== -1 ? parseFloat(row[entryPriceIdx]) : NaN;
-        const rawExitPrice = exitPriceIdx !== -1 && row[exitPriceIdx] ? parseFloat(row[exitPriceIdx]) : null;
-        const rawQty = quantityIdx !== -1 ? parseInt(row[quantityIdx]) : NaN;
-        const rawSL = stopLossIdx !== -1 && row[stopLossIdx] ? parseFloat(row[stopLossIdx]) : null;
-        const rawTarget = targetIdx !== -1 && row[targetIdx] ? parseFloat(row[targetIdx]) : null;
+        
+        // Parse date first
+        let dateVal = new Date().toISOString().split("T")[0];
+        if (dateIdx !== -1 && row[dateIdx]) {
+          const d = new Date(row[dateIdx]);
+          if (!isNaN(d.getTime())) {
+            dateVal = d.toISOString().split("T")[0];
+          }
+        }
+
+        const entryStr = entryPriceIdx !== -1 ? cleanFloat(row[entryPriceIdx]) : "";
+        const rawEntryPrice = entryStr ? parseFloat(entryStr) : NaN;
+
+        const exitStr = exitPriceIdx !== -1 ? cleanFloat(row[exitPriceIdx]) : "";
+        const rawExitPrice = exitStr ? parseFloat(exitStr) : null;
+
+        const qtyStr = quantityIdx !== -1 ? cleanFloat(row[quantityIdx]) : "";
+        const rawQty = qtyStr ? parseInt(qtyStr) : NaN;
+
+        const directionVal = rawDirection === "short" || rawDirection === "sell" ? "short" : "long";
+
+        const rawSLVal = stopLossIdx !== -1 ? row[stopLossIdx] : undefined;
+        const rawTargetVal = targetIdx !== -1 ? row[targetIdx] : undefined;
+
+        const rawSL = parseYesNoOrNumber(rawSLVal, true, rawEntryPrice, directionVal);
+        const rawTarget = parseYesNoOrNumber(rawTargetVal, false, rawEntryPrice, directionVal);
+
         const rawFollowedPlan = followedPlanIdx !== -1 ? row[followedPlanIdx]?.trim().toLowerCase() : "";
         const rawEmotion = emotionIdx !== -1 ? row[emotionIdx] : "Calm";
         const rawNotes = notesIdx !== -1 ? row[notesIdx] : "";
         const rawSentiment = sentimentIdx !== -1 ? row[sentimentIdx] : "Neutral";
-        const rawEntryTime = entryTimeIdx !== -1 ? row[entryTimeIdx] : null;
-        const rawExitTime = exitTimeIdx !== -1 ? row[exitTimeIdx] : null;
+        const rawEntryTime = entryTimeIdx !== -1 ? cleanTime(row[entryTimeIdx]) : null;
+        const rawExitTime = exitTimeIdx !== -1 ? cleanTime(row[exitTimeIdx]) : null;
 
         // Validation mapping
         const tradeObj: any = {
           stock: rawStock,
-          direction: rawDirection === "short" || rawDirection === "sell" ? "short" : "long",
+          direction: directionVal,
           entry_price: isNaN(rawEntryPrice) ? undefined : rawEntryPrice,
           quantity: isNaN(rawQty) ? undefined : rawQty,
         };
@@ -161,23 +352,23 @@ export async function POST(request: NextRequest) {
             : !validated.exit_price || validated.exit_price <= validated.stop_loss
           : false;
 
-        // Detect Mistakes
-        const mistakes: string[] = [];
-        if (!validated.stop_loss) mistakes.push("no_stop_loss");
-        if (riskPct > 1) mistakes.push("over_risk");
-        if (!validated.followed_plan) mistakes.push("plan_not_followed");
-        if (pnl < 0 && riskPct > 1.5) mistakes.push("over_leveraged");
+        // Get daily context for this date
+        const dateCtx = await getDateContext(dateVal);
 
-        // Format Date
-        let dateVal = new Date().toISOString().split("T")[0];
-        if (dateIdx !== -1 && row[dateIdx]) {
-          const d = new Date(row[dateIdx]);
-          if (!isNaN(d.getTime())) {
-            dateVal = d.toISOString().split("T")[0];
-          }
-        }
+        // Detect Mistakes with Context
+        const mistakes = detectMistakes({
+          ...validated,
+          pnl,
+          risk_pct: riskPct,
+          date: dateVal
+        }, {
+          capital,
+          todayTradeCount: dateCtx.tradeCount,
+          todayLosingTradesCount: dateCtx.losingCount,
+          todayNetPnl: dateCtx.netPnl
+        });
 
-        validTrades.push({
+        const tradeData = {
           ...validated,
           user_id: user.id,
           date: dateVal,
@@ -185,7 +376,12 @@ export async function POST(request: NextRequest) {
           risk_pct: Math.round(riskPct * 100) / 100,
           sl_followed: slFollowed,
           mistakes,
-        });
+        };
+
+        // Add this trade to date context running calculations for subsequent trades
+        dateCtx.addImportedTrade(tradeData);
+
+        validTrades.push(tradeData);
 
       } catch (err: any) {
         errors.push(`Row ${rowNum}: Exception while parsing (${err.message})`);

@@ -351,3 +351,217 @@ img:not([width]):not([height]) {
 .skeleton-pulse {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
+
+/* ──── Mobile Performance Optimizations ──── */
+@media (max-width: 768px) {
+  /* Disable expensive backdrop-filter on mobile */
+  .glass,
+  .glass-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: var(--card);
+  }
+
+  /* Reduce blur effects on mobile */
+  [class*="blur-["] {
+    filter: none !important;
+  }
+
+  /* Simplify shadows on mobile */
+  [class*="shadow-2xl"],
+  [class*="shadow-xl"] {
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%) !important;
+  }
+
+  /* Disable floating animations on mobile */
+  .animate-float {
+    animation: none;
+  }
+
+  /* Override Framer Motion initial hidden states for instant paint on mobile */
+  .mobile-no-animate,
+  .mobile-no-animate * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Prevent layout thrashing from hover effects on touch devices */
+  @media (hover: none) {
+    .hover\:scale-\[1\.02\]:hover {
+      transform: none !important;
+    }
+  }
+}
+
+/* ──── Content Visibility for Below-Fold Sections ──── */
+section:not(:first-child) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
+/* ──── Optimize font rendering ──── */
+body {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ──── Touch optimization ──── */
+@media (pointer: coarse) {
+  /* Ensure proper touch targets */
+  a, button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ──── Custom High-Performance CSS Animations (Zero JS) ──── */
+@keyframes textReveal {
+  from {
+    opacity: 0;
+    transform: translateY(20px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeUpCustom {
+  from {
+    opacity: 0;
+    transform: translateY(16px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes floatCustom {
+  0%, 100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes entryMockupCustom {
+  from {
+    opacity: 0;
+    transform: translateX(30px) rotateY(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) rotateY(0);
+  }
+}
+
+.animate-text-reveal {
+  animation: textReveal 0.4s cubic-bezier(0.25, 0.4, 0.25, 1) forwards;
+}
+
+.animate-cursor-blink {
+  animation: cursorBlink 0.8s infinite;
+}
+
+.animate-fade-up-custom {
+  animation: fadeUpCustom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float-custom {
+  animation: floatCustom 6s ease-in-out infinite;
+}
+
+.animate-entry-mockup-custom {
+  animation: entryMockupCustom 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Disable entry animations on mobile for instant paint */
+@media (max-width: 768px) {
+  .animate-text-reveal,
+  .animate-fade-up-custom,
+  .animate-entry-mockup-custom {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .animate-float-custom {
+    animation: none !important;
+  }
+}
+
+/* ──── High-Performance CSS Aurora Background ──── */
+@property --aurora-c {
+  syntax: '<color>';
+  initial-value: #22C55E;
+  inherits: false;
+}
+
+@keyframes aurora-gradient {
+  0% { --aurora-c: #22C55E; }
+  25% { --aurora-c: #10B981; }
+  50% { --aurora-c: #059669; }
+  75% { --aurora-c: #14B8A6; }
+  100% { --aurora-c: #0EA5E9; }
+}
+
+.aurora-bg-animate {
+  background-image: radial-gradient(125% 125% at 50% 0%, hsl(var(--background)) 50%, var(--aurora-c));
+  transition: background-image 0.5s ease;
+}
+
+@media (min-width: 768px) {
+  .aurora-bg-animate {
+    animation: aurora-gradient 12s ease-in-out infinite alternate;
+  }
+}
+
+/* ──── Toast Animations ──── */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ──── Print Media Utilities ──── */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  .print-only-inline {
+    display: inline !important;
+  }
+  .print-only-table {
+    display: table !important;
+  }
+  .no-print,
+  .recharts-responsive-container,
+  svg {
+    display: none !important;
+  }
+}
+
+
+

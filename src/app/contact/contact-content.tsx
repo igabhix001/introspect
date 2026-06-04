@@ -28,7 +28,7 @@ const faqs = [
   {
     question: "Which markets does it support?",
     answer:
-      "Currently, INTROSPECT™ is optimized for Indian intraday markets (Nifty 50, BankNifty). Global market support (S&P 500, FTSE, etc.) is planned for future releases.",
+      "Currently, INTROSPECT™ is optimized for Indian intraday markets (Nifty 50, BankNifty).",
   },
   {
     question: "How does the 30-Day Challenge work?",

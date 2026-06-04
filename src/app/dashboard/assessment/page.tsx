@@ -206,7 +206,13 @@ export default function AssessmentPage() {
     setLoadingAiProfile(true);
     setAiProfileError(null);
     try {
-      const response = await fetch("/api/assessment/ai-profile");
+      const response = await fetch(`/api/assessment/ai-profile?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache"
+        }
+      });
       const data = await response.json();
       if (data.profile) {
         setAiProfile(data.profile);
@@ -838,9 +844,15 @@ export default function AssessmentPage() {
           )}
 
           {currentQuestion.type === "scale" && (
-            <div className="mt-8 space-y-6">
-              <div className="flex items-center justify-center gap-3 sm:gap-4">
-                {[1, 2, 3, 4, 5].map((num) => {
+            <div className="mt-8">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 text-center text-xs font-semibold">
+                {[
+                  { num: 1, label: "Strong Discipline", baseClass: "bg-success/10 text-success border-success/20 hover:bg-success/20", activeClass: "bg-success text-success-foreground border-success shadow-lg shadow-success/20 scale-102" },
+                  { num: 2, label: "Mostly Disciplined", baseClass: "bg-success/5 text-success/90 border-success/10 hover:bg-success/15", activeClass: "bg-success/80 text-success-foreground border-success/90 shadow-lg shadow-success/15 scale-102" },
+                  { num: 3, label: "Situational Bias", baseClass: "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20", activeClass: "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20 scale-102" },
+                  { num: 4, label: "Frequent Interference", baseClass: "bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20", activeClass: "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20 scale-102" },
+                  { num: 5, label: "Emotional Dominance", baseClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20", activeClass: "bg-destructive text-white border-destructive shadow-lg shadow-destructive/20 scale-102" }
+                ].map(({ num, label, baseClass, activeClass }) => {
                   const isSelected = answers[currentQuestion.id] === num;
                   return (
                     <button
@@ -854,23 +866,17 @@ export default function AssessmentPage() {
                           }, 200);
                         }
                       }}
-                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center font-heading text-lg sm:text-xl font-bold transition-all cursor-pointer ${
-                        isSelected
-                          ? "border-success bg-success text-success-foreground scale-110 shadow-lg shadow-success/25"
-                          : "border-border hover:border-success/50 hover:bg-success/5 text-foreground hover:scale-105"
+                      className={`flex flex-col items-center justify-center py-3 px-1 sm:py-5 sm:px-2 rounded-xl border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                        isSelected ? activeClass : `${baseClass} border-transparent`
                       }`}
                     >
-                      {num}
+                      <span className="text-base sm:text-lg font-bold mb-1 sm:mb-1.5">{num}</span>
+                      <span className="text-[8px] sm:text-[10px] uppercase tracking-wider leading-tight font-semibold block whitespace-pre-line">
+                        {label.replace(/ /g, "\n")}
+                      </span>
                     </button>
                   );
                 })}
-              </div>
-              <div className="grid grid-cols-5 gap-1 text-center text-[9px] sm:text-[10px] text-muted-foreground">
-                <span className="rounded-lg bg-success/10 py-1.5 font-medium">1<br/>Strong Discipline</span>
-                <span className="rounded-lg bg-success/5 py-1.5">2<br/>Mostly Disciplined</span>
-                <span className="rounded-lg bg-amber-500/10 py-1.5">3<br/>Situational Bias</span>
-                <span className="rounded-lg bg-orange-500/10 py-1.5">4<br/>Frequent Interference</span>
-                <span className="rounded-lg bg-destructive/10 py-1.5 font-medium">5<br/>Emotional Dominance</span>
               </div>
             </div>
           )}

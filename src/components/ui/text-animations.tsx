@@ -1,6 +1,5 @@
 "use client";
 
-import { motion, useMotionValue, useTransform, animate as fmAnimate } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 export function TextReveal({
@@ -17,20 +16,18 @@ export function TextReveal({
   return (
     <span className={className}>
       {words.map((word, i) => (
-        <motion.span
+        <span
           key={`${word}-${i}`}
-          initial={{ opacity: 0, transform: "translateY(20px) translateZ(0)" }}
-          animate={{ opacity: 1, transform: "translateY(0px) translateZ(0)" }}
-          transition={{
-            duration: 0.4,
-            delay: delay + i * 0.08,
-            ease: [0.25, 0.4, 0.25, 1],
+          className="inline-block mr-[0.25em] animate-text-reveal"
+          style={{
+            animationDelay: `${delay + i * 0.08}s`,
+            animationFillMode: "both",
+            willChange: "transform, opacity",
+            backfaceVisibility: "hidden",
           }}
-          className="inline-block mr-[0.25em] will-change-transform"
-          style={{ backfaceVisibility: "hidden" }}
         >
           {word}
-        </motion.span>
+        </span>
       ))}
     </span>
   );
@@ -75,10 +72,8 @@ export function TypewriterText({
   return (
     <span className={className}>
       {displayText}
-      <motion.span
-        animate={{ opacity: [1, 0] }}
-        transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
-        className="inline-block w-[3px] h-[1em] bg-success ml-1 align-middle"
+      <span
+        className="inline-block w-[3px] h-[1em] bg-success ml-1 align-middle animate-cursor-blink"
       />
     </span>
   );
@@ -97,8 +92,6 @@ export function CountUpNumber({
   duration?: number;
   className?: string;
 }) {
-  const count = useMotionValue(0);
-  const rounded = useTransform(count, (v) => Math.round(v));
   const ref = useRef<HTMLSpanElement>(null);
   const [displayValue, setDisplayValue] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -110,15 +103,23 @@ export function CountUpNumber({
       ([entry]) => {
         if (entry.isIntersecting) {
           setHasAnimated(true);
-          const controls = fmAnimate(count, target, {
-            duration,
-            ease: "easeOut",
-          });
-          const unsubscribe = rounded.on("change", (v) => setDisplayValue(v));
-          return () => {
-            controls.stop();
-            unsubscribe();
+          let startTime: number | null = null;
+          const startVal = 0;
+          
+          const step = (timestamp: number) => {
+            if (!startTime) startTime = timestamp;
+            const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+            // Ease out quad
+            const easeProgress = progress * (2 - progress);
+            const currentVal = Math.round(startVal + easeProgress * (target - startVal));
+            setDisplayValue(currentVal);
+            
+            if (progress < 1) {
+              requestAnimationFrame(step);
+            }
           };
+          
+          requestAnimationFrame(step);
         }
       },
       { threshold: 0.5 }
@@ -126,7 +127,7 @@ export function CountUpNumber({
 
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [count, rounded, target, duration, hasAnimated]);
+  }, [target, duration, hasAnimated]);
 
   return (
     <span ref={ref} className={className}>

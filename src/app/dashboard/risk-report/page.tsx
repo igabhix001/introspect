@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Shield,
@@ -57,6 +58,11 @@ const categoryIcons: Record<string, typeof Shield> = {
 export default function RiskReportPage() {
   const { loading: authLoading, hasActiveSubscription } = useAuth();
   const { data: assessment, isLoading: assessmentLoading } = useAssessmentQuery();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loading = assessmentLoading && !assessment;
 
@@ -194,19 +200,25 @@ export default function RiskReportPage() {
             </Link>
           </div>
           <div className="h-[300px] min-h-[260px] min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                <PolarGrid stroke="var(--border)" strokeDasharray="3 3" />
-                <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 500 }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", padding: "8px 12px", color: "var(--foreground)" }}
-                  labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-                  itemStyle={{ color: "var(--success)" }}
-                  formatter={(value) => [`${value}/100`, "Score"]}
-                />
-                <Radar dataKey="score" stroke="var(--success)" strokeWidth={2} fill="var(--success)" fillOpacity={0.15} dot={{ r: 4, fill: "var(--success)", strokeWidth: 0 }} />
-              </RadarChart>
-            </ResponsiveContainer>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                  <PolarGrid stroke="var(--border)" strokeDasharray="3 3" />
+                  <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 500 }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", padding: "8px 12px", color: "var(--foreground)" }}
+                    labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
+                    itemStyle={{ color: "var(--success)" }}
+                    formatter={(value) => [`${value}/100`, "Score"]}
+                  />
+                  <Radar dataKey="score" stroke="var(--success)" strokeWidth={2} fill="var(--success)" fillOpacity={0.15} dot={{ r: 4, fill: "var(--success)", strokeWidth: 0 }} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                Loading risk visualization...
+              </div>
+            )}
           </div>
         </motion.div>
 

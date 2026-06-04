@@ -213,8 +213,7 @@ export function AboutContent() {
               execution discipline. That is the gap we close.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-6">
-              Global markets (S&P 500, FTSE) are planned for future releases. Our
-              goal: every intraday trader, everywhere, has access to a personal
+              Our goal: every intraday trader, everywhere, has access to a personal
               behavioral risk guardian.
             </p>
 

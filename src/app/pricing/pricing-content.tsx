@@ -61,23 +61,31 @@ const referralBadges = [
 const pricingFAQs = [
   {
     q: "Is there a free trial?",
-    a: "Yes! We offer a 7-day free trial on our Monthly plan. You can explore all our discipline systems, log trades, and get execution reports for 7 days. You can cancel anytime during the trial.",
+    a: "Yes, all plans include a 7-day free trial. No credit card required. Cancel anytime.",
   },
   {
-    q: "How does the loyalty program work?",
-    a: "Every action earns you loyalty points. When you reach 150 points, you get 1 free month of access. Points expire after 24 months. Annual subscribers earn 150 points immediately!",
+    q: "Do I need to connect my broker?",
+    a: "No. INTROSPECT™ works completely independently. No broker connection needed.",
   },
   {
-    q: "What payment methods do you accept?",
-    a: "UPI, credit/debit cards, net banking via Razorpay. All inclusive pricing — no hidden charges.",
+    q: "Can I switch or cancel my plan?",
+    a: "Yes. Upgrade, downgrade, or cancel anytime from your dashboard. Monthly plans have no lock-in.",
   },
   {
-    q: "Can I switch from monthly to yearly?",
-    a: "Yes! You can upgrade to yearly at any time. The remaining value of your current month will be prorated.",
+    q: "What's the refund policy?",
+    a: "14-day money-back guarantee on all annual plans. Full refund if not satisfied.",
   },
   {
-    q: "What happens when I cancel?",
-    a: "Your access continues until the end of the current billing period. Your data (trade journal, challenge history) is preserved for 90 days in case you resubscribe.",
+    q: "Is there a discount for paying annually?",
+    a: "Yes. Yearly plan is ₹3,999/year - just ₹333/month. Compared to paying monthly (₹499 × 12 = ₹5,988), you save ₹1,989. That's almost 2 months free.",
+  },
+  {
+    q: "How do loyalty points work?",
+    a: "Earn points on every purchase and renewal. 150 points = 1 free month.",
+  },
+  {
+    q: "Can I use INTROSPECT™ with any trading platform?",
+    a: "Yes. Platform-independent. Works alongside any broker or trading software.",
   },
 ];
 
@@ -544,6 +552,89 @@ export function PricingContent() {
           </div>
         </motion.div>
 
+        {/* Value Comparison Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="max-w-4xl mx-auto mb-20"
+        >
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-center mb-10">
+            Before vs After INTROSPECT™
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Without INTROSPECT */}
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/[0.02] p-6 space-y-4">
+              <h3 className="font-heading text-lg font-bold text-destructive flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+                Without INTROSPECT
+              </h3>
+              <ul className="space-y-3.5 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span>Emotional trading decisions</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span>Random position sizing</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span>No mistake tracking</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span>Trading against market trend</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span>No trading psychology profile</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-destructive font-bold">✕</span>
+                  <span className="font-medium text-foreground">₹10,000+ monthly losses possible</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* With INTROSPECT */}
+            <div className="rounded-2xl border border-success/30 bg-success/[0.02] p-6 space-y-4 shadow-[0_0_30px_rgba(34,197,94,0.05)]">
+              <h3 className="font-heading text-lg font-bold text-success flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-success" />
+                With INTROSPECT
+              </h3>
+              <ul className="space-y-3.5 text-sm text-foreground/90">
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span>Data-driven discipline system</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span>ATR-based position calculator</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span>Automated behavioural leak detection</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span>Real-time NIFTY sentiment alignment</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span>AI-powered risk assessment & archetype</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="text-success font-bold">✓</span>
+                  <span className="font-semibold text-success">Starts at just ₹499/month</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+
         {/* FAQ */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -555,14 +646,14 @@ export function PricingContent() {
         >
           <h2 className="font-heading text-2xl sm:text-3xl font-bold text-center mb-10 flex items-center justify-center gap-2">
             <HelpCircle className="h-6 w-6 text-success" />
-            Pricing FAQ
+            Frequently Asked Questions
           </h2>
 
           <Accordion className="space-y-3">
             {pricingFAQs.map((faq, i) => (
               <AccordionItem
                 key={i}
-                value={i}
+                value={i.toString()}
                 className="border border-border/50 rounded-xl px-5 data-[state=open]:bg-card/50 transition-colors"
               >
                 <AccordionTrigger className="text-sm font-medium hover:no-underline cursor-pointer py-4">

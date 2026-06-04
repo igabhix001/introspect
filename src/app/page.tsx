@@ -1,19 +1,51 @@
 import dynamic from "next/dynamic";
 import { Metadata } from "next";
 
-import TrustBarSection from "@/components/homepage/trust-bar";
-import RealProblemSection from "@/components/homepage/real-problem";
-import CoreSystemsSection from "@/components/homepage/core-systems";
-import BeforeAfterSection from "@/components/homepage/before-after";
-import WhoItIsForSection from "@/components/homepage/who-it-is-for";
-import SocialProofSection from "@/components/homepage/social-proof";
-import PricingSection from "@/components/homepage/pricing";
-import FinalCtaSection from "@/components/homepage/final-cta";
+import HeroSection from "@/components/homepage/hero";
+import { LazySection } from "@/components/ui/lazy-section";
 
-// Dynamic imports for heavy dynamic/client-side animated elements
-const HeroSection = dynamic(() => import("@/components/homepage/hero"));
-const AiPsychologySection = dynamic(() => import("@/components/homepage/ai-psychology"));
-const VisualShowcaseSection = dynamic(() => import("@/components/homepage/visual-showcase"));
+function SectionSkeleton() {
+  return (
+    <div className="w-full min-h-[450px] py-20 flex items-center animate-pulse" aria-hidden="true">
+      <div className="mx-auto max-w-6xl px-4 w-full">
+        <div className="h-10 w-1/3 bg-muted/20 rounded-lg mb-6" />
+        <div className="h-6 w-2/3 bg-muted/15 rounded-lg mb-4" />
+        <div className="h-6 w-1/2 bg-muted/10 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+const TrustBarSection = dynamic(() => import("@/components/homepage/trust-bar"), {
+  loading: () => <SectionSkeleton />,
+});
+const RealProblemSection = dynamic(() => import("@/components/homepage/real-problem"), {
+  loading: () => <SectionSkeleton />,
+});
+const CoreSystemsSection = dynamic(() => import("@/components/homepage/core-systems"), {
+  loading: () => <SectionSkeleton />,
+});
+const AiPsychologySection = dynamic(() => import("@/components/homepage/ai-psychology"), {
+  loading: () => <SectionSkeleton />,
+});
+const VisualShowcaseSection = dynamic(() => import("@/components/homepage/visual-showcase"), {
+  loading: () => <SectionSkeleton />,
+});
+const BeforeAfterSection = dynamic(() => import("@/components/homepage/before-after"), {
+  loading: () => <SectionSkeleton />,
+});
+const WhoItIsForSection = dynamic(() => import("@/components/homepage/who-it-is-for"), {
+  loading: () => <SectionSkeleton />,
+});
+const SocialProofSection = dynamic(() => import("@/components/homepage/social-proof"), {
+  loading: () => <SectionSkeleton />,
+});
+const PricingSection = dynamic(() => import("@/components/homepage/pricing"), {
+  loading: () => <SectionSkeleton />,
+});
+const FinalCtaSection = dynamic(() => import("@/components/homepage/final-cta"), {
+  loading: () => <SectionSkeleton />,
+});
 
 export const metadata: Metadata = {
   title: "Stop Blowing Accounts | INTROSPECT™ AI Trading Companion",
@@ -25,16 +57,17 @@ export default function HomePage() {
   return (
     <div className="overflow-hidden">
       <HeroSection />
-      <TrustBarSection />
-      <RealProblemSection />
-      <CoreSystemsSection />
-      <AiPsychologySection />
-      <VisualShowcaseSection />
-      <BeforeAfterSection />
-      <WhoItIsForSection />
-      <SocialProofSection />
-      <PricingSection />
-      <FinalCtaSection />
+      
+      <LazySection fallback={<SectionSkeleton />}><TrustBarSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><RealProblemSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><CoreSystemsSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><AiPsychologySection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><VisualShowcaseSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><BeforeAfterSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><WhoItIsForSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><SocialProofSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><PricingSection /></LazySection>
+      <LazySection fallback={<SectionSkeleton />}><FinalCtaSection /></LazySection>
     </div>
   );
 }

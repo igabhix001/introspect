@@ -1,9 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 export default function VisualShowcaseSection() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <section className="py-24 bg-[#0A0B0D] dark:bg-black text-white relative overflow-hidden">
       {/* Fintech grid background */}
@@ -38,14 +45,18 @@ export default function VisualShowcaseSection() {
             <div className="relative w-full max-w-[500px] aspect-square rounded-2xl border border-white/10 bg-black/60 shadow-2xl p-2 select-none overflow-hidden group">
               <div className="absolute -inset-1 bg-gradient-to-tr from-[#00D1FF]/20 to-[#00c853]/20 rounded-2xl blur-md opacity-75 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="relative h-full w-full rounded-xl overflow-hidden bg-zinc-950">
-                <video
-                  src="/Manage money.webm"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="h-full w-full object-cover"
-                />
+                {isMounted ? (
+                  <video
+                    src="/Manage money.webm"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-zinc-950 animate-pulse" />
+                )}
               </div>
             </div>
             <span className="text-[10px] font-mono text-white/40 uppercase mt-4 tracking-widest">

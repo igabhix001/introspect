@@ -1,9 +1,17 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode, useMemo } from "react";
-import { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types/database";
+
+let supabaseInstance: any = null;
+
+async function getSupabase() {
+  if (supabaseInstance) return supabaseInstance;
+  const { createClient } = await import("@/lib/supabase/client");
+  supabaseInstance = createClient();
+  return supabaseInstance;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -45,9 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!cachedAuthState.initialized);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(cachedAuthState.hasActiveSubscription);
   
-  // Use singleton Supabase client - memoized to prevent recreation
-  const supabase = useMemo(() => createClient(), []);
-
   // Refs to prevent race conditions — NEVER put these in useEffect deps
   const mountedRef = useRef(true);
   const initDoneRef = useRef(cachedAuthState.initialized);
@@ -66,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
+      const supabase = await getSupabase();
       // Add timeout to prevent hanging on slow Supabase responses
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4000);
@@ -154,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
 
       try {
+        const supabase = await getSupabase();
         // Subscription check with aggressive 2s timeout
         const subPromise = supabase
           .from("subscriptions")
@@ -191,12 +198,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // ── 1. Initial auth check (runs once) ──
-    // Uses getSession() which reads from local storage (fast) rather than network
     const initAuth = async () => {
       if (initDoneRef.current) return;
       initDoneRef.current = true;
 
       try {
+        // Fast check: if no supabase keys exist in localStorage, the user is guest
+        if (typeof window !== "undefined") {
+          let hasSbKey = false;
+          try {
+            for (let i = 0; i < window.localStorage.length; i++) {
+              const key = window.localStorage.key(i);
+              if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+                hasSbKey = true;
+                break;
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+          
+          if (!hasSbKey) {
+            clearAuth();
+            setLoading(false);
+            return;
+          }
+        }
+
+        const supabase = await getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         if (!mountedRef.current) return;
 
@@ -213,74 +242,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initAuth();
+    // Delay initialization to let initial paint complete without CPU contention
+    const delayTimer = setTimeout(() => {
+      initAuth();
+    }, 100);
 
     // ── 2. Auth state listener — handles sign-in, sign-out, token refresh ──
     // CRITICAL: This listener should NOT cause loading states after initial load
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mountedRef.current) return;
-
-        // SIGNED_OUT: Clear everything
-        if (event === "SIGNED_OUT") {
-          clearAuth();
-          setLoading(false);
-          return;
-        }
-
-        // TOKEN_REFRESHED: Just update user object silently - NO loading state change
-        if (event === "TOKEN_REFRESHED" && session?.user) {
-          setUser(session.user);
-          return;
-        }
-
-        // USER_UPDATED: Update user object silently
-        if (event === "USER_UPDATED" && session?.user) {
-          setUser(session.user);
-          return;
-        }
-
-        // SIGNED_IN: Full hydration only for actual sign-in (not token refresh)
-        if (event === "SIGNED_IN" && session?.user) {
-          // Only hydrate if we don't already have this user
-          if (!user || user.id !== session.user.id) {
-            await hydrateUser(session.user);
-          } else {
-            setUser(session.user);
-          }
-          if (mountedRef.current) setLoading(false);
-          return;
-        }
-
-        // INITIAL_SESSION: Always ensure loading clears even if hydration is skipped
-        if (event === "INITIAL_SESSION") {
-          if (session?.user) {
-            // Only hydrate if initAuth hasn't already done it
-            if (!user && !hydratingRef.current) {
-              await hydrateUser(session.user);
+    let activeSubscription: any = null;
+    
+    const initListener = async () => {
+      // Fast check: if no supabase keys exist in localStorage, the user is guest
+      if (typeof window !== "undefined") {
+        let hasSbKey = false;
+        try {
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+              hasSbKey = true;
+              break;
             }
-          } else {
-            clearAuth();
           }
-          // ALWAYS clear loading on INITIAL_SESSION — this is the critical fix
-          if (mountedRef.current) setLoading(false);
+        } catch (e) {
+          // ignore
+        }
+        
+        if (!hasSbKey) {
+          return;
         }
       }
-    );
+
+      const supabase = await getSupabase();
+      if (!mountedRef.current) return;
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event: any, session: any) => {
+          if (!mountedRef.current) return;
+
+          // SIGNED_OUT: Clear everything
+          if (event === "SIGNED_OUT") {
+            clearAuth();
+            setLoading(false);
+            return;
+          }
+
+          // TOKEN_REFRESHED: Just update user object silently - NO loading state change
+          if (event === "TOKEN_REFRESHED" && session?.user) {
+            setUser(session.user);
+            return;
+          }
+
+          // USER_UPDATED: Update user object silently
+          if (event === "USER_UPDATED" && session?.user) {
+            setUser(session.user);
+            return;
+          }
+
+          // SIGNED_IN: Full hydration only for actual sign-in (not token refresh)
+          if (event === "SIGNED_IN" && session?.user) {
+            // Only hydrate if we don't already have this user
+            if (!user || user.id !== session.user.id) {
+              await hydrateUser(session.user);
+            } else {
+              setUser(session.user);
+            }
+            if (mountedRef.current) setLoading(false);
+            return;
+          }
+
+          // INITIAL_SESSION: Always ensure loading clears even if hydration is skipped
+          if (event === "INITIAL_SESSION") {
+            if (session?.user) {
+              // Only hydrate if initAuth hasn't already done it
+              if (!user && !hydratingRef.current) {
+                await hydrateUser(session.user);
+              }
+            } else {
+              clearAuth();
+            }
+            // ALWAYS clear loading on INITIAL_SESSION — this is the critical fix
+            if (mountedRef.current) setLoading(false);
+          }
+        }
+      );
+      if (!mountedRef.current) {
+        subscription.unsubscribe();
+      } else {
+        activeSubscription = subscription;
+      }
+    };
+    initListener();
 
     return () => {
       mountedRef.current = false;
       clearTimeout(safetyTimer);
+      clearTimeout(delayTimer);
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
-      subscription.unsubscribe();
+      if (activeSubscription) {
+        activeSubscription.unsubscribe();
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // ← EMPTY deps — runs once, never re-runs
 
   const signOut = async () => {
     try {
+      const supabase = await getSupabase();
       await supabase.auth.signOut();
     } catch (err) {
       console.error("Supabase signOut error, forcing local logout:", err);

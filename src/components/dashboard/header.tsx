@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import {
   Menu,
   Sun,
@@ -133,6 +133,7 @@ export function DashboardHeader({
   }, []);
 
   return (
+    <LazyMotion features={domAnimation}>
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 sm:px-6 border-b border-border bg-background/80 backdrop-blur-md">
         {/* Left: Mobile menu + Page title */}
@@ -195,7 +196,7 @@ export function DashboardHeader({
             {/* Notification dropdown */}
             <AnimatePresence>
               {notifOpen && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 5, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.95 }}
@@ -217,7 +218,7 @@ export function DashboardHeader({
                       ))
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -260,7 +261,7 @@ export function DashboardHeader({
                     className="fixed inset-0 z-40"
                     onClick={() => setProfileOpen(false)}
                   />
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0, y: 8, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.95 }}
@@ -293,7 +294,7 @@ export function DashboardHeader({
                         Log out
                       </button>
                     </div>
-                  </motion.div>
+                  </m.div>
                 </>
               )}
             </AnimatePresence>
@@ -305,14 +306,14 @@ export function DashboardHeader({
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
               onClick={onMobileMenuToggle}
             />
-            <motion.nav
+            <m.nav
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
@@ -403,10 +404,11 @@ export function DashboardHeader({
                   Log out
                 </button>
               </div>
-            </motion.nav>
+            </m.nav>
           </>
         )}
       </AnimatePresence>
     </>
+    </LazyMotion>
   );
 }

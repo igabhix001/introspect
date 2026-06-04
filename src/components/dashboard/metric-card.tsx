@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { motion } from "framer-motion";
+
 import { LucideIcon } from "lucide-react";
 
 interface MetricCardProps {
@@ -23,10 +23,8 @@ export const MetricCard = memo(function MetricCard({
   color = "success",
 }: MetricCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group"
+    <div
+      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 group animate-fade-up"
     >
       <div className={`absolute -top-8 -right-8 w-24 h-24 bg-${color}/[0.07] rounded-full blur-2xl transition-all group-hover:bg-${color}/[0.12]`} />
       <div className="relative">
@@ -54,6 +52,6 @@ export const MetricCard = memo(function MetricCard({
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 });

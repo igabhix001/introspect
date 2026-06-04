@@ -2,9 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  poweredByHeader: false,
 
   // Performance optimizations
   experimental: {
+    inlineCss: true,
     optimizeCss: true,
     optimizePackageImports: [
       "lucide-react",
@@ -13,6 +15,8 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-dialog",
       "@radix-ui/react-dropdown-menu",
       "@radix-ui/react-tabs",
+      "@supabase/supabase-js",
+      "date-fns",
     ],
   },
 

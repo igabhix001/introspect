@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTradesQuery, useDailyReportQuery, useChallengesQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 const emotionColors: Record<string, string> = {
   Calm: "bg-success/10 text-success",
@@ -68,6 +69,7 @@ interface TradeRow {
 export default function JournalPage() {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { data: tradesData, isLoading } = useTradesQuery();
   const trades = (tradesData as TradeRow[]) || [];
   
@@ -179,6 +181,10 @@ export default function JournalPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.challenges(user.id) });
+        queryClient.refetchQueries({ queryKey: queryKeys.trades(user.id) });
+        queryClient.refetchQueries({ queryKey: queryKeys.dashboard(user.id) });
+        queryClient.refetchQueries({ queryKey: queryKeys.challenges(user.id) });
+        router.refresh();
         setShowAddModal(false);
         setFormData({
           stock: "",
@@ -231,6 +237,11 @@ export default function JournalPage() {
         alert(msg);
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+        queryClient.invalidateQueries({ queryKey: ["analytics", user.id] });
+        queryClient.refetchQueries({ queryKey: queryKeys.trades(user.id) });
+        queryClient.refetchQueries({ queryKey: queryKeys.dashboard(user.id) });
+        queryClient.refetchQueries({ queryKey: ["analytics", user.id] });
+        router.refresh();
       }
     } catch (err) {
       console.error("Error importing CSV:", err);
@@ -252,6 +263,9 @@ export default function JournalPage() {
     // Invalidate queries to refetch fresh data
     queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
+    queryClient.refetchQueries({ queryKey: queryKeys.trades(user.id) });
+    queryClient.refetchQueries({ queryKey: queryKeys.dashboard(user.id) });
+    router.refresh();
     setDeleting(null);
   };
 
@@ -339,9 +353,10 @@ export default function JournalPage() {
   });
 
   const totalPnl = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
-  const winRate = filteredTrades.length
+  const closedTrades = filteredTrades.filter((t) => t.exit_price !== null && t.exit_price !== undefined);
+  const winRate = closedTrades.length
     ? Math.round(
-        (filteredTrades.filter((t) => t.pnl > 0).length / filteredTrades.length) * 100
+        (closedTrades.filter((t) => t.pnl > 0).length / closedTrades.length) * 100
       )
     : 0;
   const rulesFollowed = filteredTrades.length

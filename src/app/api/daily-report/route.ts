@@ -4,6 +4,8 @@ import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 import { generateCoachingNarrative } from "@/lib/ai/kimi-client";
 import { checkAndTrackAiUsage, commitAiUsage } from "@/lib/ai/ai-limiter";
 
+export const dynamic = "force-dynamic";
+
 /**
  * INTROSPECT™ Behavioral Audit Engine — 4-Pillar Discipline Score
  *

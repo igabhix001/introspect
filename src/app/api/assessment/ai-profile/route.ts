@@ -4,6 +4,8 @@ import { generateAssessmentAiProfile } from "@/lib/ai/kimi-client";
 import { checkAndTrackAiUsage, commitAiUsage } from "@/lib/ai/ai-limiter";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 // Define the exact diagnostic questions map for high-fidelity prompt generation
 const QUESTIONS_MAP: Record<string, { question: string; category: string }> = {
   q1: {

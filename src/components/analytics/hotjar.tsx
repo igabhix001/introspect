@@ -12,6 +12,7 @@
 'use client';
 
 import Script from 'next/script';
+import { useEffect, useState } from 'react';
 import { ANALYTICS_CONFIG } from '@/lib/analytics/config';
 
 // Microsoft Clarity Project ID - set in environment or use hardcoded production ID
@@ -19,13 +20,42 @@ const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || 'w6qsn3
 
 export function Hotjar() {
   const { enabled } = ANALYTICS_CONFIG.hotjar;
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const loadScripts = () => {
+      setShouldLoad(true);
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('scroll', loadScripts);
+      window.removeEventListener('click', loadScripts);
+      window.removeEventListener('touchstart', loadScripts);
+      window.removeEventListener('mousemove', loadScripts);
+    };
+
+    // Add event listeners for user interaction
+    window.addEventListener('scroll', loadScripts, { passive: true });
+    window.addEventListener('click', loadScripts, { passive: true });
+    window.addEventListener('touchstart', loadScripts, { passive: true });
+    window.addEventListener('mousemove', loadScripts, { passive: true });
+
+    return () => {
+      cleanup();
+    };
+  }, [enabled]);
 
   if (!enabled) {
     console.log('[Clarity] Disabled (not production)');
     return null;
   }
 
-  // Remove the check since we now have a hardcoded fallback
+  if (!shouldLoad) {
+    return null;
+  }
 
   return (
     <Script

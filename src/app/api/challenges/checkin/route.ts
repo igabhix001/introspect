@@ -62,14 +62,12 @@ export async function POST(request: NextRequest) {
     const newStatus = isCompleted ? "completed" : "active";
 
     // Calculate points earned on completion
-    // NEW LOGIC: 1 point per day + bonus
-    // 30-day = 30 points (1 per day, no bonus)
-    // 60-day = 65 points (60 + 5 bonus)
-    // 90-day = 100 points (90 + 10 bonus)
     let pointsEarned = 0;
     if (isCompleted) {
-      const pointsMap: Record<string, number> = { "30": 30, "60": 65, "90": 100 };
-      pointsEarned = pointsMap[challenge.type] || 30;
+      const challengeAction = challenge.type === "90" ? "challenge_90" 
+        : challenge.type === "60" ? "challenge_60" 
+        : "challenge_30";
+      pointsEarned = POINTS_CONFIG[challengeAction] || 0;
     }
 
     // Update challenge

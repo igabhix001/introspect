@@ -22,24 +22,40 @@ export function ParticleField({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Only render particles when visible (Intersection Observer)
+  // Only render particles when visible and display is not none (e.g. hidden on mobile)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const checkVisibility = () => {
+      return canvas.offsetWidth > 0;
+    };
+
     const observer = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting && checkVisibility());
+      },
       { threshold: 0.1 }
     );
     observer.observe(canvas);
-    return () => observer.disconnect();
+
+    // Also listen to window resize to update visibility status if screen layout changes
+    const handleResize = () => {
+      setIsVisible(checkVisibility());
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   useEffect(() => {
     if (!isVisible) return;
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || canvas.offsetWidth === 0) return;
 
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
@@ -47,11 +63,12 @@ export function ParticleField({
     let animationId: number;
     let particles: Particle[] = [];
     let lastTime = 0;
-    const targetFPS = 30; // Reduce to 30fps for performance
+    const targetFPS = 30; // 30fps for performance
     const frameInterval = 1000 / targetFPS;
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio, 2); // Cap DPR for performance
+      if (!canvas || canvas.offsetWidth === 0) return;
+      const dpr = Math.min(window.devicePixelRatio, 2); // Cap DPR
       canvas.width = canvas.offsetWidth * dpr;
       canvas.height = canvas.offsetHeight * dpr;
       ctx.scale(dpr, dpr);
@@ -70,6 +87,8 @@ export function ParticleField({
     };
 
     const drawParticles = (timestamp: number) => {
+      if (!canvas || canvas.offsetWidth === 0) return;
+      
       // Throttle to target FPS
       if (timestamp - lastTime < frameInterval) {
         animationId = requestAnimationFrame(drawParticles);
@@ -121,9 +140,13 @@ export function ParticleField({
     createParticles();
     animationId = requestAnimationFrame(drawParticles);
 
-    window.addEventListener("resize", resize);
+    const handleResize = () => {
+      resize();
+    };
+    window.addEventListener("resize", handleResize);
+
     return () => {
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationId);
     };
   }, [count, isVisible]);
@@ -131,7 +154,7 @@ export function ParticleField({
   return (
     <canvas
       ref={canvasRef}
-      className={`absolute inset-0 pointer-events-none ${className}`}
+      className={`absolute inset-0 pointer-events-none hidden md:block ${className}`}
       style={{ width: "100%", height: "100%", willChange: "transform" }}
     />
   );

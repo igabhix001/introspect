@@ -55,7 +55,7 @@ export function useDashboardQuery() {
 
       const today = new Date().toISOString().split("T")[0];
 
-      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes] = await Promise.all([
+      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes, allTradesRes] = await Promise.all([
         supabase
           .from("trades")
           .select("*")
@@ -94,12 +94,18 @@ export function useDashboardQuery() {
           .eq("date", today)
           .abortSignal(signal)
           .maybeSingle(),
+        supabase
+          .from("trades")
+          .select("pnl, exit_price")
+          .eq("user_id", userId)
+          .abortSignal(signal),
       ]);
 
       const trades = tradesRes.data || [];
       const assessment = assessmentRes.data;
       const reports = reportsRes.data || [];
       const activeChallenge = challengeRes.data;
+      const allTrades = allTradesRes.data || [];
       const todayFullReport = todayReportRes.data as {
         discipline_score?: number;
         mistakes_count?: number;
@@ -156,12 +162,19 @@ export function useDashboardQuery() {
       const rulesFollowed = todayFullReport?.rules_followed || 0;
       const totalRules = todayFullReport?.total_rules || 4;
 
+      const closedTrades = allTrades.filter(t => t.exit_price !== null && t.exit_price !== undefined);
+      const totalClosed = closedTrades.length;
+      const wins = closedTrades.filter(t => (t.pnl || 0) > 0).length;
+      const winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
+
       return {
         disciplineScore,
         hasJournaledToday,
         hasTodayReport,
         hasEverTraded,
         hasAssessment,
+        winRate,
+        totalClosed,
         todayTrades: trades.length,
         maxTrades: 5,
         todayPnl,
@@ -194,7 +207,7 @@ export function useDashboardQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 0, // Always fetch fresh dashboard data
   });
 }
 
@@ -219,7 +232,7 @@ export function useTradesQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 0, // Always fetch fresh trades data
   });
 }
 
@@ -285,7 +298,7 @@ export function useChallengesQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 0, // Always fetch fresh challenges data
   });
 }
 
@@ -561,7 +574,9 @@ export function useAnalyticsQuery() {
       }
 
       const total = allTrades.reduce((sum: number, t: { pnl: number }) => sum + t.pnl, 0);
-      const wins = allTrades.filter((t: { pnl: number }) => t.pnl > 0).length;
+      const closedTrades = allTrades.filter((t: { exit_price?: number | null }) => t.exit_price !== null && t.exit_price !== undefined);
+      const totalClosed = closedTrades.length;
+      const wins = closedTrades.filter((t: { pnl: number }) => t.pnl > 0).length;
       const rulesFollowed = allTrades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
 
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -589,7 +604,7 @@ export function useAnalyticsQuery() {
         allTrades,
         tradeCount: allTrades.length,
         totalPnl: total,
-        winRate: Math.round((wins / allTrades.length) * 100),
+        winRate: totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0,
         ruleAdherence: Math.round((rulesFollowed / allTrades.length) * 100),
         weeklyPnl,
         mistakeData,
@@ -600,7 +615,7 @@ export function useAnalyticsQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 0, // Always fetch fresh analytics data
   });
 }
 

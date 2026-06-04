@@ -272,6 +272,11 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const [subscriptionVerified, setSubscriptionVerified] = useState<boolean | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle payment success redirect - verify subscription directly from DB
   useEffect(() => {
@@ -346,6 +351,7 @@ function DashboardContent() {
   const todayAreasToImprove = data?.todayAreasToImprove || [];
   const hasEverTraded = data?.hasEverTraded || false;
   const hasAssessment = data?.hasAssessment || false;
+  const winRate = data?.winRate || 0;
   // Show welcome banner only for truly new users who have never traded or done assessment
   const hasNoAssessment = !hasEverTraded && !hasAssessment;
 
@@ -512,7 +518,7 @@ function DashboardContent() {
               {todayPnl >= 0 ? "+" : ""}₹{Math.abs(todayPnl).toLocaleString("en-IN")}
             </span>
             <p className="text-xs text-muted-foreground mt-1.5">
-              Win rate: <span className="text-foreground font-medium">67%</span>
+              Win rate: <span className="text-foreground font-medium">{winRate}%</span>
             </p>
           </div>
         </motion.div>
@@ -574,8 +580,9 @@ function DashboardContent() {
           </div>
 
           <div className="h-[260px] min-h-[260px] min-w-0 -ml-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={disciplineData}>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={disciplineData}>
                 <defs>
                   <linearGradient
                     id="disciplineGradient"
@@ -638,6 +645,11 @@ function DashboardContent() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
           </div>
         </motion.div>
 

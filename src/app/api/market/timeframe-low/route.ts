@@ -27,7 +27,17 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const tf = searchParams.get("timeframe") || "15m";
+    const symbol = searchParams.get("symbol") || "Nifty 50";
     const fyersResolution = TIMEFRAME_MAPPING[tf] || "15";
+
+    let fyersSymbol = "NSE:NIFTY50-INDEX";
+    if (symbol === "Bank Nifty") {
+      fyersSymbol = "NSE:NIFTYBANK-INDEX";
+    } else if (symbol === "Fin Nifty") {
+      fyersSymbol = "NSE:NIFTYFINSERVICE-INDEX";
+    } else if (symbol === "Midcap Nifty") {
+      fyersSymbol = "NSE:MIDCPNIFTY-INDEX";
+    }
 
     let closePrice: number;
     let lowPrice: number;
@@ -44,7 +54,7 @@ export async function GET(request: NextRequest) {
 
       try {
         const res = await fetch(
-          `https://api-t1.fyers.in/data/history?symbol=NSE:NIFTY50-INDEX&resolution=${fyersResolution}&date_format=0&range_from=${rangeFrom}&range_to=${now}&cont_flag=1`,
+          `https://api-t1.fyers.in/data/history?symbol=${fyersSymbol}&resolution=${fyersResolution}&date_format=0&range_from=${rangeFrom}&range_to=${now}&cont_flag=1`,
           {
             headers: {
               Authorization: `${process.env.FYERS_APP_ID}:${token}`,
@@ -71,11 +81,23 @@ export async function GET(request: NextRequest) {
 
     // Fallback if simulated or Fyers fetch failed
     if (dataSource === "simulated") {
-      // Simulate Nifty values close to a realistic level
-      closePrice = 22450 + Math.floor(Math.random() * 60 - 30);
+      let basePrice = 22450;
+      let volMultiplier = 1.0;
+      if (symbol === "Bank Nifty") {
+        basePrice = 48000;
+        volMultiplier = 3.0;
+      } else if (symbol === "Fin Nifty") {
+        basePrice = 21200;
+        volMultiplier = 1.25;
+      } else if (symbol === "Midcap Nifty") {
+        basePrice = 10800;
+        volMultiplier = 0.75;
+      }
+
+      closePrice = basePrice + Math.floor(Math.random() * 60 * volMultiplier - 30 * volMultiplier);
       const tfMinutes = tf.endsWith("m") ? parseInt(tf) : tf.endsWith("h") ? parseInt(tf) * 60 : 1440;
       // Low is close price minus a simulated buffer relative to the timeframe
-      const range = 20 + Math.sqrt(tfMinutes) * 8;
+      const range = (20 + Math.sqrt(tfMinutes) * 8) * volMultiplier;
       lowPrice = closePrice - (Math.random() * 0.4 + 0.6) * range;
       highPrice = closePrice + (Math.random() * 0.4 + 0.6) * range;
       

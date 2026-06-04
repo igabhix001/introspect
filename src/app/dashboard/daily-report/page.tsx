@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
@@ -81,6 +81,11 @@ export default function DailyReportPage() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [generating, setGenerating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: reportData, isLoading: reportLoading } = useDailyReportQuery(selectedDate);
   const { data: recentReportsData } = useRecentDailyReportsQuery();
@@ -366,73 +371,111 @@ export default function DailyReportPage() {
                     <div>
                       Avg Loss Hold: <span className="font-semibold text-destructive">{report.feedback.holdingTimes.avgLossHoldTime}m</span>
                     </div>
-                    <div className="px-1.5 py-0.5 rounded bg-muted font-semibold text-[10px] text-foreground">
-                      Disposition Ratio: {report.feedback.holdingTimes.dispositionRatio}x
-                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="h-[200px] min-h-[260px] min-w-0 -ml-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={[
-                      { tradeIndex: 0, time: "Start", pnl: 0 },
-                      ...(() => {
-                        let runningPnl = 0;
-                        return report.feedback.tradeScorecard.map((t, idx) => {
-                          runningPnl += t.pnl;
-                          return {
-                            tradeIndex: idx + 1,
-                            time: t.exit_time || t.entry_time || `T${idx + 1}`,
-                            pnl: runningPnl,
-                            symbol: t.stock
-                          };
-                        });
-                      })()
-                    ]}
-                  >
-                    <defs>
-                      <linearGradient id="pnlCurveGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                    <XAxis
-                      dataKey="time"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                      tickFormatter={(val) => `₹${val}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--card)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "12px",
-                        fontSize: "12px",
-                      }}
-                      formatter={(val: any, name, props) => {
-                        const symbol = props.payload.symbol ? ` (${props.payload.symbol})` : "";
-                        return [`₹${val.toLocaleString("en-IN")}${symbol}`, "Running P&L"];
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="pnl"
-                      stroke="var(--primary)"
-                      strokeWidth={2.5}
-                      fill="url(#pnlCurveGradient)"
-                      dot={{ r: 4, fill: "var(--card)", stroke: "var(--primary)", strokeWidth: 2 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="h-[200px] min-h-[260px] min-w-0 -ml-2 no-print">
+                {mounted ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={[
+                        { tradeIndex: 0, time: "Start", pnl: 0 },
+                        ...(() => {
+                          let runningPnl = 0;
+                          return report.feedback.tradeScorecard.map((t, idx) => {
+                            runningPnl += t.pnl;
+                            return {
+                              tradeIndex: idx + 1,
+                              time: t.exit_time || t.entry_time || `T${idx + 1}`,
+                              pnl: runningPnl,
+                              symbol: t.stock
+                            };
+                          });
+                        })()
+                      ]}
+                    >
+                      <defs>
+                        <linearGradient id="pnlCurveGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                      <XAxis
+                        dataKey="time"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                        tickFormatter={(val) => `₹${val}`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--card)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                        }}
+                        formatter={(val: any, name, props) => {
+                          const symbol = props.payload.symbol ? ` (${props.payload.symbol})` : "";
+                          return [`₹${val.toLocaleString("en-IN")}${symbol}`, "Running P&L"];
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="pnl"
+                        stroke="var(--primary)"
+                        strokeWidth={2.5}
+                        fill="url(#pnlCurveGradient)"
+                        dot={{ r: 4, fill: "var(--card)", stroke: "var(--primary)", strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+
+              {/* Print-only Textual Cumulative P&L Path */}
+              <div className="print-only mt-4 pt-2 border-t border-border">
+                <p className="text-xs font-bold uppercase tracking-wider mb-2">Chronological Running P&L Progression</p>
+                <table className="w-full text-left border-collapse text-[10pt] text-foreground">
+                  <thead>
+                    <tr className="border-b border-muted">
+                      <th className="py-1.5 font-semibold">Trade #</th>
+                      <th className="py-1.5 font-semibold">Instrument</th>
+                      <th className="py-1.5 font-semibold text-right">Trade P&L</th>
+                      <th className="py-1.5 font-semibold text-right">Cumulative Running P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      let runningPnl = 0;
+                      return report.feedback.tradeScorecard.map((t, idx) => {
+                        runningPnl += t.pnl;
+                        return (
+                          <tr key={idx} className="border-b border-muted/50 font-mono">
+                            <td className="py-1.5 text-muted-foreground">#{idx + 1}</td>
+                            <td className="py-1.5 font-sans font-medium text-foreground">{t.stock}</td>
+                            <td className={`py-1.5 text-right font-bold ${t.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                              {t.pnl >= 0 ? "+" : ""}₹{t.pnl.toLocaleString("en-IN")}
+                            </td>
+                            <td className={`py-1.5 text-right font-bold ${runningPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                              ₹{runningPnl.toLocaleString("en-IN")}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

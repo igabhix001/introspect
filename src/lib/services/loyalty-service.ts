@@ -35,6 +35,17 @@ export interface AwardPointsResult {
  */
 export async function awardPoints(params: AwardPointsParams): Promise<AwardPointsResult> {
   const { userId, points, reason, description, activityNote, skipEmail = false } = params;
+  
+  if (points === 0) {
+    return {
+      success: true,
+      previousBalance: 0,
+      newBalance: 0,
+      pointsAwarded: 0,
+      emailSent: false,
+    };
+  }
+
   const adminDb = createAdminClient();
 
   try {
@@ -162,33 +173,30 @@ export function calculateTier(lifetimePoints: number): string {
  * Points values per action type (from client spec)
  */
 export const POINTS_CONFIG = {
-  // Subscription rewards
-  monthly_purchase: 10,
-  monthly_renewal: 10,
-  semiannual_purchase: 75,
-  annual_purchase: 150,
-  annual_renewal: 150,
-  early_renewal: 25,
+  // Subscription rewards (Disabled per client request: "no rewards for Challenges, renewals or anything else")
+  monthly_purchase: 0,
+  monthly_renewal: 0,
+  semiannual_purchase: 0,
+  annual_purchase: 0,
+  annual_renewal: 0,
+  early_renewal: 0,
   
-  // Referral rewards
+  // Referral rewards (ENABLED - only referrals earn points)
   referral_reward: 25,
   referral_milestone_3: 20,
   referral_milestone_5: 50,
   referral_milestone_10: 100,
   
-  // Challenge rewards (1 point per day + bonus on completion)
-  // 30-day = 30 points (1 per day, no bonus)
-  // 60-day = 65 points (60 + 5 bonus)
-  // 90-day = 100 points (90 + 10 bonus)
-  challenge_30: 30,
-  challenge_60: 65,
-  challenge_90: 100,
+  // Challenge rewards (Disabled per client request)
+  challenge_30: 0,
+  challenge_60: 0,
+  challenge_90: 0,
   
-  // Engagement rewards (1 point per journal entry)
-  journal_entry: 1,
-  weekly_journal: 5, // Legacy - kept for backward compatibility
-  birthday_bonus: 10,
-  anniversary: 100,
+  // Engagement rewards (Disabled per client request)
+  journal_entry: 0,
+  weekly_journal: 0, // Legacy - kept for backward compatibility
+  birthday_bonus: 0,
+  anniversary: 0,
   
   // Redemption
   free_month_cost: -150,

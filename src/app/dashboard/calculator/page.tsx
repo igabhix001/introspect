@@ -33,13 +33,14 @@ export default function CalculatorPage() {
   const [copied, setCopied] = useState(false);
 
   // Advanced Stop Loss Helper States
-  const [slMethod, setSlMethod] = useState<"manual" | "atr" | "timeframe">("manual");
+  const [slMethod, setSlMethod] = useState<"manual" | "atr" | "timeframe">("atr");
   const [tradeDirection, setTradeDirection] = useState<"long" | "short">("long");
   const [atrVal, setAtrVal] = useState<string>("80");
   const [atrMultiplier, setAtrMultiplier] = useState<string>("2");
 
   // Timeframe Sizing States
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("15m");
+  const [selectedInstrument, setSelectedInstrument] = useState<string>("Nifty 50");
   const [fetchingTimeframe, setFetchingTimeframe] = useState(false);
   const [timeframeData, setTimeframeData] = useState<{ close: number; low: number; high: number } | null>(null);
 
@@ -62,10 +63,10 @@ export default function CalculatorPage() {
     }
   };
 
-  const fetchTimeframePrices = async (tf: string) => {
+  const fetchTimeframePrices = async (tf: string, symbol: string) => {
     setFetchingTimeframe(true);
     try {
-      const res = await fetch(`/api/market/timeframe-low?timeframe=${tf}`);
+      const res = await fetch(`/api/market/timeframe-low?timeframe=${tf}&symbol=${encodeURIComponent(symbol)}`);
       const data = await res.json();
       if (data && !data.error) {
         setTimeframeData(data);
@@ -82,16 +83,24 @@ export default function CalculatorPage() {
     }
   };
 
+  const handleInstrumentChange = (inst: string) => {
+    setSelectedInstrument(inst);
+    if (inst === "Nifty 50") setAtrVal("80");
+    else if (inst === "Bank Nifty") setAtrVal("250");
+    else if (inst === "Fin Nifty") setAtrVal("100");
+    else if (inst === "Midcap Nifty") setAtrVal("60");
+  };
+
   useEffect(() => {
     fetchMarketSentiment();
   }, []);
 
-  // Fetch timeframe prices when method, timeframe, or direction changes
+  // Fetch timeframe prices when method, timeframe, direction, or instrument changes
   useEffect(() => {
     if (slMethod === "timeframe") {
-      fetchTimeframePrices(selectedTimeframe);
+      fetchTimeframePrices(selectedTimeframe, selectedInstrument);
     }
-  }, [slMethod, selectedTimeframe, tradeDirection]);
+  }, [slMethod, selectedTimeframe, tradeDirection, selectedInstrument]);
 
   // Compute dynamic stop loss price
   const computedStopLossPrice = useMemo(() => {
@@ -236,12 +245,12 @@ export default function CalculatorPage() {
                           CONFIRMED
                         </span>
                       )}
-                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                                      <span className={`px-4 py-1.5 rounded-xl text-sm sm:text-base font-black tracking-wider uppercase border ${
                         marketData.market_zone === "BULLISH" 
-                          ? "bg-success/10 text-success" 
+                          ? "bg-success/20 text-success border-success/30 shadow-[0_0_12px_rgba(34,197,94,0.15)]" 
                           : marketData.market_zone === "BEARISH" 
-                          ? "bg-destructive/10 text-destructive" 
-                          : "bg-amber-500/10 text-amber-500"
+                          ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
+                          : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
                         {marketData.market_zone}
                       </span>
@@ -385,18 +394,32 @@ export default function CalculatorPage() {
         {/* Right Side: Position Calculator Input Form & Result */}
         <div className="lg:col-span-3 space-y-6">
           <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Calculator className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Calculator className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-sm font-bold">
+                    Sizing Parameters
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    Define your setup guidelines to automatically calculate share quantity
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-heading text-sm font-bold">
-                  Sizing Parameters
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  Define your setup guidelines to automatically calculate share quantity
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetchMarketSentiment();
+                  await fetchTimeframePrices(selectedTimeframe, selectedInstrument);
+                }}
+                disabled={loadingMarket || fetchingTimeframe}
+                className="p-2 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${(loadingMarket || fetchingTimeframe) ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh Data</span>
+              </button>
             </div>
 
             {/* Trade Direction Selector */}
@@ -428,6 +451,21 @@ export default function CalculatorPage() {
                   SHORT (Sell)
                 </button>
               </div>
+            </div>
+
+            {/* Trading Instrument Selector */}
+            <div>
+              <label className="text-xs font-medium mb-1.5 block">Trading Instrument</label>
+              <select
+                value={selectedInstrument}
+                onChange={(e) => handleInstrumentChange(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-medium focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-pointer"
+              >
+                <option value="Nifty 50">Nifty 50</option>
+                <option value="Bank Nifty">Bank Nifty</option>
+                <option value="Fin Nifty">Fin Nifty</option>
+                <option value="Midcap Nifty">Midcap Nifty</option>
+              </select>
             </div>
 
             {/* Account Capital */}
@@ -644,7 +682,7 @@ export default function CalculatorPage() {
                         <option value="1d">Daily (1D)</option>
                       </select>
                       <button
-                        onClick={() => fetchTimeframePrices(selectedTimeframe)}
+                        onClick={() => fetchTimeframePrices(selectedTimeframe, selectedInstrument)}
                         disabled={fetchingTimeframe}
                         className="px-3 rounded-lg border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
                       >

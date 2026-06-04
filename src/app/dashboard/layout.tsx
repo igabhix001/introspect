@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { QueryProvider } from "@/lib/query-client";
@@ -12,6 +12,18 @@ export default function DashboardLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // Trigger welcome email check for trial users on layout mount
+    fetch("/api/user/welcome-email", { method: "POST" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status === "sent") {
+          console.log("[Welcome Email] Welcome email successfully sent via Resend.");
+        }
+      })
+      .catch((err) => console.error("[Welcome Email] Error invoking welcome email trigger:", err));
+  }, []);
 
   return (
     <QueryProvider>

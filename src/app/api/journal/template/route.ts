@@ -9,8 +9,8 @@ export async function GET() {
   
   const sampleRow = [
     "2026-05-27", "NIFTY 50", "long", "22450.00", "22550.00", 
-    "75", "22400.00", "22600.00", "Yes", "Calm", 
-    "Sample trade notes explaining logic", "Bullish", "09:30", "15:15"
+    "75", "yes", "yes", "Yes", "Calm", 
+    "Sample trade notes explaining logic", "Bullish", "not required", "not required"
   ];
 
   const csv = [

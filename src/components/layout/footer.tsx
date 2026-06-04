@@ -26,15 +26,14 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Brand Column */}
           <div className="md:col-span-1 space-y-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="relative w-7 h-7">
-                <Image
-                  src="/logo.png"
-                  alt="INTROSPECT™"
-                  fill
-                  className="object-contain"
-                />
-              </div>
+            <Link href="/" prefetch={false} className="flex items-center gap-2">
+              <Image
+                src="/logo.png"
+                alt="INTROSPECT™"
+                width={28}
+                height={28}
+                className="object-contain h-7 w-7"
+              />
               <span className="font-heading text-base font-bold text-foreground">
                 INTROSPECT
                 <span className="text-xs align-super ml-0.5 opacity-60">™</span>
@@ -57,6 +56,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
+                    prefetch={false}
                     className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}
@@ -74,6 +74,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
+                    prefetch={false}
                     className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}
@@ -91,6 +92,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
+                    prefetch={false}
                     className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
                   >
                     {link.label}

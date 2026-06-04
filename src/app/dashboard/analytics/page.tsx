@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -53,6 +53,11 @@ export default function AnalyticsPage() {
   const { loading: authLoading } = useAuth();
   const { data, isLoading } = useAnalyticsQuery();
   const [dateFilter, setDateFilter] = useState<string>("week");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if ((isLoading && !data) || authLoading) {
     return (
@@ -90,7 +95,8 @@ export default function AnalyticsPage() {
   const totalPnl = filteredTrades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
   const winningTrades = filteredTrades.filter((t: { pnl?: number }) => (t.pnl || 0) > 0);
   const losingTrades = filteredTrades.filter((t: { pnl?: number }) => (t.pnl || 0) < 0);
-  const winRate = filteredTrades.length > 0 ? Math.round((winningTrades.length / filteredTrades.length) * 100) : 0;
+  const closedTrades = filteredTrades.filter((t: { exit_price?: number | null }) => t.exit_price !== null && t.exit_price !== undefined);
+  const winRate = closedTrades.length > 0 ? Math.round((winningTrades.length / closedTrades.length) * 100) : 0;
   const tradeCount = filteredTrades.length;
   const rulesFollowedCount = filteredTrades.filter((t: { followed_plan?: boolean }) => t.followed_plan).length;
   const ruleAdherence = filteredTrades.length > 0 ? Math.round((rulesFollowedCount / filteredTrades.length) * 100) : 0;
@@ -259,6 +265,45 @@ export default function AnalyticsPage() {
     total: stat.total,
   }));
 
+  // Simple Performance Metrics: Weekly Loss, Daily Loss, Mistakes Count & Recommendations (Point 19)
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const weeklyLoss = allTrades
+    .filter((t: { created_at: string; pnl?: number }) => new Date(t.created_at) >= oneWeekAgo && (t.pnl || 0) < 0)
+    .reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
+
+  const todayDateOnly = new Date();
+  todayDateOnly.setHours(0, 0, 0, 0);
+  const dailyLoss = allTrades
+    .filter((t: { created_at: string; pnl?: number }) => {
+      const tradeDate = new Date(t.created_at);
+      tradeDate.setHours(0, 0, 0, 0);
+      return tradeDate.getTime() === todayDateOnly.getTime() && (t.pnl || 0) < 0;
+    })
+    .reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
+
+  const totalMistakesCount = filteredTrades.reduce((sum: number, t: { mistakes?: string[] | null }) => {
+    return sum + (t.mistakes?.length || 0);
+  }, 0);
+
+  // Derive simple action plan recommendations based on the top biases or default rules
+  const simpleRecommendations: string[] = [];
+  if (biasData.length > 0) {
+    biasData.slice(0, 3).forEach((item) => {
+      if (item.bias.toLowerCase().includes("stop")) {
+        simpleRecommendations.push("Always enter stop-loss orders in your terminal immediately at trade execution.");
+      } else if (item.bias.toLowerCase().includes("revenge") || item.bias.toLowerCase().includes("over")) {
+        simpleRecommendations.push("Strictly block new entries once you reach your max daily limit (5 trades or 3% drawdown).");
+      } else {
+        simpleRecommendations.push(`Address ${item.bias}: Review your entry setup parameters before placing execution orders.`);
+      }
+    });
+  }
+  if (simpleRecommendations.length === 0) {
+    simpleRecommendations.push("Maintain strict capital allocation per trade (limit risk to max 1% of total account balance).");
+    simpleRecommendations.push("Journal pre-trade emotional states to build awareness of boredom or urgency spikes.");
+  }
+
   const dateFilterLabel = dateFilter === "today" ? "Today" : dateFilter === "week" ? "7 Days" : dateFilter === "month" ? "30 Days" : "All Time";
 
   return (
@@ -283,6 +328,46 @@ export default function AnalyticsPage() {
           </select>
         </div>
       </div>
+
+      {/* Simple Numerical Performance Scorecard (Point 19) */}
+      <motion.div variants={stagger.item} className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h3 className="font-heading text-sm font-bold">Behavioural & Loss Scorecard</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Today's Total Loss</span>
+            <p className="text-xl font-bold font-mono text-destructive">
+              ₹{Math.abs(dailyLoss).toLocaleString("en-IN")}
+            </p>
+            <span className="text-[9px] text-muted-foreground block mt-1">Sum of negative trades today</span>
+          </div>
+          
+          <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Weekly Drawdown Total</span>
+            <p className="text-xl font-bold font-mono text-destructive">
+              ₹{Math.abs(weeklyLoss).toLocaleString("en-IN")}
+            </p>
+            <span className="text-[9px] text-muted-foreground block mt-1">Sum of negative trades over past 7 days</span>
+          </div>
+
+          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Mistakes Logged ({dateFilterLabel})</span>
+            <p className="text-xl font-bold font-mono text-amber-500">
+              {totalMistakesCount}
+            </p>
+            <span className="text-[9px] text-muted-foreground block mt-1">Total rules deviated or system overrides</span>
+          </div>
+        </div>
+
+        {/* Action Recommendations */}
+        <div className="p-4 rounded-xl bg-success/5 border border-success/10 space-y-2">
+          <span className="text-[10px] text-success uppercase tracking-wider font-bold block">Central Safeguard Recommendations</span>
+          <ul className="list-disc pl-4 text-xs space-y-1 text-muted-foreground">
+            {simpleRecommendations.map((rec, i) => (
+              <li key={i}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+      </motion.div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -323,24 +408,30 @@ export default function AnalyticsPage() {
           </div>
           <div className="h-[250px] min-h-[260px] min-w-0 -ml-2">
             {filteredTrades.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equityCurveData}>
-                  <defs>
-                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", color: "var(--foreground)" }}
-                    formatter={(value: any) => [`₹${value.toLocaleString("en-IN")}`, "Account Balance"]}
-                  />
-                  <Area type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={2} fill="url(#equityGradient)" dot={{ r: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              mounted ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={equityCurveData}>
+                    <defs>
+                      <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", color: "var(--foreground)" }}
+                      formatter={(value: any) => [`₹${value.toLocaleString("en-IN")}`, "Account Balance"]}
+                    />
+                    <Area type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={2} fill="url(#equityGradient)" dot={{ r: 2 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                 No trades recorded for this period.
@@ -412,91 +503,6 @@ export default function AnalyticsPage() {
           </div>
         </motion.div>
       </div>
-
-      {/* Disposition Effect Metric Card */}
-      <motion.div variants={stagger.item} className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-primary/10 rounded-xl">
-            <Clock className="h-6 w-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading text-sm font-bold text-foreground">
-                Disposition Effect: Cutting Winners vs Letting Losers Run
-              </h3>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                dispositionRatio > 1.5 ? "bg-destructive/10 text-destructive" : dispositionRatio > 1.0 ? "bg-amber-500/10 text-amber-500" : "bg-success/10 text-success"
-              }`}>
-                {dispositionRatio > 1.5 ? "🔴 Critical Leak" : dispositionRatio > 1.0 ? "🟡 Warnings" : "🟢 Balanced"}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Calculates your relative average holding time. An industry-standard ratio of &gt; 1.0 indicates that you let losers run while rushing out of winning positions.
-            </p>
-
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div className="bg-muted/30 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase">Avg Win Hold</p>
-                <p className="text-lg font-bold mt-1 text-success">{avgWinHold} mins</p>
-              </div>
-              <div className="bg-muted/30 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase">Avg Loss Hold</p>
-                <p className="text-lg font-bold mt-1 text-destructive">{avgLossHold} mins</p>
-              </div>
-              <div className="bg-muted/30 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase">Hold Ratio</p>
-                <p className="text-lg font-bold mt-1 text-foreground">{dispositionRatio}x</p>
-              </div>
-            </div>
-
-            {dispositionRatio > 1.5 && (
-              <div className="flex items-center gap-2 mt-4 p-3 bg-destructive/5 border border-destructive/20 rounded-xl text-xs text-destructive">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>You hold losing trades {dispositionRatio}x longer than winners. Implement a hard stop-loss and trailing stops to fix this gap.</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Hourly Distribution of Performance (Fatigue Analysis) */}
-      <motion.div variants={stagger.item} className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-heading text-base font-bold">Hourly Performance & Fatigue Radar</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Win rate and Net P&L mapped by the hour of entry</p>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-success rounded-sm opacity-80" /> P&L</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-px border-t-2 border-primary" /> Win Rate</span>
-          </div>
-        </div>
-        <div className="h-[300px] min-h-[260px] min-w-0">
-          {filteredTrades.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hourlyChartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="hourLabel" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
-                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v) => `₹${v}`} />
-                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v) => `${v}%`} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", color: "var(--foreground)" }}
-                  formatter={(value, name) => {
-                    if (name === "pnl") return [`₹${value}`, "Net P&L"];
-                    return [`${value}%`, "Win Rate"];
-                  }}
-                />
-                <Bar yAxisId="left" dataKey="pnl" fill="var(--success)" radius={[4, 4, 0, 0]} opacity={0.6} />
-                <Line yAxisId="right" type="monotone" dataKey="winRate" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              No trade data available to plot hourly performance.
-            </div>
-          )}
-        </div>
-      </motion.div>
 
       {/* Grid: Cognitive Bias Frequency + Emotion Correlation */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

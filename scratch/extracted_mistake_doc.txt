@@ -1,0 +1,161 @@
+
+Daily View: Total Mistakes + Corrective Measures
+After user finishes journaling, show this single summary screen:
+
+text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 TODAY'S TRADE JOURNAL - [DATE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Trades logged: 4     Winners: 1     Losers: 3     P&L: -2.4%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 TOTAL MISTAKES TODAY: 4
+┌─────────────────────────────────────────────────────┐
+│ # │ MISTAKE              │ TRADE    │ SEVERITY      │
+├─────────────────────────────────────────────────────┤
+│ 1 │ Risk per trade >1%   │ AAPL     │ 🔴 Critical   │
+│ 2 │ No stop loss set     │ NVDA     │ 🟠 High        │
+│ 3 │ Missing exit time    │ MSFT     │ 🟡 Medium      │
+│ 4 │ Overtrading          │ Day (5/3)│ 🟠 High        │
+└─────────────────────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 CORRECTIVE MEASURES
+┌─────────────────────────────────────────────────────┐
+│ MISTAKE                 │ HOW TO FIX TOMORROW       │
+├─────────────────────────────────────────────────────┤
+│ Risk per trade >1%      │ Use formula:              │
+│                         │ (1% × capital) ÷ stop_dist │
+│                         │ = max shares              │
+├─────────────────────────────────────────────────────┤
+│ No stop loss set        │ Make stop field mandatory │
+│                         │ Preview stop before entry │
+├─────────────────────────────────────────────────────┤
+│ Missing exit time       │ Log exit immediately      │
+│                         │ Or set reminder alert     │
+├─────────────────────────────────────────────────────┤
+│ Overtrading (5 trades)  │ Planned = 3 trades        │
+│                         │ Stop after 3, no例外      │
+└─────────────────────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 AI RECOMMENDATION FOR TOMORROW
+"Your #1 leak is position sizing. Use the formula above.
+Also, 80% of your losses happen on Trade #4 and #5 — 
+stopping at 3 trades would have saved you 1.8% today."
+📝 REFLECTION QUESTION
+"If you had stopped after 3 trades today, what would your P&L be?"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ I have reviewed all mistakes and corrective measures
+[CLOSE]  [EXPORT PDF]  [SHARE WITH COACH]
+
+Weekly View: Total Mistakes + Corrective Measures
+Shown every Sunday (or user-selected day):
+
+text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📆 WEEKLY TRADE JOURNAL SUMMARY - [WEEK 12]
+   Mar 10 - Mar 16
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total trades: 22     Winners: 9 (41%)     Losers: 13 (59%)
+Total P&L: -3.8%     Best day: Wed (+1.2%)     Worst day: Tue (-2.4%)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 TOTAL MISTAKES THIS WEEK: 14
+┌─────────────────────────────────────────────────────────┐
+│ MISTAKE TYPE              │ COUNT │ TREND VS LAST WEEK │
+├─────────────────────────────────────────────────────────┤
+│ Risk per trade >1%        │ 5     │ 🔴 +2              │
+│ No stop loss set          │ 3     │ 🟢 -1              │
+│ Overtrading               │ 2     │ 🔴 +1              │
+│ Missing critical fields   │ 3     │ 🟡 same            │
+│ Revenge trading           │ 1     │ 🟢 -1              │
+└─────────────────────────────────────────────────────────┘
+By day:
+┌──────────┬────────────────────────────────────┐
+│ Monday   │ ████ (4 mistakes)                  │
+│ Tuesday  │ ██████ (6 mistakes) 🔴 worst day   │
+│ Wednesday│ ██ (2 mistakes) 🟢 best day        │
+│ Thursday │ ██ (2 mistakes)                    │
+│ Friday   │ ████ (0 mistakes today? Check)     │
+└──────────┴────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 CORRECTIVE MEASURES FOR NEXT WEEK
+┌─────────────────────────────────────────────────────────┐
+│ TOP MISTAKE          │ ACTION PLAN                      │
+├─────────────────────────────────────────────────────────┤
+│ Risk per trade >1%   │ 1. Pre-calculate size daily      │
+│ (5 times, critical)  │ 2. Reduce size by 20% as buffer  │
+│                      │ 3. Review before each entry      │
+├─────────────────────────────────────────────────────────┤
+│ Overtrading          │ 1. Set hard limit: 3 trades/day  │
+│ (Tue & Thu)          │ 2. Lock journal after 3 trades   │
+│                      │ 3. Review before 4th trade       │
+├─────────────────────────────────────────────────────────┤
+│ Missing fields       │ 1. Use template with required *  │
+│ (exit time, setup)   │ 2. Check completeness before save│
+└─────────────────────────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 AI WEEKLY RECOMMENDATION
+"Focus on ONE thing next week: Position sizing.
+You exceeded 1% risk on 5 trades. Fixing this alone would have 
+saved you 2.1% (more than your total loss for the week).
+Tuesdays are your worst day. Consider paper trading on Tuesdays 
+until you fix the risk issue."
+🎯 WEEKLY GOAL (pick one)
+☐ Zero "risk >1%" mistakes next week
+☐ Zero "no stop loss" mistakes  
+☐ Max 3 trades per day, every day
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ I have reviewed weekly mistakes and corrective measures
+[CLOSE]  [EXPORT PDF]  [SET WEEKLY GOAL]  [RESET FOR NEXT WEEK]
+
+
+
+
+Simple Summary Card (Optional Quick View)
+For users who want less detail:
+text
+📊 TODAY: 4 trades | 4 mistakes | -2.4%
+Top fix: Use position size formula
+Stop after 3 trades
+[View full report]
+text
+📆 WEEK: 22 trades | 14 mistakes | -3.8%
+Top fix: Risk >1% happened 5 times
+Focus on position sizing next week
+[View full report]
+
+Data Structure for Summary Generation
+json
+{
+  "date": "2024-03-10",
+  "total_trades": 4,
+  "total_mistakes": 4,
+  "mistakes_by_type": [
+    {"type": "risk_per_trade_breached", "count": 1, "severity": "critical"},
+    {"type": "no_stop_loss", "count": 1, "severity": "high"},
+    {"type": "missing_exit_time", "count": 1, "severity": "medium"},
+    {"type": "overtrading", "count": 1, "severity": "high"}
+  ],
+  "corrective_measures": [
+    {"mistake": "risk_per_trade_breached", "action": "Use formula: (1% × capital) ÷ stop_distance"},
+    {"mistake": "no_stop_loss", "action": "Make stop field mandatory"},
+    {"mistake": "overtrading", "action": "Stop after planned trades"}
+  ],
+  "ai_recommendation": "Your #1 leak is position sizing...",
+  "reflection_question": "If you had stopped after 3 trades today..."
+}
+
+Summary: Key Principles
+Principle
+Daily
+Weekly
+Total mistakes count
+✓
+✓
+List each mistake
+✓
+By type + trend
+Corrective measure per mistake
+✓
+Top 3 only
+AI recommendation
+For tomorrow
+For next week

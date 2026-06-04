@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { assessmentSchema } from "@/lib/validation/schemas";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 // ──── IMV_Master Scoring Engine (from client's Excel reference) ────
 // Questions q1-q12, scale 1-5. Weights per client spec.
 // Response meanings: 1=Strong discipline, 2=Mostly disciplined, 3=Situational bias, 4=Frequent interference, 5=Strong emotional dominance
