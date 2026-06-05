@@ -120,7 +120,7 @@ export default function SignupPage() {
         password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: `${siteUrl}/auth/login?verified=true`,
+          emailRedirectTo: `${siteUrl}/auth/callback`,
         },
       });
 
@@ -133,7 +133,9 @@ export default function SignupPage() {
       if (data.user) {
         // Track successful signup in GA4
         trackSignUp('email');
-        setSuccess(true);
+        // Redirect to verify page with email in URL
+        router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
+        return;
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");

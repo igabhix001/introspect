@@ -1,43 +1,84 @@
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowLeft, Shield, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Shield, RefreshCw, AlertTriangle, Loader2, Mail, Check } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ParticleField } from "@/components/ui/particle-field";
+import { createClient } from "@/lib/supabase/client";
 
 function VerifyContent() {
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [countdown, setCountdown] = useState(45);
+  const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const email = searchParams.get("email") || "";
+
   useEffect(() => {
-    // Check for error in URL (e.g., expired link)
+    // Check for error in URL (e.g., expired link from Supabase)
     const errorParam = searchParams.get("error");
     const errorDesc = searchParams.get("error_description");
-    
     if (errorParam) {
-      setError(errorDesc || "The link is invalid or has expired.");
+      setError(errorDesc || "The verification link is invalid or has expired.");
     }
   }, [searchParams]);
 
   useEffect(() => {
-    if (countdown > 0 && !error) {
+    if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (countdown === 0) {
+    } else {
       setCanResend(true);
     }
-  }, [countdown, error]);
+  }, [countdown]);
 
-  // Show error state if link expired
+  const handleResend = async () => {
+    if (!email) {
+      setError("Email address not found. Please go back and sign up again.");
+      return;
+    }
+    setResending(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (typeof window !== "undefined"
+          ? window.location.origin
+          : "https://www.intradaymindview.com");
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: `${siteUrl}/auth/callback`,
+        },
+      });
+
+      if (resendError) {
+        setError(resendError.message);
+      } else {
+        setResendSuccess(true);
+        setCountdown(60);
+        setCanResend(false);
+        setTimeout(() => setResendSuccess(false), 4000);
+      }
+    } catch {
+      setError("Failed to resend. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Show error state if link expired or invalid
   if (error) {
     return (
       <AuroraBackground>
@@ -62,15 +103,13 @@ function VerifyContent() {
                 <AlertTriangle className="h-8 w-8 text-destructive" />
               </div>
               <h2 className="font-heading text-2xl font-bold mb-2">Link Expired</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                {error}
-              </p>
+              <p className="text-sm text-muted-foreground mb-6">{error}</p>
               <div className="space-y-3">
                 <Link
-                  href="/auth/forgot-password"
+                  href="/auth/signup"
                   className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl transition-all duration-300"
                 >
-                  Request New Link
+                  Try Signing Up Again
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -86,41 +125,6 @@ function VerifyContent() {
       </AuroraBackground>
     );
   }
-
-  const handleChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
-    setOtp(newOtp);
-
-    if (value && index < 5) {
-      inputs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      inputs.current[index - 1]?.focus();
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    const newOtp = [...otp];
-    pasted.split("").forEach((char, i) => {
-      newOtp[i] = char;
-    });
-    setOtp(newOtp);
-    const nextEmpty = newOtp.findIndex((v) => !v);
-    inputs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus();
-  };
-
-  const handleResend = () => {
-    setCountdown(45);
-    setCanResend(false);
-  };
 
   return (
     <AuroraBackground>
@@ -161,76 +165,70 @@ function VerifyContent() {
                 </motion.span>
               </motion.div>
 
-              <h2 className="font-heading text-2xl font-bold mb-2">Verify Your Email</h2>
+              <h2 className="font-heading text-2xl font-bold mb-2">Check Your Email</h2>
               <p className="text-sm text-muted-foreground">
-                We&apos;ve sent a 6-digit code to{" "}
-                <span className="text-foreground font-medium">your@email.com</span>
+                We&apos;ve sent a verification link to{" "}
+                {email ? (
+                  <span className="text-foreground font-medium">{email}</span>
+                ) : (
+                  <span className="text-foreground font-medium">your inbox</span>
+                )}
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-              {/* OTP Input */}
-              <div className="flex justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
-                {otp.map((digit, i) => (
-                  <motion.input
-                    key={i}
-                    ref={(el) => { inputs.current[i] = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleChange(i, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(i, e)}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 + i * 0.05 }}
-                    className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-xl font-bold rounded-xl border transition-all duration-200 bg-background/50 focus:outline-none ${
-                      digit
-                        ? "border-success/40 ring-1 ring-success/20"
-                        : "border-border focus:border-success/40 focus:ring-1 focus:ring-success/20"
-                    }`}
-                  />
-                ))}
-              </div>
+            {/* Instructions */}
+            <div className="bg-muted/30 border border-border/50 rounded-xl p-4 mb-6 space-y-2.5">
+              {[
+                "Open the email from INTROSPECT™",
+                'Click the "Confirm your email" button',
+                "You will be automatically signed in",
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-success text-[10px] font-bold">{i + 1}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{step}</p>
+                </div>
+              ))}
+            </div>
 
-              {/* Verify Button */}
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.25)] hover:shadow-[0_0_30px_rgba(34,197,94,0.35)] transition-all duration-300 cursor-pointer group"
-              >
-                Verify Code
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </button>
-            </form>
-
-            {/* Resend */}
-            <div className="text-center mt-6">
-              {canResend ? (
+            {/* Resend section */}
+            <div className="text-center">
+              {resendSuccess ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center justify-center gap-2 text-success text-sm font-medium"
+                >
+                  <Check className="h-4 w-4" />
+                  New verification email sent!
+                </motion.div>
+              ) : canResend ? (
                 <button
                   onClick={handleResend}
-                  className="inline-flex items-center gap-1.5 text-sm text-success hover:text-success/80 transition-colors cursor-pointer"
+                  disabled={resending}
+                  className="inline-flex items-center gap-1.5 text-sm text-success hover:text-success/80 transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Resend code
+                  {resending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  {resending ? "Sending..." : "Resend verification email"}
                 </button>
               ) : (
                 <p className="text-sm text-muted-foreground/60">
-                  Didn&apos;t receive the code?{" "}
+                  Didn&apos;t receive it? Resend in{" "}
                   <span className="text-muted-foreground font-mono">
-                    0:{countdown.toString().padStart(2, "0")}
+                    {countdown}s
                   </span>
                 </p>
               )}
             </div>
 
-            <div className="text-center mt-4">
-              <Link
-                href="/auth/forgot-password"
-                className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              >
-                Change email address
-              </Link>
-            </div>
+            <p className="text-center text-xs text-muted-foreground/50 mt-4">
+              Check your spam folder if you don&apos;t see it within 2 minutes.
+            </p>
           </div>
 
           <div className="flex items-center justify-between mt-6">

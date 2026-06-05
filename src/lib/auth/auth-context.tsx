@@ -1,17 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, ReactNode, useMemo } from "react";
-import type { User } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types/database";
-
-let supabaseInstance: any = null;
-
-async function getSupabase() {
-  if (supabaseInstance) return supabaseInstance;
-  const { createClient } = await import("@/lib/supabase/client");
-  supabaseInstance = createClient();
-  return supabaseInstance;
-}
 
 interface AuthContextType {
   user: User | null;
@@ -33,27 +25,61 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
-// Module-level cache for auth state to prevent loading flash on navigation
-let cachedAuthState: {
+/**
+ * Reads/writes auth cache from sessionStorage (tab-scoped, not shared across requests).
+ * Prevents loading flash on in-app navigation without risking cross-user state leakage.
+ */
+const SESSION_CACHE_KEY = "introspect_auth_cache";
+
+interface CachedAuth {
   user: User | null;
   profile: Profile | null;
   hasActiveSubscription: boolean | null;
   initialized: boolean;
-} = {
-  user: null,
-  profile: null,
-  hasActiveSubscription: null,
-  initialized: false,
-};
+}
+
+function readCache(): CachedAuth {
+  if (typeof window === "undefined") {
+    return { user: null, profile: null, hasActiveSubscription: null, initialized: false };
+  }
+  try {
+    const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
+    if (raw) return JSON.parse(raw) as CachedAuth;
+  } catch {
+    // ignore parse errors
+  }
+  return { user: null, profile: null, hasActiveSubscription: null, initialized: false };
+}
+
+function writeCache(state: CachedAuth) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function clearCache() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(SESSION_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialize from cache to prevent loading flash on navigation within dashboard
-  const [user, setUser] = useState<User | null>(cachedAuthState.user);
-  const [profile, setProfile] = useState<Profile | null>(cachedAuthState.profile);
-  const [loading, setLoading] = useState(!cachedAuthState.initialized);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(cachedAuthState.hasActiveSubscription);
-  
-  // Refs for tracking latest state in persistent event listener closure
+  // Read from sessionStorage on mount for instant hydration (tab-scoped, safe)
+  const initialCache = readCache();
+
+  const [user, setUser] = useState<User | null>(initialCache.user);
+  const [profile, setProfile] = useState<Profile | null>(initialCache.profile);
+  const [loading, setLoading] = useState(!initialCache.initialized);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(
+    initialCache.hasActiveSubscription
+  );
+
   const userRef = useRef<User | null>(user);
   const profileRef = useRef<Profile | null>(profile);
 
@@ -62,118 +88,110 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileRef.current = profile;
   }, [user, profile]);
 
-  // Refs to prevent race conditions — NEVER put these in useEffect deps
   const mountedRef = useRef(true);
-  const initDoneRef = useRef(cachedAuthState.initialized);
-  const hydratingRef = useRef(false); // Prevent concurrent hydrations
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track loading timeout
+  // Mutex: prevents concurrent hydrations
+  const hydrationStartedRef = useRef(initialCache.initialized);
+  const hydrationDoneRef = useRef(initialCache.initialized);
 
-  // Update cache whenever state changes
+  // Keep sessionStorage cache in sync with state
   useEffect(() => {
-    cachedAuthState = {
-      user,
-      profile,
-      hasActiveSubscription,
-      initialized: !loading,
-    };
+    writeCache({ user, profile, hasActiveSubscription, initialized: !loading });
   }, [user, profile, hasActiveSubscription, loading]);
 
-  const fetchProfile = async (userId: string, userEmail?: string) => {
+  /**
+   * Fetch profile via server API route (uses admin client to bypass RLS).
+   * Falls back to direct Supabase query with user JWT if API fails.
+   * Profile creation is NOT done here — that happens in /auth/callback (server-side).
+   */
+  const fetchProfile = async (userId: string, userEmail?: string): Promise<void> => {
     try {
-      const supabase = await getSupabase();
+      // Primary: server route with admin client — guarantees correct `role` field
+      const res = await fetch("/api/user/profile", {
+        method: "GET",
+        credentials: "include", // Send session cookies for auth verification
+        signal: AbortSignal.timeout(5000), // 5s timeout to prevent hanging
+      });
 
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.id && mountedRef.current) {
+          setProfile(data as Profile);
+          return;
+        }
+      }
+
+      // Fallback: direct Supabase query (may not have `role` if RLS blocks it)
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
 
-      if (error) {
-        console.error("[AuthProvider] Profile fetch error details:", error);
-        // Handle RLS infinite recursion (42P17)
-        if (error.code === "42P17" || error.code === "PGRST301") {
-          const emailLower = userEmail?.toLowerCase() || "";
-          const fallback = {
-            id: userId, email: userEmail || "",
-            role: "user",
-            full_name: null, trading_capital: 0, trading_style: "intraday",
-            is_suspended: false, referral_code: null,
-            created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-          } as unknown as Profile;
-          if (mountedRef.current) setProfile(fallback);
-          return;
-        }
-        // Profile row doesn't exist — create it
-        if (error.code === "PGRST116") {
-          console.log("[AuthProvider] Profile not found, creating new profile row.");
-          const { data: newProfile, error: upsertError } = await supabase
-            .from("profiles")
-            .upsert({ id: userId, role: "user", email: userEmail })
-            .select("*")
-            .single();
-          if (upsertError) {
-            console.error("[AuthProvider] Failed to create new profile row:", upsertError);
-          } else if (mountedRef.current) {
-            setProfile(newProfile as Profile | null);
-          }
-          return;
-        }
+      if (!error && data && mountedRef.current) {
+        setProfile(data as Profile);
+        return;
       }
-      if (mountedRef.current) setProfile(data as Profile | null);
+
+      console.error("[AuthProvider] Profile fetch failed:", error?.code);
     } catch (err) {
       console.error("[AuthProvider] Exception during profile fetch:", err);
-      // Absolute fallback — never crash the app
-      if (mountedRef.current) {
-        const emailLower = userEmail?.toLowerCase() || "";
-        setProfile({
-          id: userId, email: userEmail || "",
-          role: "user",
-        } as unknown as Profile);
-      }
+    }
+
+    // Final fallback: minimal profile — user can still use the app but no admin features
+    if (mountedRef.current) {
+      setProfile({
+        id: userId,
+        email: userEmail || "",
+        role: "user",
+      } as unknown as Profile);
     }
   };
 
   const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id, user.email || undefined);
+    if (user) await fetchProfile(user.id, user.email ?? undefined);
   };
 
-  // ── Single useEffect, empty deps, runs ONCE ──
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading > 1.5s no matter what (reduced for faster navigation)
-    // This is critical to prevent infinite loading when switching between admin/user dashboards
+    // Safety net: force loading=false after 5s regardless of network conditions
     const safetyTimer = setTimeout(() => {
-      if (mountedRef.current && loading) {
+      if (mountedRef.current && !hydrationDoneRef.current) {
         console.warn("[AuthProvider] Safety timer fired — forcing loading=false");
+        hydrationDoneRef.current = true;
         setLoading(false);
-        hydratingRef.current = false; // Also reset hydrating flag
       }
-    }, 1500);
-    loadingTimeoutRef.current = safetyTimer;
+    }, 5000);
 
     /**
-     * Helper: given a valid user, hydrate profile + subscription in parallel.
-     * Does NOT touch `loading` — the caller decides when to clear it.
-     * Uses hydratingRef to prevent concurrent hydrations that cause race conditions.
-     * IMPORTANT: If hydration is already in progress, still ensures loading clears.
+     * Core hydration: fetch profile + subscription for a validated user.
+     * Mutex (hydrationStartedRef) prevents concurrent duplicate hydrations.
      */
     const hydrateUser = async (u: User) => {
       if (!mountedRef.current) return;
-      
-      // Prevent concurrent hydrations - this is critical for mobile stability
-      if (hydratingRef.current) {
-        // Just update user object — the in-flight hydration will clear loading
-        setUser(u);
+
+      // Deduplication: if already hydrating, and same user + profile exists → just update user
+      if (hydrationStartedRef.current) {
+        if (userRef.current?.id === u.id && profileRef.current) {
+          setUser(u);
+          if (!hydrationDoneRef.current) {
+            hydrationDoneRef.current = true;
+            setLoading(false);
+          }
+        }
         return;
       }
-      
-      hydratingRef.current = true;
+
+      hydrationStartedRef.current = true;
       setUser(u);
 
       try {
-        const supabase = await getSupabase();
-        // Subscription check with aggressive 2s timeout
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+
+        // Subscription check with 3s timeout
         const subPromise = supabase
           .from("subscriptions")
           .select("id")
@@ -184,22 +202,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         const [, subResult] = await Promise.allSettled([
-          fetchProfile(u.id, u.email || undefined),
-          Promise.race([subPromise, new Promise<null>((r) => setTimeout(() => r(null), 2000))]),
+          fetchProfile(u.id, u.email ?? undefined),
+          Promise.race([
+            subPromise,
+            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+          ]),
         ]);
 
         if (!mountedRef.current) return;
-        const sub =
+
+        const subData =
           subResult.status === "fulfilled" &&
-          subResult.value &&
+          subResult.value !== null &&
           typeof subResult.value === "object" &&
           "data" in subResult.value
             ? (subResult.value as { data: unknown }).data
             : null;
-        setHasActiveSubscription(!!sub);
+
+        setHasActiveSubscription(!!subData);
       } finally {
-        hydratingRef.current = false;
-        if (mountedRef.current) {
+        if (mountedRef.current && !hydrationDoneRef.current) {
+          hydrationDoneRef.current = true;
           setLoading(false);
         }
       }
@@ -210,135 +233,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setProfile(null);
       setHasActiveSubscription(false);
+      hydrationStartedRef.current = false;
+      hydrationDoneRef.current = true;
+      clearCache();
     };
 
-    // ── 1. Initial auth check (runs once) ──
-    const initAuth = async () => {
-      if (initDoneRef.current) return;
-      initDoneRef.current = true;
+    let activeSubscription: ReturnType<SupabaseClient["auth"]["onAuthStateChange"]>["data"]["subscription"] | null = null;
 
-      try {
-        const supabase = await getSupabase();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mountedRef.current) return;
-
-        if (!session?.user) {
-          clearAuth();
-          setLoading(false);
-          return;
-        }
-
-        await hydrateUser(session.user);
-      } catch {
-        if (mountedRef.current) { clearAuth(); setLoading(false); }
-      }
-    };
-
-    // Delay initialization to let initial paint complete without CPU contention
-    const delayTimer = setTimeout(() => {
-      initAuth();
-    }, 100);
-
-    // ── 2. Auth state listener — handles sign-in, sign-out, token refresh ──
-    // CRITICAL: This listener should NOT cause loading states after initial load
-    let activeSubscription: any = null;
-    
     const initListener = async () => {
-      const supabase = await getSupabase();
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
       if (!mountedRef.current) return;
+
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event: any, session: any) => {
+        async (event: AuthChangeEvent, session: Session | null) => {
           if (!mountedRef.current) return;
 
-          // SIGNED_OUT: Clear everything
-          if (event === "SIGNED_OUT") {
-            clearAuth();
-            setLoading(false);
-            return;
-          }
-
-          // TOKEN_REFRESHED: Just update user object silently - NO loading state change
-          if (event === "TOKEN_REFRESHED" && session?.user) {
-            setUser(session.user);
-            return;
-          }
-
-          // USER_UPDATED: Update user object silently
-          if (event === "USER_UPDATED" && session?.user) {
-            setUser(session.user);
-            return;
-          }
-
-          // SIGNED_IN: Full hydration only for actual sign-in (not token refresh)
-          if (event === "SIGNED_IN" && session?.user) {
-            // Only hydrate if we don't already have this user or if the profile is missing
-            if (!userRef.current || userRef.current.id !== session.user.id || !profileRef.current) {
-              await hydrateUser(session.user);
-            } else {
-              setUser(session.user);
-              if (mountedRef.current) setLoading(false);
-            }
-            return;
-          }
-
-          // INITIAL_SESSION: Always ensure loading clears even if hydration is skipped
-          if (event === "INITIAL_SESSION") {
-            if (session?.user) {
-              // Only hydrate if initAuth hasn't already done it
-              if ((!userRef.current || !profileRef.current) && !hydratingRef.current) {
-                await hydrateUser(session.user);
-              } else if (!hydratingRef.current) {
-                if (mountedRef.current) setLoading(false);
-              }
-            } else {
+          switch (event) {
+            case "SIGNED_OUT":
               clearAuth();
-              if (mountedRef.current) setLoading(false);
-            }
+              setLoading(false);
+              break;
+
+            case "TOKEN_REFRESHED":
+              if (session?.user) setUser(session.user);
+              break;
+
+            case "USER_UPDATED":
+              if (session?.user) {
+                setUser(session.user);
+                // Re-fetch profile in case email/metadata changed
+                await fetchProfile(session.user.id, session.user.email ?? undefined);
+              }
+              break;
+
+            case "INITIAL_SESSION":
+              // Primary hydration trigger for all page loads
+              if (session?.user) {
+                await hydrateUser(session.user);
+              } else {
+                clearAuth();
+                setLoading(false);
+              }
+              break;
+
+            case "SIGNED_IN":
+              if (session?.user) {
+                const isDifferentUser = userRef.current?.id !== session.user.id;
+                const missingProfile = !profileRef.current;
+                if (isDifferentUser || missingProfile) {
+                  hydrationStartedRef.current = false; // Allow fresh hydration for new sign-in
+                  await hydrateUser(session.user);
+                } else {
+                  setUser(session.user);
+                  if (!hydrationDoneRef.current) {
+                    hydrationDoneRef.current = true;
+                    setLoading(false);
+                  }
+                }
+              }
+              break;
+
+            default:
+              break;
           }
         }
       );
+
       if (!mountedRef.current) {
         subscription.unsubscribe();
       } else {
         activeSubscription = subscription;
       }
     };
+
     initListener();
 
     return () => {
       mountedRef.current = false;
       clearTimeout(safetyTimer);
-      clearTimeout(delayTimer);
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-      if (activeSubscription) {
-        activeSubscription.unsubscribe();
-      }
+      activeSubscription?.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // ← EMPTY deps — runs once, never re-runs
+  }, []);
 
   const signOut = async () => {
     try {
-      const supabase = await getSupabase();
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
       await supabase.auth.signOut();
     } catch (err) {
-      console.error("Supabase signOut error, forcing local logout:", err);
+      console.error("[AuthProvider] signOut error:", err);
     }
     setUser(null);
     setProfile(null);
     setHasActiveSubscription(false);
-    if (typeof window !== "undefined") {
-      // Clear all supabase local storage keys
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const key = window.localStorage.key(i);
-        if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
-          window.localStorage.removeItem(key);
-        }
-      }
-    }
-    window.location.href = "/";
+    hydrationStartedRef.current = false;
+    hydrationDoneRef.current = false;
+    clearCache();
+    // Redirect via full navigation to ensure all client state is reset
+    window.location.replace("/");
   };
 
   const calculatedIsAdmin = profile?.role === "admin";
@@ -350,6 +344,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdmin: calculatedIsAdmin,
+        // Admins always have "active subscription" access
         hasActiveSubscription: calculatedIsAdmin ? true : hasActiveSubscription,
         signOut,
         refreshProfile,
