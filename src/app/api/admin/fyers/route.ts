@@ -6,7 +6,6 @@ import { NextRequest, NextResponse } from "next/server";
 async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  if (user.email === "intradaymindview@gmail.com") return user;
   try {
     const adminDb = createAdminClient();
     const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();

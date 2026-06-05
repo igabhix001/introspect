@@ -8,7 +8,6 @@ import path from "path";
 async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  if (user.email === "intradaymindview@gmail.com") return user;
   
   try {
     // Check role in database
@@ -71,6 +70,7 @@ async function handleMigrationRequest(request: NextRequest) {
     const migrationsDir = path.join(process.cwd(), "supabase");
     const mig11Path = path.join(migrationsDir, "migration_011_add_market_sentiment.sql");
     const mig12Path = path.join(migrationsDir, "migration_012_ai_limits.sql");
+    const mig13Path = path.join(migrationsDir, "migration_013_ai_cost_tracking.sql");
 
     // Execute migration 011 if it exists
     if (fs.existsSync(mig11Path)) {
@@ -90,6 +90,16 @@ async function handleMigrationRequest(request: NextRequest) {
       results.push("migration_012_ai_limits.sql successfully applied.");
     } else {
       results.push("migration_012_ai_limits.sql not found.");
+    }
+
+    // Execute migration 013 if it exists
+    if (fs.existsSync(mig13Path)) {
+      console.log("Applying migration 013...");
+      const sql = fs.readFileSync(mig13Path, "utf8");
+      await client.query(sql);
+      results.push("migration_013_ai_cost_tracking.sql successfully applied.");
+    } else {
+      results.push("migration_013_ai_cost_tracking.sql not found.");
     }
 
     await client.end();

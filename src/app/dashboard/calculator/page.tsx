@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calculator,
@@ -22,6 +22,8 @@ import {
   Clock,
   Shield,
   Zap,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 
 export default function CalculatorPage() {
@@ -41,6 +43,23 @@ export default function CalculatorPage() {
   // Timeframe Sizing States
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("15m");
   const [selectedInstrument, setSelectedInstrument] = useState<string>("Nifty 50");
+  const [customInstrument, setCustomInstrument] = useState<string>("");
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboboxRef = useRef<HTMLDivElement>(null);
+
+  // Close combobox when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+        setComboboxOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const [fetchingTimeframe, setFetchingTimeframe] = useState(false);
   const [timeframeData, setTimeframeData] = useState<{ close: number; low: number; high: number } | null>(null);
 
@@ -86,21 +105,133 @@ export default function CalculatorPage() {
   const handleInstrumentChange = (inst: string) => {
     setSelectedInstrument(inst);
     if (inst === "Nifty 50") setAtrVal("80");
-    else if (inst === "Bank Nifty") setAtrVal("250");
+    else if (inst === "Nifty Bank" || inst === "Bank Nifty") setAtrVal("250");
     else if (inst === "Fin Nifty") setAtrVal("100");
     else if (inst === "Midcap Nifty") setAtrVal("60");
+    else if (inst === "Nifty Next 50") setAtrVal("120");
+    else if (inst === "Custom") setAtrVal(""); // User sets their own ATR
   };
 
+  // Load preferences from localStorage on mount & fetch default instrument
   useEffect(() => {
+    async function loadDefaults() {
+      try {
+        const res = await fetch("/api/pricing");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.defaultInstrument) {
+            const standardInstruments = ["Nifty 50", "Nifty Bank", "Bank Nifty", "Fin Nifty", "Midcap Nifty", "Nifty Next 50"];
+            if (standardInstruments.includes(data.defaultInstrument)) {
+              setSelectedInstrument(data.defaultInstrument);
+              if (data.defaultInstrument === "Nifty 50") setAtrVal("80");
+              else if (data.defaultInstrument === "Nifty Bank" || data.defaultInstrument === "Bank Nifty") setAtrVal("250");
+              else if (data.defaultInstrument === "Fin Nifty") setAtrVal("100");
+              else if (data.defaultInstrument === "Midcap Nifty") setAtrVal("60");
+              else if (data.defaultInstrument === "Nifty Next 50") setAtrVal("120");
+            } else {
+              setSelectedInstrument("Custom");
+              setCustomInstrument(data.defaultInstrument);
+              setAtrVal("");
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (typeof window !== "undefined") {
+      const savedMethod = localStorage.getItem("introspect_default_sl_method");
+      if (savedMethod === "manual" || savedMethod === "atr" || savedMethod === "timeframe") {
+        setSlMethod(savedMethod);
+      }
+      const savedTimeframe = localStorage.getItem("introspect_default_timeframe");
+      if (savedTimeframe) {
+        setSelectedTimeframe(savedTimeframe);
+      }
+    }
+    loadDefaults();
     fetchMarketSentiment();
   }, []);
+
+  const handleSlMethodChange = (method: "manual" | "atr" | "timeframe") => {
+    setSlMethod(method);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("introspect_default_sl_method", method);
+    }
+  };
+
+  const handleTimeframeChange = (tf: string) => {
+    setSelectedTimeframe(tf);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("introspect_default_timeframe", tf);
+    }
+  };
 
   // Fetch timeframe prices when method, timeframe, direction, or instrument changes
   useEffect(() => {
     if (slMethod === "timeframe") {
-      fetchTimeframePrices(selectedTimeframe, selectedInstrument);
+      const inst = selectedInstrument === "Custom" ? customInstrument : selectedInstrument;
+      if (inst) {
+        fetchTimeframePrices(selectedTimeframe, inst);
+      }
     }
-  }, [slMethod, selectedTimeframe, tradeDirection, selectedInstrument]);
+  }, [slMethod, selectedTimeframe, tradeDirection, selectedInstrument, customInstrument]);
+
+  const comboboxOptions = useMemo(() => {
+    const standardOptions = ["Nifty 50", "Nifty Bank", "Fin Nifty", "Nifty Next 50", "Midcap Nifty"];
+    const query = searchQuery.trim().toLowerCase();
+    
+    // If query is empty or matches the currently selected instrument (i.e. focused/opened without typing yet),
+    // show all standard options plus Custom.
+    const isInitialFocus = selectedInstrument.toLowerCase() === query;
+    if (query === "" || isInitialFocus) {
+      return [...standardOptions, "Custom"];
+    }
+    
+    const filtered = standardOptions.filter(opt => opt.toLowerCase().includes(query));
+    
+    // Add custom option if query does not match any standard options
+    const matchesAny = standardOptions.some(opt => opt.toLowerCase() === query);
+    if (!matchesAny) {
+      return [...filtered, "Custom"];
+    }
+    
+    return filtered;
+  }, [searchQuery, selectedInstrument]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!comboboxOpen) {
+      if (e.key === "ArrowDown" || e.key === "Enter") {
+        setComboboxOpen(true);
+        return;
+      }
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev + 1) % comboboxOptions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev - 1 + comboboxOptions.length) % comboboxOptions.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (comboboxOptions.length > 0) {
+        const selected = comboboxOptions[highlightedIndex];
+        if (selected === "Custom") {
+          const symbol = searchQuery.trim() !== "" ? searchQuery.trim().toUpperCase() : "";
+          setSelectedInstrument("Custom");
+          if (symbol) {
+            setCustomInstrument(symbol);
+          }
+          handleInstrumentChange("Custom");
+        } else {
+          handleInstrumentChange(selected);
+        }
+        setComboboxOpen(false);
+      }
+    } else if (e.key === "Escape") {
+      setComboboxOpen(false);
+    }
+  };
 
   // Compute dynamic stop loss price
   const computedStopLossPrice = useMemo(() => {
@@ -185,7 +316,7 @@ export default function CalculatorPage() {
           : { label: "Aggressive", color: "text-destructive", bg: "bg-destructive/10" };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Page Header */}
       <div className="border-b border-border/50 pb-4">
         <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
@@ -196,9 +327,9 @@ export default function CalculatorPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left Side: Market Sentiment Panel */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Column 1: Market Sentiment Panel */}
+        <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
               <div className="flex items-center gap-2">
@@ -391,10 +522,9 @@ export default function CalculatorPage() {
           </div>
         </div>
 
-        {/* Right Side: Position Calculator Input Form & Result */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
-            <div className="flex items-center justify-between">
+        {/* Column 2: Sizing Parameters Form */}
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
+          <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Calculator className="h-5 w-5 text-primary" />
@@ -453,19 +583,113 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            {/* Trading Instrument Selector */}
-            <div>
+            {/* Trading Instrument Selector (Searchable Autocomplete Combobox) */}
+            <div className="relative" ref={comboboxRef}>
               <label className="text-xs font-medium mb-1.5 block">Trading Instrument</label>
-              <select
-                value={selectedInstrument}
-                onChange={(e) => handleInstrumentChange(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-medium focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-pointer"
-              >
-                <option value="Nifty 50">Nifty 50</option>
-                <option value="Bank Nifty">Bank Nifty</option>
-                <option value="Fin Nifty">Fin Nifty</option>
-                <option value="Midcap Nifty">Midcap Nifty</option>
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={comboboxOpen ? searchQuery : (selectedInstrument === "Custom" ? (customInstrument || "Custom Symbol") : selectedInstrument)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setComboboxOpen(true);
+                    setHighlightedIndex(0);
+                  }}
+                  onFocus={() => {
+                    setSearchQuery(selectedInstrument === "Custom" ? customInstrument : selectedInstrument);
+                    setComboboxOpen(true);
+                    setHighlightedIndex(0);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search or enter custom symbol..."
+                  className="w-full px-4 py-3 pr-10 rounded-xl bg-background/50 border border-border text-sm font-medium focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-text placeholder:text-muted-foreground/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setComboboxOpen(!comboboxOpen)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  {comboboxOpen ? <Search className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {comboboxOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute left-0 right-0 z-50 mt-1.5 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-2xl py-1.5 max-h-60 overflow-y-auto overflow-x-hidden"
+                  >
+                    {comboboxOptions.length === 0 ? (
+                      <div className="px-4 py-2.5 text-xs text-muted-foreground text-center">
+                        No matches found.
+                      </div>
+                    ) : (
+                      comboboxOptions.map((option, index) => {
+                        const isHighlighted = highlightedIndex === index;
+                        const isCustom = option === "Custom";
+                        
+                        return (
+                          <div
+                            key={option}
+                            onClick={() => {
+                              if (isCustom) {
+                                const symbol = searchQuery.trim() !== "" ? searchQuery.trim().toUpperCase() : "";
+                                setSelectedInstrument("Custom");
+                                if (symbol) {
+                                  setCustomInstrument(symbol);
+                                }
+                                handleInstrumentChange("Custom");
+                              } else {
+                                handleInstrumentChange(option);
+                              }
+                              setComboboxOpen(false);
+                            }}
+                            onMouseEnter={() => setHighlightedIndex(index)}
+                            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                              isHighlighted 
+                                ? "bg-success/10 text-success font-semibold" 
+                                : "text-foreground hover:bg-muted/40"
+                            }`}
+                          >
+                            <span>
+                              {isCustom 
+                                ? (searchQuery.trim() !== "" ? `Add Custom "${searchQuery.toUpperCase()}"` : "Custom Stock / Instrument...")
+                                : option
+                              }
+                            </span>
+                            {selectedInstrument === option && !isCustom && (
+                              <Check className="h-3.5 w-3.5 text-success" />
+                            )}
+                            {isCustom && selectedInstrument === "Custom" && (
+                              <span className="text-[10px] bg-success/15 text-success px-1.5 py-0.5 rounded font-bold">
+                                {customInstrument || "Custom"}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {selectedInstrument === "Custom" && (
+                <div className="relative mt-2">
+                  <input
+                    type="text"
+                    value={customInstrument}
+                    onChange={(e) => setCustomInstrument(e.target.value.toUpperCase())}
+                    placeholder="Enter stock symbol (e.g., RELIANCE, TATASTEEL)"
+                    className="w-full px-4 py-3 rounded-xl bg-background/50 border border-success/30 text-sm font-medium focus:outline-none focus:border-success/60 focus:ring-1 focus:ring-success/20 transition-all placeholder:text-muted-foreground/50 font-mono"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-success font-bold bg-success/10 px-1.5 py-0.5 rounded pointer-events-none">
+                    CUSTOM SYMBOL
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Account Capital */}
@@ -553,7 +777,7 @@ export default function CalculatorPage() {
                   <button
                     key={method}
                     type="button"
-                    onClick={() => setSlMethod(method as any)}
+                    onClick={() => handleSlMethodChange(method as any)}
                     className={`flex-1 py-2 rounded-lg text-[11px] font-semibold capitalize transition-colors cursor-pointer ${
                       slMethod === method
                         ? "bg-card text-foreground border border-border shadow-sm"
@@ -613,11 +837,7 @@ export default function CalculatorPage() {
 
             {/* Dynamic Helper Controls */}
             {slMethod === "atr" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="p-4 rounded-xl border border-border bg-muted/20 space-y-3"
-              >
+              <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-semibold text-muted-foreground uppercase mb-1 block">
@@ -654,15 +874,11 @@ export default function CalculatorPage() {
                     : `${entryPrice || "Entry"} + (${atrVal || "ATR"} * ${atrMultiplier}) = ${computedStopLossPrice || "?"}`
                   }
                 </p>
-              </motion.div>
+              </div>
             )}
 
             {slMethod === "timeframe" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="p-4 rounded-xl border border-border bg-muted/20 space-y-3"
-              >
+              <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex-1 w-full">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block">
@@ -671,7 +887,7 @@ export default function CalculatorPage() {
                     <div className="flex gap-2 w-full">
                       <select
                         value={selectedTimeframe}
-                        onChange={(e) => setSelectedTimeframe(e.target.value)}
+                        onChange={(e) => handleTimeframeChange(e.target.value)}
                         className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-xs focus:outline-none cursor-pointer font-semibold"
                       >
                         <option value="5m">5 Minute</option>
@@ -715,11 +931,12 @@ export default function CalculatorPage() {
                 ) : (
                   <p className="text-[10px] text-destructive italic">Failed to retrieve index metrics. Falling back to manual parameters.</p>
                 )}
-              </motion.div>
+              </div>
             )}
-          </div>
+        </div>
 
-          {/* Sizing Result Card */}
+        {/* Column 3: Sizing Recommendation */}
+        <div className="space-y-4 lg:sticky lg:top-6">
           {result && result.quantity ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}

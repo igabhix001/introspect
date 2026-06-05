@@ -13,6 +13,8 @@ import {
   Info,
   Loader2,
   CheckCircle2,
+  Zap,
+  AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -27,11 +29,11 @@ const plans = [
   {
     id: "monthly",
     name: "Monthly",
-    priceINR: 499,
+    priceINR: 333,
     priceUSD: 6,
     period: "/month",
     features: [
-      "7-Day Free Trial",
+      "5 Trading Days Free Trial",
       "Diagnostic Assessment & Risk Profile",
       "Personalized Trading Rules",
       "Position Sizing Calculator",
@@ -41,14 +43,13 @@ const plans = [
       "Market Sentiment Engine",
       "End-of-Day Report",
       "Referral Rewards System",
-      "10 Loyalty Points per renewal",
     ],
     badge: null,
   },
   {
     id: "6-month",
     name: "6 Months",
-    priceINR: 2499,
+    priceINR: 1836,
     priceUSD: 30,
     period: "/6 mo",
     features: [
@@ -56,31 +57,29 @@ const plans = [
       "Challenge History & Analytics",
       "Journal Export (PDF/CSV)",
       "Priority Support",
-      "75 Loyalty Points on purchase",
     ],
     badge: "POPULAR",
-    savings: "₹416/month",
+    savings: "",
   },
   {
     id: "yearly",
     name: "Yearly",
-    priceINR: 3999,
+    priceINR: 3654,
     priceUSD: 48,
     period: "/year",
     features: [
       "Everything in 6-Month plan",
-      "150 Loyalty Points (= 1 free month)",
       "All Future Updates",
     ],
     badge: "BEST VALUE",
-    savings: "₹333/month",
+    savings: "",
   },
 ];
 
 const loyaltyTiers = [
-  { referrals: 3, bonus: "+20 pts", badge: "Risk Mentor" },
-  { referrals: 5, bonus: "+50 pts", badge: "Discipline Influencer" },
-  { referrals: 10, bonus: "+100 pts", badge: "Community Builder" },
+  { referrals: 3, bonus: "Risk Mentor Badge", badge: "Risk Mentor" },
+  { referrals: 5, bonus: "Discipline Influencer Badge", badge: "Discipline Influencer" },
+  { referrals: 10, bonus: "Community Builder Badge", badge: "Community Builder" },
 ];
 
 export default function PaymentsPage() {
@@ -90,12 +89,22 @@ export default function PaymentsPage() {
   const [processing, setProcessing] = useState(false);
   const [activeSub, setActiveSub] = useState<Record<string, unknown> | null>(null);
   const supabase = createClient();
+  const [aiLimits, setAiLimits] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetch("/api/user/ai-limits")
+        .then((res) => res.json())
+        .then((data) => setAiLimits(data))
+        .catch((err) => console.error("Error fetching AI limits:", err));
+    }
+  }, [user]);
 
   // Dynamic pricing state loaded from /api/pricing
   const [prices, setPrices] = useState({
-    monthly: 499,
-    "6-month": 2499,
-    yearly: 3999,
+    monthly: 333,
+    "6-month": 1836,
+    yearly: 3654,
   });
 
   // Fetch prices from /api/pricing
@@ -105,9 +114,9 @@ export default function PaymentsPage() {
       .then((data) => {
         if (data.pricing) {
           setPrices({
-            monthly: data.pricing.monthly?.amount || 499,
-            "6-month": data.pricing["6-month"]?.amount || 2499,
-            yearly: data.pricing.yearly?.amount || 3999,
+            monthly: data.pricing.monthly?.amount || 333,
+            "6-month": data.pricing["6-month"]?.amount || 1836,
+            yearly: data.pricing.yearly?.amount || 3654,
           });
         }
       })
@@ -122,12 +131,10 @@ export default function PaymentsPage() {
       price = prices.monthly;
     } else if (plan.id === "6-month") {
       price = prices["6-month"];
-      const perMonth = Math.round(prices["6-month"] / 6);
-      savings = `₹${perMonth}/month`;
+      savings = `Save ₹${((prices.monthly * 6) - prices["6-month"]).toLocaleString("en-IN")} compared to monthly`;
     } else if (plan.id === "yearly") {
       price = prices.yearly;
-      const perMonth = Math.round(prices.yearly / 12);
-      savings = `₹${perMonth}/month`;
+      savings = `Save ₹${((prices.monthly * 12) - prices.yearly).toLocaleString("en-IN")} compared to monthly`;
     }
     return {
       ...plan,
@@ -331,12 +338,80 @@ export default function PaymentsPage() {
 
       {/* Active Subscription Notice */}
       {activeSub && (
-        <div className="rounded-2xl border border-success/30 bg-success/[0.06] p-5 text-center">
-          <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
-          <p className="text-sm font-semibold">You have an active {(activeSub.plan as string) || ""} subscription!</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Expires: {activeSub.current_period_end ? new Date(activeSub.current_period_end as string).toLocaleDateString("en-IN") : "N/A"}
-          </p>
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-success/30 bg-success/[0.06] p-5 text-center">
+            <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
+            <p className="text-sm font-semibold">You have an active {(activeSub.plan as string) || ""} subscription!</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Expires: {activeSub.current_period_end ? new Date(activeSub.current_period_end as string).toLocaleDateString("en-IN") : "N/A"}
+            </p>
+          </div>
+
+          {aiLimits && (
+            <div className="rounded-2xl border border-border bg-card overflow-hidden text-left">
+              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/50 bg-muted/20">
+                <Zap className="h-4 w-4 text-success" />
+                <h3 className="text-sm font-semibold">AI Coaching Plan Quotas</h3>
+              </div>
+              <div className="divide-y divide-border/50">
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="text-sm font-medium">AI Coaching Insights Remaining Today</p>
+                    <p className="text-xs text-muted-foreground">EOD summaries and coaching feedback</p>
+                  </div>
+                  <span className="text-sm font-semibold font-mono text-success">
+                    {aiLimits.isAdmin ? "Unlimited (Admin)" : `${aiLimits.daily_insights_remaining} / 5`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="text-sm font-medium">Weekly Review Available</p>
+                    <p className="text-xs text-muted-foreground">In-depth weekly discipline analysis</p>
+                  </div>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                    aiLimits.weekly_review_available 
+                      ? "bg-success/15 text-success" 
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {aiLimits.weekly_review_available ? "Available" : "Limit Reached"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="text-sm font-medium">Monthly Review Available</p>
+                    <p className="text-xs text-muted-foreground">Comprehensive monthly synthesis</p>
+                  </div>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                    aiLimits.monthly_review_available 
+                      ? "bg-success/15 text-success" 
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {aiLimits.monthly_review_available ? "Available" : "Limit Reached"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="text-sm font-medium">Deep Pattern Analyses Remaining</p>
+                    <p className="text-xs text-muted-foreground">Psychological trigger breakdown</p>
+                  </div>
+                  <span className="text-sm font-semibold font-mono text-success">
+                    {aiLimits.isAdmin ? "Unlimited (Admin)" : `${aiLimits.deep_patterns_remaining} / 5`}
+                  </span>
+                </div>
+                {!aiLimits.isAdmin && aiLimits.total_monthly_cost >= 20.0 && (
+                  <div className="px-5 py-3.5 bg-destructive/10 text-destructive text-xs flex gap-2 items-start">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">AI spending warning threshold reached</p>
+                      <p className="text-[11px] opacity-90 mt-0.5">
+                        Your monthly AI cost is at ₹{aiLimits.total_monthly_cost.toFixed(2)} of ₹{aiLimits.hard_limit.toFixed(2)}. New AI insight generation will stop when the cap is reached, but rule-engine alerts and cached feedback remain active.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -368,38 +443,24 @@ export default function PaymentsPage() {
         <div className="flex items-center gap-2.5 mb-4">
           <Gift className="h-5 w-5 text-amber-500" />
           <h3 className="font-heading text-base font-bold">
-            Loyalty Rewards Program
+            Referral Rewards Program
           </h3>
         </div>
         <p className="text-xs text-muted-foreground mb-5">
-          Earn points with every purchase and referral.{" "}
+          Earn points on REFERRALS. Accumulate{" "}
           <span className="text-foreground font-semibold">
             150 points = 1 free month!
           </span>
         </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-          <div className="rounded-xl border border-border p-3 text-center">
-            <p className="text-lg font-bold font-heading text-success">150</p>
-            <p className="text-[10px] text-muted-foreground">
-              Annual Purchase
-            </p>
+        <div className="rounded-xl border border-border p-4 mb-6 bg-muted/20 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Each Successful Referral</p>
+            <p className="text-xs text-muted-foreground mt-0.5">When referred user subscribes</p>
           </div>
-          <div className="rounded-xl border border-border p-3 text-center">
-            <p className="text-lg font-bold font-heading text-success">150</p>
-            <p className="text-[10px] text-muted-foreground">
-              Annual Renewal
-            </p>
-          </div>
-          <div className="rounded-xl border border-border p-3 text-center">
-            <p className="text-lg font-bold font-heading text-amber-500">25</p>
-            <p className="text-[10px] text-muted-foreground">Per Referral</p>
-          </div>
-          <div className="rounded-xl border border-border p-3 text-center">
-            <p className="text-lg font-bold font-heading text-blue-500">10</p>
-            <p className="text-[10px] text-muted-foreground">
-              Monthly Renewal
-            </p>
+          <div className="text-right">
+            <p className="text-xl font-bold font-heading text-success">+25</p>
+            <p className="text-[10px] text-muted-foreground">Points</p>
           </div>
         </div>
 
@@ -427,7 +488,7 @@ export default function PaymentsPage() {
       <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <p>
-          7-day free trial available for new monthly subscriptions. Points expire after 24 months. Maximum
+          5 trading days free trial available for new monthly subscriptions. Points expire after 24 months. Maximum
           1 free month redemption per renewal cycle. Referral rewards
           activate only after the referred user completes payment.
         </p>

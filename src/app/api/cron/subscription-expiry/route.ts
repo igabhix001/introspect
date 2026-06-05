@@ -79,7 +79,62 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 5. Get stats for response
+    // 5. Send trial expiry warning emails — on last day of trial
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowISO = tomorrow.toISOString();
+
+    const { data: expiringTrials } = await adminDb
+      .from("subscriptions")
+      .select("user_id, plan, current_period_end")
+      .eq("status", "active")
+      .eq("plan", "trial")
+      .lte("current_period_end", tomorrowISO)
+      .gte("current_period_end", now);
+
+    let trialEmailsSent = 0;
+    if (expiringTrials && expiringTrials.length > 0) {
+      const { sendWelcomeTrialEmail } = await import("@/lib/email/welcome-email");
+      const today = new Date().toISOString().split("T")[0];
+
+      for (const trial of expiringTrials) {
+        try {
+          // Dedup: only send once per day
+          const { data: alreadySent } = await adminDb
+            .from("ai_response_cache")
+            .select("state_hash")
+            .eq("state_hash", `trial_expiry_email:${trial.user_id}:${today}`)
+            .maybeSingle();
+
+          if (alreadySent) continue;
+
+          const { data: profile } = await adminDb
+            .from("profiles")
+            .select("email, full_name")
+            .eq("id", trial.user_id)
+            .single();
+
+          if (profile?.email) {
+            await sendWelcomeTrialEmail({
+              userEmail: profile.email,
+              userName: profile.full_name || "Trader",
+              type: "trial_expiry_warning",
+            });
+
+            // Mark as sent
+            await adminDb.from("ai_response_cache").insert({
+              state_hash: `trial_expiry_email:${trial.user_id}:${today}`,
+              response_text: `sent_at:${new Date().toISOString()}`,
+            });
+            trialEmailsSent++;
+          }
+        } catch (emailErr) {
+          console.error("Failed to send trial expiry email:", emailErr);
+        }
+      }
+    }
+
+    // 6. Get stats for response
     const { count: totalActive } = await adminDb
       .from("subscriptions")
       .select("*", { count: "exact", head: true })
@@ -95,6 +150,7 @@ export async function POST(request: NextRequest) {
       processed: {
         expired: expiredSubs?.length || 0,
         expiringSoon: expiringSoon?.length || 0,
+        trialEmailsSent,
       },
       stats: {
         totalActive: totalActive || 0,
@@ -102,6 +158,7 @@ export async function POST(request: NextRequest) {
       },
       timestamp: now,
     });
+
   } catch (error) {
     console.error("Subscription expiry cron error:", error);
     return NextResponse.json({ error: "Cron job failed" }, { status: 500 });

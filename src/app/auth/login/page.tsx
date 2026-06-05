@@ -95,10 +95,7 @@ export default function LoginPage() {
           // ignore profile fetch errors
         }
 
-        // Fallback: check email for known admin
-        if (!isAdmin && data.user.email === "intradaymindview@gmail.com") {
-          isAdmin = true;
-        }
+        // Role is strictly checked from database profile
 
         // Use window.location for hard redirect to ensure cookies are sent with fresh request
         const searchParams = new URLSearchParams(window.location.search);

@@ -20,13 +20,19 @@ import {
   Wifi,
   WifiOff,
   Copy,
+  Save,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const searchParams = useSearchParams();
-  const [pricing, setPricing] = useState({ monthly: 499, sixMonth: 2499, yearly: 3999 });
+  const [pricing, setPricing] = useState({ monthly: 399, sixMonth: 1999, yearly: 3499 });
   const [pricingSaved, setPricingSaved] = useState(false);
   const [pricingLoading, setPricingLoading] = useState(false);
+
+  // Fyers default instrument state
+  const [fyersDefaultInstrument, setFyersDefaultInstrument] = useState("Nifty 50");
+  const [fyersDefaultInstrumentSaved, setFyersDefaultInstrumentSaved] = useState(false);
+  const [fyersDefaultInstrumentLoading, setFyersDefaultInstrumentLoading] = useState(false);
 
   // Fyers state
   const [fyersStatus, setFyersStatus] = useState<{
@@ -55,7 +61,7 @@ export default function AdminSettingsPage() {
     }
   }, [searchParams]);
 
-  // Load saved pricing
+  // Load saved pricing & settings
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -70,6 +76,9 @@ export default function AdminSettingsPage() {
           }
           if (data.settings?.pricing_yearly) {
             setPricing((p) => ({ ...p, yearly: data.settings.pricing_yearly.amount || p.yearly }));
+          }
+          if (data.settings?.fyers_default_instrument) {
+            setFyersDefaultInstrument(data.settings.fyers_default_instrument.instrument || "Nifty 50");
           }
         }
       } catch { /* ignore */ }
@@ -141,6 +150,20 @@ export default function AdminSettingsPage() {
       setFyersMessage({ type: "error", text: "Network error" });
     }
     setFyersLoading(false);
+  };
+
+  const handleSaveDefaultInstrument = async () => {
+    setFyersDefaultInstrumentLoading(true);
+    try {
+      await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "fyers_default_instrument", value: { instrument: fyersDefaultInstrument } }),
+      });
+      setFyersDefaultInstrumentSaved(true);
+      setTimeout(() => setFyersDefaultInstrumentSaved(false), 2000);
+    } catch { /* ignore */ }
+    setFyersDefaultInstrumentLoading(false);
   };
 
   // Redirect to admin settings page to auto-capture auth code
@@ -338,7 +361,54 @@ export default function AdminSettingsPage() {
               {fyersMessage.text}
             </div>
           )}
-        </div>
+
+          <div className="pt-4 border-t border-border/50 mt-4">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Default Fyers Instrument</label>
+            <div className="flex gap-2">
+              <select
+                value={["Nifty 50", "Nifty Bank", "Fin Nifty", "Nifty Next 50", "Midcap Nifty"].includes(fyersDefaultInstrument) ? fyersDefaultInstrument : "Custom"}
+                onChange={(e) => {
+                  if (e.target.value === "Custom") {
+                    setFyersDefaultInstrument("");
+                  } else {
+                    setFyersDefaultInstrument(e.target.value);
+                  }
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm focus:outline-none focus:border-amber-500/40"
+              >
+                <option value="Nifty 50">Nifty 50</option>
+                <option value="Nifty Bank">Nifty Bank</option>
+                <option value="Fin Nifty">Fin Nifty</option>
+                <option value="Nifty Next 50">Nifty Next 50</option>
+                <option value="Midcap Nifty">Midcap Nifty</option>
+                <option value="Custom">Custom Stock / Instrument</option>
+              </select>
+              <button
+                onClick={handleSaveDefaultInstrument}
+                disabled={fyersDefaultInstrumentLoading}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+              >
+                {fyersDefaultInstrumentLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : fyersDefaultInstrumentSaved ? (
+                  <CheckCircle2 className="h-3 w-3" />
+                ) : (
+                  <Save className="h-3 w-3" />
+                )}
+                {fyersDefaultInstrumentSaved ? "Saved!" : "Save"}
+              </button>
+            </div>
+            {!["Nifty 50", "Nifty Bank", "Fin Nifty", "Nifty Next 50", "Midcap Nifty"].includes(fyersDefaultInstrument) && (
+              <input
+                type="text"
+                value={fyersDefaultInstrument}
+                onChange={(e) => setFyersDefaultInstrument(e.target.value.toUpperCase())}
+                placeholder="Enter custom stock symbol (e.g., RELIANCE)"
+                className="w-full mt-2 px-4 py-2.5 rounded-xl bg-background/50 border border-amber-500/30 text-sm font-medium focus:outline-none focus:border-amber-500/60 transition-all placeholder:text-muted-foreground/50"
+              />
+            )}
+          </div>
+      </div>
       </div>
 
       {/* Pricing Config */}

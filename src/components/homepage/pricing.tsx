@@ -15,66 +15,11 @@ interface PlanItem {
   href: string;
 }
 
-const pricingPlans: PlanItem[] = [
-  {
-    id: "monthly",
-    name: "INTROSPECT PRO (Monthly)",
-    period: "/month",
-    description: "7-Day Free Trial included. Cancel anytime.",
-    features: [
-      "Interactive Discipline Dashboard",
-      "Real-time Behavioural Risk Engine",
-      "ATR Position Size Calculator",
-      "Market Sentiment Analyzer",
-      "Emotional Mistake Logger & Journal",
-      "Discipline Scoring & Habits Tracker",
-      "10 Loyalty Points per renewal",
-    ],
-    cta: "Start 7-Day Free Trial",
-    badge: null,
-    href: "/auth/signup?plan=monthly",
-  },
-  {
-    id: "6-month",
-    name: "INTROSPECT PRO (6 Months)",
-    period: "/6 mo",
-    description: "Build consistent discipline habits.",
-    features: [
-      "Everything in Monthly plan",
-      "Challenge History & Deep Analytics",
-      "Journal Export (PDF/CSV)",
-      "Priority Email Support",
-      "75 Loyalty Points on purchase",
-      "Save ₹500 compared to monthly",
-    ],
-    cta: "Get 6 Months Access",
-    badge: "POPULAR",
-    href: "/auth/signup?plan=6-month",
-  },
-  {
-    id: "yearly",
-    name: "INTROSPECT ELITE (Yearly)",
-    period: "/year",
-    description: "Commit to trading mastery & consistency.",
-    features: [
-      "Everything in 6 Months plan",
-      "150 Loyalty Points (= 1 free month)",
-      "All Future Features & Updates",
-      "Elite Discord Community Access",
-      "Direct Priority Support Channel",
-      "Save ₹2,000 compared to monthly",
-    ],
-    cta: "Get Elite Yearly Access",
-    badge: "BEST VALUE",
-    href: "/auth/signup?plan=yearly",
-  },
-];
-
 export default function PricingSection() {
   const [prices, setPrices] = useState({
-    monthly: { amount: 499 },
-    "6-month": { amount: 2499 },
-    yearly: { amount: 3999 },
+    monthly: { amount: 333 },
+    "6-month": { amount: 1836 },
+    yearly: { amount: 3654 },
   });
 
   useEffect(() => {
@@ -94,6 +39,58 @@ export default function PricingSection() {
     const amount = prices[planId]?.amount ?? 0;
     return `₹${amount.toLocaleString("en-IN")}`;
   };
+
+  const pricingPlans: PlanItem[] = [
+    {
+      id: "monthly",
+      name: "INTROSPECT PRO (Monthly)",
+      period: "/month",
+      description: "5 Trading Days Free Trial included. Cancel anytime.",
+      features: [
+        "Interactive Discipline Dashboard",
+        "Real-time Behavioural Risk Engine",
+        "ATR Position Size Calculator",
+        "Market Sentiment Analyzer",
+        "Emotional Mistake Logger & Journal",
+        "Discipline Scoring & Habits Tracker",
+      ],
+      cta: "Start 5-Day Free Trial",
+      badge: null,
+      href: "/auth/signup?plan=monthly",
+    },
+    {
+      id: "6-month",
+      name: "INTROSPECT PRO (6 Months)",
+      period: "/6 mo",
+      description: "Build consistent discipline habits.",
+      features: [
+        "Everything in Monthly plan",
+        "Challenge History & Deep Analytics",
+        "Journal Export (PDF/CSV)",
+        "Priority Email Support",
+        `Save ₹${((prices.monthly.amount * 6) - prices["6-month"].amount).toLocaleString("en-IN")} compared to monthly`,
+      ],
+      cta: "Get 6 Months Access",
+      badge: "POPULAR",
+      href: "/auth/signup?plan=6-month",
+    },
+    {
+      id: "yearly",
+      name: "INTROSPECT ELITE (Yearly)",
+      period: "/year",
+      description: "Commit to trading mastery & consistency.",
+      features: [
+        "Everything in 6 Months plan",
+        "All Future Features & Updates",
+        "Elite Discord Community Access",
+        "Direct Priority Support Channel",
+        `Save ₹${((prices.monthly.amount * 12) - prices.yearly.amount).toLocaleString("en-IN")} compared to monthly`,
+      ],
+      cta: "Get Elite Yearly Access",
+      badge: "BEST VALUE",
+      href: "/auth/signup?plan=yearly",
+    },
+  ];
 
   return (
     <section className="py-24 bg-muted/20 border-t border-border" id="pricing">

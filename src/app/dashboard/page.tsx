@@ -352,8 +352,32 @@ function DashboardContent() {
   const hasEverTraded = data?.hasEverTraded || false;
   const hasAssessment = data?.hasAssessment || false;
   const winRate = data?.winRate || 0;
+  const dailyReports = data?.dailyReports || [];
   // Show welcome banner only for truly new users who have never traded or done assessment
   const hasNoAssessment = !hasEverTraded && !hasAssessment;
+
+  // Helper to format date for Consistency Heatmap tooltips
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // Construct past 30 days for Consistency Heatmap
+  const last30Days = Array.from({ length: 30 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    const dateStr = d.toISOString().split("T")[0];
+    const report = dailyReports.find((r: { date: string }) => r.date === dateStr);
+    const score = report ? (report as { discipline_score: number }).discipline_score : null;
+    return {
+      date: d,
+      dateStr,
+      score,
+    };
+  });
 
   // Calculate Cognitive Triggers from real trade records
   const isRevenge = todayMistakeTags.some(t => t.tag?.includes("REVENGE") || t.tag?.includes("revenge"));
@@ -386,7 +410,7 @@ function DashboardContent() {
           <div>
             <p className="text-sm font-semibold text-amber-500 mb-0.5">Smart Money Filter</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Stop chasing the 9:15 AM gamble. Professional trends form after 10:30 AM. Be patient—let the market prove its direction first.
+              Patience is a trading edge. Let the market prove its direction first.
             </p>
           </div>
         </div>
@@ -553,6 +577,80 @@ function DashboardContent() {
       </div>
 
       <RiskLimitStatusBar todayTradeCount={todayTradeCount} todayPnl={todayPnl} capitalUsed={data?.capitalUsed || 100000} />
+
+      {/* Consistency Heatmap Card */}
+      <motion.div
+        variants={staggerItem}
+        className="rounded-2xl border border-border bg-card p-5 space-y-4"
+      >
+        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+          <div className="flex items-center gap-2">
+            <Flame className="h-4.5 w-4.5 text-success" />
+            <h3 className="font-heading text-xs font-bold uppercase tracking-wider">
+              Discipline Consistency Heatmap (Last 30 Days)
+            </h3>
+          </div>
+          <span className="text-[10px] text-muted-foreground">Hover blocks for daily score detail</span>
+        </div>
+
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none snap-x justify-start md:justify-between">
+            {last30Days.map((day) => {
+              let colorClass = "bg-white/5 border border-white/10 hover:border-white/20";
+              let glowColor = "";
+              if (day.score !== null) {
+                if (day.score >= 75) {
+                  colorClass = "bg-success border border-success/30";
+                  glowColor = "shadow-[0_0_8px_rgba(34,197,94,0.35)]";
+                } else if (day.score >= 55) {
+                  colorClass = "bg-amber-500 border border-amber-500/30";
+                  glowColor = "shadow-[0_0_8px_rgba(245,158,11,0.35)]";
+                } else {
+                  colorClass = "bg-destructive border border-destructive/30";
+                  glowColor = "shadow-[0_0_8px_rgba(239,68,68,0.35)]";
+                }
+              }
+              return (
+                <div key={day.dateStr} className="relative group/day snap-center shrink-0">
+                  <div className={`w-8 h-8 rounded-lg transition-all duration-200 cursor-pointer ${colorClass} ${glowColor} hover:scale-105`} />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/day:block bg-popover text-popover-foreground text-xs rounded-lg px-2.5 py-1.5 shadow-xl border border-border whitespace-nowrap z-30">
+                    <p className="font-semibold text-foreground">{formatDate(day.date)}</p>
+                    <p className="text-muted-foreground mt-0.5">
+                      {day.score !== null ? (
+                        <>
+                          Score: <span className="font-mono font-bold text-foreground">{day.score}</span>/100
+                        </>
+                      ) : (
+                        "No trades logged"
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 flex-wrap text-[10px] text-muted-foreground pt-1 border-t border-white/5">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-white/5 border border-white/10" />
+              No Trades
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-destructive border border-destructive/30 shadow-[0_0_6px_rgba(239,68,68,0.2)]" />
+              Uncontrolled (&lt;55)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-amber-500 border border-amber-500/30 shadow-[0_0_6px_rgba(245,158,11,0.2)]" />
+              Moderate (55-74)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-success border border-success/30 shadow-[0_0_6px_rgba(34,197,94,0.2)]" />
+              Disciplined (75+)
+            </span>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Middle Row: Chart + Rules */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

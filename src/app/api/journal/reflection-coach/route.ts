@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateReflectionFeedback } from "@/lib/ai/kimi-client";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { checkAndTrackAiUsage, commitAiUsage } from "@/lib/ai/ai-limiter";
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +55,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Call Kimi to generate Cognitive Behavioral Therapy (CBT) reflection feedback
-    const feedback = await generateReflectionFeedback(mistakeType, userReflection);
+    const stateText = `reflection_${tradeId}_${userReflection}`;
+    const aiCheck = await checkAndTrackAiUsage(user.id, stateText, "daily_insight");
+    
+    let feedback = "";
+    if (aiCheck.allowed) {
+      if (aiCheck.cachedResponse) {
+        feedback = aiCheck.cachedResponse;
+      } else {
+        const { content, promptTokens, completionTokens } = await generateReflectionFeedback(mistakeType, userReflection);
+        feedback = content;
+        await commitAiUsage(user.id, stateText, feedback, promptTokens, completionTokens, "daily_insight");
+      }
+    } else {
+      feedback = aiCheck.message || "You've reached your AI coaching limit for this billing period. Core behavioral insights and alerts remain available.";
+    }
 
     // Save reflection text and feedback response directly to the trade journal entry
     const { error: updateError } = await supabase

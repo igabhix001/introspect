@@ -76,7 +76,7 @@ export function useDashboardQuery() {
           .select("date, discipline_score")
           .eq("user_id", userId)
           .order("date", { ascending: false })
-          .limit(7)
+          .limit(35)
           .abortSignal(signal),
         supabase
           .from("challenges")
@@ -173,6 +173,7 @@ export function useDashboardQuery() {
         hasTodayReport,
         hasEverTraded,
         hasAssessment,
+        dailyReports: reports,
         winRate,
         totalClosed,
         todayTrades: trades.length,

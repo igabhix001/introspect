@@ -101,9 +101,9 @@ export async function POST(request: NextRequest) {
 
       // Amount mapping
       const amountPaidMap: Record<string, number> = {
-        "yearly": 3999,
-        "6-month": 2499,
-        "monthly": 499,
+        "yearly": 3499,
+        "6-month": 1999,
+        "monthly": 399,
       };
 
       // Create subscription record
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
       // Create notification for admin
       try {
-        const amountDisplay = plan === "yearly" ? "₹3,999" : plan === "6-month" ? "₹2,499" : "₹499";
+        const amountDisplay = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
         await adminDb.from("notifications").insert({
           title: `New ${plan} Subscription! 🎉`,
           message: `User ${userEmail || userId} subscribed to ${plan} plan for ${amountDisplay}. Payment ID: ${payment.id}`,

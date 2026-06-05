@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
       date: reportDate
     });
 
-    const aiCheck = await checkAndTrackAiUsage(user.id, stateText);
+    const aiCheck = await checkAndTrackAiUsage(user.id, stateText, "daily_insight");
     let aiNarrative = "";
     let aiStatus = "free";
 
@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
       } else {
         try {
           const formattedMistakeTags = audit.mistakeTags.map(m => m.tag);
-          aiNarrative = await generateCoachingNarrative({
+          const { content: narrativeText, promptTokens, completionTokens } = await generateCoachingNarrative({
             tradesCount: tradesTaken,
             totalPnl: totalPnl,
             rulesFollowed: [!audit.pillar1.breached, !audit.pillar2.breached, !audit.pillar3.breached, !audit.pillar4.breached].filter(Boolean).length,
@@ -360,8 +360,9 @@ export async function POST(request: NextRequest) {
             emotions,
             notes
           });
+          aiNarrative = narrativeText;
           
-          await commitAiUsage(user.id, stateText, aiNarrative);
+          await commitAiUsage(user.id, stateText, aiNarrative, promptTokens, completionTokens, "daily_insight");
         } catch (err: any) {
           console.error("Failed to generate AI narrative:", err);
           aiNarrative = "AI Coaching failed to compile today's analysis. Using rules-based fallback suggestions.";

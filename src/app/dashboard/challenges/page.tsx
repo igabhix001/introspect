@@ -13,7 +13,6 @@ import {
   ChevronUp,
   Share2,
   Medal,
-  Award,
   Zap,
   Activity,
   Download,
@@ -21,7 +20,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useChallengesQuery, useLoyaltyQuery, queryKeys } from "@/lib/hooks/use-queries";
+import { useChallengesQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
@@ -38,10 +37,6 @@ interface ChallengeRow {
   last_checkin_date: string | null;
 }
 
-// Challenge reward structure: 1 point per day + completion bonus
-// 30-day = 30 points (1 per day, no bonus)
-// 60-day = 65 points (60 + 5 bonus)
-// 90-day = 100 points (90 + 10 bonus)
 const challengeTemplates = [
   {
     type: "30",
@@ -49,8 +44,6 @@ const challengeTemplates = [
     title: "30-Day Builder",
     duration: "30 DAYS",
     focus: "Basic Rules",
-    points: 30,
-    pointsBreakdown: "30 days × 1 pt",
     badge: "Bronze Badge",
     badgeIcon: "🟫",
     difficulty: "★★☆☆☆",
@@ -64,8 +57,6 @@ const challengeTemplates = [
     title: "60-Day Master",
     duration: "60 DAYS",
     focus: "Pattern Building",
-    points: 65,
-    pointsBreakdown: "60 + 5 bonus",
     badge: "Silver Badge",
     badgeIcon: "⚪",
     difficulty: "★★★☆☆",
@@ -79,8 +70,6 @@ const challengeTemplates = [
     title: "90-Day Elite",
     duration: "90 DAYS",
     focus: "Mastery",
-    points: 100,
-    pointsBreakdown: "90 + 10 bonus",
     badge: "Gold Badge",
     badgeIcon: "🟡",
     extraBadge: "💎 Platinum Path",
@@ -100,13 +89,11 @@ export default function ChallengesPage() {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { data: challengesData, isLoading: challengesLoading } = useChallengesQuery();
-  const { data: loyaltyData } = useLoyaltyQuery();
   
   const challenges = [
     ...(challengesData?.active ? [challengesData.active as ChallengeRow] : []),
     ...((challengesData?.history || []) as ChallengeRow[]),
   ];
-  const totalPoints = (loyaltyData as { points?: number })?.points || 0;
   
   const [starting, setStarting] = useState<string | null>(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
@@ -166,14 +153,6 @@ export default function ChallengesPage() {
     setExporting(false);
   };
 
-  const getTierProgress = (pts: number) => {
-    if (pts < 300) return { tier: "Bronze", next: 300, pct: (pts / 300) * 100 };
-    if (pts < 600) return { tier: "Silver", next: 600, pct: ((pts - 300) / 300) * 100 };
-    if (pts < 900) return { tier: "Gold", next: 900, pct: ((pts - 600) / 300) * 100 };
-    return { tier: "Platinum", next: 900, pct: 100 };
-  };
-
-  const progress = getTierProgress(totalPoints);
 
   if (loading) {
     return (
@@ -198,7 +177,7 @@ export default function ChallengesPage() {
         </p>
         <div className="bg-card border border-border rounded-xl p-4 max-w-3xl mx-auto mb-6 shadow-sm">
           <p className="font-medium text-foreground">
-            &ldquo;Complete challenges to earn points, unlock badges, and build unshakeable trading discipline&rdquo;
+            &ldquo;Complete challenges to unlock badges and build unshakeable trading discipline&rdquo;
           </p>
         </div>
         <div className="flex justify-center gap-4 flex-wrap">
@@ -264,26 +243,21 @@ export default function ChallengesPage() {
           <Zap className="h-4 w-4" /> 
           Why Take Challenges?
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl border border-success/20 bg-success/[0.03] text-center">
             <Star className="h-6 w-6 text-success mx-auto mb-2" />
-            <h3 className="font-bold text-sm mb-1">EARN POINTS</h3>
-            <p className="text-xs text-muted-foreground">1 point per day + bonus</p>
+            <h3 className="font-bold text-sm mb-1">BUILD HABITS</h3>
+            <p className="text-xs text-muted-foreground">Master consistency</p>
           </div>
           <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] text-center">
             <Medal className="h-6 w-6 text-amber-500 mx-auto mb-2" />
             <h3 className="font-bold text-sm mb-1">COLLECT BADGES</h3>
             <p className="text-xs text-muted-foreground">Exclusive profile recognition</p>
           </div>
-          <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/[0.03] text-center">
-            <Award className="h-6 w-6 text-blue-500 mx-auto mb-2" />
-            <h3 className="font-bold text-sm mb-1">RISE TIERS</h3>
-            <p className="text-xs text-muted-foreground">Reach Platinum status</p>
-          </div>
           <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/[0.03] text-center">
             <CheckCircle2 className="h-6 w-6 text-purple-500 mx-auto mb-2" />
             <h3 className="font-bold text-sm mb-1">UNLOCK VALUE</h3>
-            <p className="text-xs text-muted-foreground">150 points = 1 Free Month</p>
+            <p className="text-xs text-muted-foreground">Refer friends to earn free months</p>
           </div>
         </div>
       </motion.div>
@@ -342,10 +316,6 @@ export default function ChallengesPage() {
                       <Trophy className="h-3.5 w-3.5" /> Rewards:
                     </div>
                     <ul className="space-y-3">
-                      <li className="flex items-center gap-2 text-sm">
-                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                        <span className="font-bold">{template.points} POINTS</span>
-                      </li>
                       <li className="flex items-center gap-2 text-sm">
                         <span className="text-base leading-none">{template.badgeIcon}</span>
                         <span>{template.badge}</span>
@@ -435,12 +405,6 @@ export default function ChallengesPage() {
                   </thead>
                   <tbody>
                     <tr className="border-b border-border">
-                      <td className="px-4 py-3 font-semibold">Points</td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">30</td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">65 <span className="text-[10px] text-muted-foreground">(60+5)</span></td>
-                      <td className="px-4 py-3 font-mono font-medium text-amber-500">100 <span className="text-[10px] text-muted-foreground">(90+10)</span></td>
-                    </tr>
-                    <tr className="border-b border-border">
                       <td className="px-4 py-3 font-semibold">Badge Level</td>
                       <td className="px-4 py-3 text-muted-foreground">🟫 Bronze</td>
                       <td className="px-4 py-3 text-muted-foreground">⚪ Silver</td>
@@ -451,18 +415,6 @@ export default function ChallengesPage() {
                       <td className="px-4 py-3">✅</td>
                       <td className="px-4 py-3">✅</td>
                       <td className="px-4 py-3">✅</td>
-                    </tr>
-                    <tr className="border-b border-border">
-                      <td className="px-4 py-3 font-semibold">Tier Progress</td>
-                      <td className="px-4 py-3">10% to Silver</td>
-                      <td className="px-4 py-3">22% to Silver</td>
-                      <td className="px-4 py-3 font-medium text-success">33% to Silver</td>
-                    </tr>
-                    <tr className="border-border">
-                      <td className="px-4 py-3 font-semibold">Exclusive Access</td>
-                      <td className="px-4 py-3">❌</td>
-                      <td className="px-4 py-3">❌</td>
-                      <td className="px-4 py-3">✅ Webinar</td>
                     </tr>
                   </tbody>
                 </table>
@@ -481,9 +433,7 @@ export default function ChallengesPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {completedChallenges.map((challenge) => {
-              const ptsMap: Record<string, number> = { "30": 30, "60": 65, "90": 100 };
               const badgeMap: Record<string, string> = { "30": "Bronze", "60": "Silver", "90": "Gold" };
-              const pts = ptsMap[challenge.type] || 50;
               const badge = badgeMap[challenge.type] || "Bronze";
               return (
                 <div key={challenge.id} className="bg-card border border-border rounded-2xl p-5 relative overflow-hidden group">
@@ -497,7 +447,7 @@ export default function ChallengesPage() {
                     </div>
                     <h3 className="font-heading text-lg font-bold mb-3">{challenge.name}</h3>
                     <div className="space-y-1.5 text-sm text-muted-foreground mb-4">
-                      <p>✨ Rewards Issued: <span className="font-bold text-foreground">{pts} pts</span> • {badge} Badge</p>
+                      <p>✨ Rewards Issued: <span className="font-bold text-foreground">{badge} Badge</span></p>
                       <p>📅 Finished: {new Date(challenge.completed_at || challenge.start_date).toLocaleDateString("en-IN", { month: "short", year: "numeric", day: "numeric" })}</p>
                     </div>
                     <div className="flex items-center gap-3">

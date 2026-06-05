@@ -105,9 +105,11 @@ export async function GET(request: NextRequest) {
     // 3. Subscription & AI usage limits verification (Paywall check)
     // To generate the profile, we build a state text of the answers
     const answersList = (assessment.answers || []) as Array<{ question_id: string; answer: number | string }>;
-    const answersText = JSON.stringify(answersList);
+    // Sort answers by question_id to guarantee a deterministic hash
+    const sortedAnswersList = [...answersList].sort((a, b) => a.question_id.localeCompare(b.question_id));
+    const answersText = JSON.stringify(sortedAnswersList);
 
-    const aiCheck = await checkAndTrackAiUsage(user.id, answersText);
+    const aiCheck = await checkAndTrackAiUsage(user.id, answersText, "deep_pattern");
     
     if (!aiCheck.allowed) {
       return NextResponse.json({
@@ -158,7 +160,7 @@ export async function GET(request: NextRequest) {
       .filter((q): q is NonNullable<typeof q> => q !== null);
 
     // 5. Generate AI profile via Kimi client
-    const generatedProfile = await generateAssessmentAiProfile(answersWithText);
+    const { profile: generatedProfile, promptTokens, completionTokens } = await generateAssessmentAiProfile(answersWithText);
 
     // 6. Persist generated profile into categories_analysis column
     const updatedAnalysis = {
@@ -176,7 +178,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 7. Track usage limits
-    await commitAiUsage(user.id, answersText, JSON.stringify(generatedProfile));
+    await commitAiUsage(user.id, answersText, JSON.stringify(generatedProfile), promptTokens, completionTokens, "deep_pattern");
 
     return NextResponse.json({
       profile: generatedProfile,

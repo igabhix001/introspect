@@ -296,7 +296,18 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    const hasActiveSubscription = !!subscription;
+    // Check if admin to bypass subscription gate
+    let isAdmin = false;
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      isAdmin = profile?.role === "admin";
+    } catch { /* not admin */ }
+
+    const hasActiveSubscription = !!subscription || isAdmin;
 
     // If not subscribed, check if user has already taken one free assessment
     if (!hasActiveSubscription) {
@@ -329,7 +340,9 @@ export async function POST(request: NextRequest) {
     }
     
     const { answers } = validation.data;
-    const metrics = computeCategoriesAnalysis(answers);
+    // Sort answers by question_id to guarantee a deterministic hash
+    const sortedAnswers = [...answers].sort((a, b) => a.question_id.localeCompare(b.question_id));
+    const metrics = computeCategoriesAnalysis(sortedAnswers);
 
     // Fetch templates from database corresponding to the computed risk bands
     const categoryNames = metrics.categories.map(c => c.name);
@@ -386,7 +399,7 @@ export async function POST(request: NextRequest) {
       .from("assessments")
       .insert({
         user_id: user.id,
-        answers,
+        answers: sortedAnswers,
         discipline_score: metrics.disciplineScore,
         risk_level: metrics.riskLevel,
         trader_level: metrics.traderLevel,

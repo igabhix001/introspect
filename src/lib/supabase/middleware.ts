@@ -51,26 +51,21 @@ export async function updateSession(request: NextRequest) {
 
   // Protect /dashboard/admin routes: redirect non-admin users to /dashboard
   if (pathname.startsWith("/dashboard/admin") && user) {
-    // First check email-based admin (fastest, no DB call)
-    const isEmailAdmin = user.email === "intradaymindview@gmail.com";
-    
-    if (!isEmailAdmin) {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
 
-      if (profileError) {
-        console.error("[Middleware] Profile fetch error:", profileError);
-      }
+    if (profileError) {
+      console.error("[Middleware] Profile fetch error:", profileError);
+    }
 
-      const isAdmin = profile?.role === "admin";
-      if (!isAdmin) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
+    const isAdmin = profile?.role === "admin";
+    if (!isAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
     }
   }
 

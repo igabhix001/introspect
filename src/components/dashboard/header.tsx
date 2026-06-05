@@ -29,6 +29,7 @@ import {
   Gift,
   FileText,
   Home,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -275,6 +276,16 @@ export function DashboardHeader({
                       </p>
                     </div>
                     <div className="py-1.5">
+                      {isAdmin && (
+                        <Link
+                          href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-amber-500 font-semibold hover:bg-muted transition-colors"
+                        >
+                          <Shield className="h-4 w-4" />
+                          {isOnAdminPage ? "User Dashboard" : "Admin Panel"}
+                        </Link>
+                      )}
                       <Link
                         href="/dashboard/settings"
                         onClick={() => setProfileOpen(false)}

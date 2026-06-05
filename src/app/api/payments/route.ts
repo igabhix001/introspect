@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
       const referralCode = body.referral_code || null;
 
       const pricingMap: Record<string, number> = {
-        "monthly": 49900,
-        "6-month": 249900,
-        "yearly": 399900
+        "monthly": 33300,
+        "6-month": 183600,
+        "yearly": 365400
       };
 
       // Try to fetch dynamic pricing from system settings
@@ -106,9 +106,9 @@ export async function POST(request: NextRequest) {
 
       // Fetch dynamic pricing to save correct amount paid
       const pricingMap: Record<string, number> = {
-        "monthly": 49900,
-        "6-month": 249900,
-        "yearly": 399900
+        "monthly": 39900,
+        "6-month": 199900,
+        "yearly": 349900
       };
       try {
         const adminDb = createAdminClient();
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         
         const userName = profile?.full_name || profile?.email || user.email || "Unknown User";
         const userEmail = profile?.email || user.email || "N/A";
-        const amountDisplay = plan === "yearly" ? "₹3,999" : plan === "6-month" ? "₹2,499" : "₹499";
+        const amountDisplay = plan === "yearly" ? "₹3,654" : plan === "6-month" ? "₹1,836" : "₹333";
         
         const adminDb = createAdminClient();
         await adminDb.from("notifications").insert({

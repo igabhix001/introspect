@@ -275,7 +275,7 @@ export function Hero() {
                 >
                   <p className="text-xs font-medium text-success flex items-center gap-1.5">
                     <Check className="h-3.5 w-3.5" />
-                    Rule followed! +5 pts
+                    Rule followed! Streak preserved
                   </p>
                 </motion.div>
               </motion.div>

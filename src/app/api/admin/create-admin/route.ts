@@ -10,15 +10,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify caller is admin
-    const isAdmin = user.email === "intradaymindview@gmail.com";
-    if (!isAdmin) {
-      try {
-        const adminDb = createAdminClient();
-        const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      } catch {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    try {
+      const adminDb = createAdminClient();
+      const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
+      if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { email, password, full_name } = await request.json();

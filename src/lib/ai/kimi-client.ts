@@ -7,7 +7,11 @@ const KIMI_API_URL = "https://api.moonshot.cn/v1/chat/completions";
 const MODEL_SMALL = "kimi-k2.5";
 const MODEL_COMPLEX = "kimi-k2.6";
 
-async function callKimi(messages: ChatMessage[], model = MODEL_COMPLEX, maxTokens = 1000): Promise<string> {
+async function callKimi(
+  messages: ChatMessage[],
+  model = MODEL_COMPLEX,
+  maxTokens = 1000
+): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
   const apiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
   if (!apiKey) {
     console.warn("Kimi API key not configured. Falling back to rule-based analysis.");
@@ -35,7 +39,11 @@ async function callKimi(messages: ChatMessage[], model = MODEL_COMPLEX, maxToken
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || "";
+    const content = data.choices?.[0]?.message?.content || "";
+    const promptTokens = data.usage?.prompt_tokens || 0;
+    const completionTokens = data.usage?.completion_tokens || 0;
+
+    return { content, promptTokens, completionTokens };
   } catch (error) {
     console.error("Kimi API call failed:", error);
     throw error;
@@ -54,7 +62,7 @@ export async function generateCoachingNarrative(data: {
   mistakeTags: string[];
   emotions: string[];
   notes: string[];
-}): Promise<string> {
+}): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
   const systemPrompt = `You are INTROSPECT™, an elite trading psychology coach and behavioral therapist. Your goal is to help traders understand their execution mistakes and emotional leaks.
 You speak with clinical authority, empathy, and absolute directness. Do not sound like generic AI (avoid phrases like "As an AI...", "It's important to remember...", or overly cheerful greetings). Do not output bulleted summaries of what the user already knows. Instead, provide deep cognitive synthesis.
 
@@ -81,7 +89,11 @@ Format your response in plain text with clear paragraph breaks.`;
     ], MODEL_COMPLEX, 1000);
   } catch (err) {
     // Return rule-based fallback if API fails
-    return getFallbackNarrative(data);
+    return {
+      content: getFallbackNarrative(data),
+      promptTokens: 0,
+      completionTokens: 0
+    };
   }
 }
 
@@ -91,7 +103,7 @@ Format your response in plain text with clear paragraph breaks.`;
 export async function generateReflectionFeedback(
   mistakeType: string,
   userReflection: string
-): Promise<string> {
+): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
   const systemPrompt = `You are INTROSPECT™ Cognitive Reflection Coach. A trader has committed a '${mistakeType}' mistake and provided their personal reflection.
 Provide a direct, constructive feedback using Cognitive Behavioral Therapy (CBT) principles. 
 Acknowledge their honesty, identify any cognitive distortions in their reflection (e.g. catastrophizing, emotional reasoning, or illusion of control), and give them one actionable rule or practice to implement immediately.
@@ -103,7 +115,11 @@ Keep your response concise, under 150 words. Avoid generic pleasantries.`;
       { role: "user", content: `My mistake: ${mistakeType}\nMy reflection: "${userReflection}"` }
     ], MODEL_SMALL, 400);
   } catch (err) {
-    return `Coaching Feedback: It takes courage to acknowledge a ${mistakeType} deviation. You recognized that emotional pressure drove this trade. For your next session, implement a pre-entry checklist: before clicking buy or sell, wait 10 seconds to confirm if it aligns with your exact plan. Capital preservation is your only priority.`;
+    return {
+      content: `Coaching Feedback: It takes courage to acknowledge a ${mistakeType} deviation. You recognized that emotional pressure drove this trade. For your next session, implement a pre-entry checklist: before clicking buy or sell, wait 10 seconds to confirm if it aligns with your exact plan. Capital preservation is your only priority.`,
+      promptTokens: 0,
+      completionTokens: 0
+    };
   }
 }
 
@@ -156,24 +172,31 @@ function getFallbackNarrative(data: {
 export async function generateAssessmentAiProfile(
   answers: Array<{ question: string; category: string; answer: number }>
 ): Promise<{
-  archetype: string;
-  triggers: string[];
-  tailRiskScenario: string;
-  defensePlan: string[];
+  profile: {
+    archetype: string;
+    triggers: string[];
+    tailRiskScenario: string;
+    defensePlan: string[];
+  };
+  promptTokens: number;
+  completionTokens: number;
 }> {
   const overallAvg = answers.length > 0 ? answers.reduce((sum, a) => sum + a.answer, 0) / answers.length : 3;
   const allIdentical = answers.every(a => a.answer === answers[0]?.answer);
 
   if (overallAvg <= 2.2 || overallAvg >= 4.5 || allIdentical) {
     console.log(`[AI Profiler] Edge case detected (avg: ${overallAvg.toFixed(2)}, identical: ${allIdentical}). Routing directly to fallback profile.`);
-    return getFallbackAiProfile(answers);
+    return {
+      profile: getFallbackAiProfile(answers),
+      promptTokens: 0,
+      completionTokens: 0
+    };
   }
 
   // Prune prompt payload: group answers by category and format only trimmed category: score mappings
   const categoryScores: Record<string, number> = {};
   const categoryCounts: Record<string, number> = {};
   answers.forEach(a => {
-
     categoryScores[a.category] = (categoryScores[a.category] || 0) + a.answer;
     categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
   });
@@ -219,11 +242,20 @@ Ensure the output is valid, parseable JSON.`;
       { role: "user", content: "Analyze my diagnostic results and output my psychological profile." }
     ], MODEL_COMPLEX, 1000);
 
-    const cleanJson = rawResult.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-    return JSON.parse(cleanJson);
+    const cleanJson = rawResult.content.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    const parsedProfile = JSON.parse(cleanJson);
+    return {
+      profile: parsedProfile,
+      promptTokens: rawResult.promptTokens,
+      completionTokens: rawResult.completionTokens
+    };
   } catch (err) {
     console.error("AI Profiler Kimi call failed, using rule-based fallback:", err);
-    return getFallbackAiProfile(answers);
+    return {
+      profile: getFallbackAiProfile(answers),
+      promptTokens: 0,
+      completionTokens: 0
+    };
   }
 }
 

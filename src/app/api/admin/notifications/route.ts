@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  if (user.email === "intradaymindview@gmail.com") return user;
   try {
     const adminDb = createAdminClient();
     const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
@@ -55,15 +54,11 @@ export async function GET(request: NextRequest) {
 
     const adminDb = createAdminClient();
 
-    // Check if admin
-    const isAdmin = user.email === "intradaymindview@gmail.com";
-    let roleIsAdmin = isAdmin;
-    if (!isAdmin) {
-      try {
-        const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
-        roleIsAdmin = profile?.role === "admin";
-      } catch { /* not admin */ }
-    }
+    let roleIsAdmin = false;
+    try {
+      const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
+      roleIsAdmin = profile?.role === "admin";
+    } catch { /* not admin */ }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");

@@ -183,9 +183,9 @@ export const POINTS_CONFIG = {
   
   // Referral rewards (ENABLED - only referrals earn points)
   referral_reward: 25,
-  referral_milestone_3: 20,
-  referral_milestone_5: 50,
-  referral_milestone_10: 100,
+  referral_milestone_3: 0,
+  referral_milestone_5: 0,
+  referral_milestone_10: 0,
   
   // Challenge rewards (Disabled per client request)
   challenge_30: 0,

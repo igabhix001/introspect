@@ -85,7 +85,7 @@ export default function LoyaltyPage() {
             Loyalty <span className="gradient-text">Rewards</span>
           </h1>
           <p className="text-muted-foreground mt-2">
-            Earn points for discipline. Redeem for free subscription months.
+            Invite friends to earn points. Redeem for free subscription months.
           </p>
         </motion.div>
 
@@ -138,9 +138,7 @@ export default function LoyaltyPage() {
               <Award className="h-5 w-5 text-success" />
               Free Month Progress
             </h3>
-            <p className="text-xs text-muted-foreground mb-4 italic">
-              "Disciplined traders often earn 1–2 free months per year."
-            </p>
+
             
             <div className="mb-4">
               <div className="flex justify-between items-end mb-2">
@@ -248,7 +246,7 @@ export default function LoyaltyPage() {
         </div>
 
         {/* Referral Link Sharing */}
-        <motion.div variants={stagger.item} className="p-6 rounded-2xl bg-card border border-primary/20 shadow-lg">
+        <motion.div id="referral-section" variants={stagger.item} className="p-6 rounded-2xl bg-card border border-primary/20 shadow-lg">
           <h3 className="text-lg font-heading font-semibold flex items-center gap-2 mb-2">
             <Zap className="h-5 w-5 text-primary" />
             Share & Earn 25 Points
@@ -324,9 +322,15 @@ export default function LoyaltyPage() {
               <div className="p-12 text-center flex flex-col items-center justify-center">
                 <Gift className="h-10 w-10 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground">No points activity yet.</p>
-                <Link href="/dashboard/challenges" className="mt-4 text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1">
-                  Start a challenge to earn points <ArrowRight className="h-3 w-3" />
-                </Link>
+                <button 
+                  onClick={() => {
+                    const section = document.getElementById("referral-section");
+                    if (section) section.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="mt-4 text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1"
+                >
+                  Share your referral link to earn points <ArrowRight className="h-3 w-3" />
+                </button>
               </div>
             )}
           </div>

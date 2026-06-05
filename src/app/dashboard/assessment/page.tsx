@@ -393,6 +393,21 @@ export default function AssessmentPage() {
     // Active subscribers see full results and can view report
     const isActive = hasActiveSubscription === true;
 
+    const mockAiProfile = {
+      archetype: "The Volatile Rule-Overrider - You have a solid theoretical understanding of risk but override your boundaries when under pressure. You repeatedly commit the same mistakes despite logging and reviewing them, indicating a breakdown in execution control.",
+      triggers: [
+        "Experiencing a slippage or execution delay that worsens your entry price.",
+        "A series of choppy market whipsaws that hit multiple stops in a row.",
+        "Trading while distracted by personal stress or fatigue."
+      ],
+      tailRiskScenario: "After a stop-loss is hit, you get angry at the broker or market. You immediately re-enter the same trade, violating your cooldown rule. The trade fails again. You override your sizing rule, double your position, and enter a third time. The market continues its move against you, resulting in a massive draw down from consecutive rule-breaking.",
+      defensePlan: [
+        "Create a physical checklist of your rules and check them off manually before every trade.",
+        "Install a hard auto-cooldown block in your broker terminal after two losses.",
+        "Step away from the screens for at least 15 minutes after any losing trade."
+      ]
+    };
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -568,23 +583,68 @@ export default function AssessmentPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
                   <span className="text-xs text-muted-foreground">Synthesizing behavioral metrics...</span>
                 </div>
-              ) : aiStatus === "paywall" ? (
-                <div className="relative p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-center space-y-3">
-                  <div className="w-10 h-10 rounded-full bg-muted/80 border border-border flex items-center justify-center mx-auto mb-2">
-                    <Lock className="h-4 w-4 text-muted-foreground" />
+              ) : (!isActive || aiStatus === "paywall") ? (
+                <div className="relative">
+                  {/* Blurry mock content */}
+                  <div className="space-y-4 text-xs text-left blur-[3px] opacity-40 pointer-events-none select-none">
+                    {/* Archetype */}
+                    <div className="p-3.5 rounded-xl border border-border bg-card">
+                      <p className="text-[9px] text-primary uppercase font-bold tracking-wider mb-1">Archetype Personality</p>
+                      <p className="font-heading text-sm font-bold text-foreground mb-1">{mockAiProfile.archetype.split(" - ")[0]}</p>
+                      <p className="text-muted-foreground leading-relaxed">{mockAiProfile.archetype.split(" - ")[1]}</p>
+                    </div>
+
+                    {/* Triggers */}
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] text-amber-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Tilt Triggers
+                      </p>
+                      {mockAiProfile.triggers.map((t, idx) => (
+                        <div key={idx} className="flex items-start gap-2 p-2 rounded-lg border border-border/40 bg-card/40">
+                          <span className="text-amber-500 font-semibold">•</span>
+                          <span className="text-muted-foreground leading-relaxed">{t}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tail Risk Scenario */}
+                    <div className="p-3.5 rounded-xl border border-destructive/20 bg-destructive/5 space-y-1">
+                      <p className="text-[9px] text-destructive uppercase font-bold tracking-wider flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Tail-Risk Scenario
+                      </p>
+                      <p className="text-muted-foreground leading-relaxed font-medium">{mockAiProfile.tailRiskScenario}</p>
+                    </div>
+
+                    {/* Defense Plan */}
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] text-success uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Customized Defense Plan
+                      </p>
+                      {mockAiProfile.defensePlan.map((d, idx) => (
+                        <div key={idx} className="flex items-start gap-2 p-2 rounded-lg border border-success/15 bg-success/[0.02]">
+                          <span className="text-success font-semibold">✓</span>
+                          <span className="text-muted-foreground leading-relaxed">{d}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">Unlock AI Psychological Profiling</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 max-w-xs mx-auto">
-                      Get a customized analysis of your trading personality archetype, tilt triggers, and a personalized defense plan.
+
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/35 backdrop-blur-[1px] p-4 text-center">
+                    <div className="w-10 h-10 rounded-full bg-background/90 border border-border flex items-center justify-center mb-2.5 shadow-md">
+                      <Lock className="h-4.5 w-4.5 text-amber-500" />
+                    </div>
+                    <p className="text-xs font-bold text-foreground mb-0.5">Subscribe to unlock your AI Profiler</p>
+                    <p className="text-[10px] text-muted-foreground mb-3 max-w-[240px] leading-snug">
+                      Get detailed analysis of your trading personality archetype, tilt triggers, and tailored defense plans.
                     </p>
+                    <Link
+                      href="/dashboard/payments"
+                      className="px-4 py-2 rounded-xl bg-success text-success-foreground text-[10px] font-bold hover:bg-success/90 transition-all shadow-md shadow-success/10 cursor-pointer"
+                    >
+                      Unlock with Pro Subscription
+                    </Link>
                   </div>
-                  <Link
-                    href="/dashboard/payments"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-[10px] font-semibold hover:bg-primary/90 transition-colors"
-                  >
-                    Upgrade Plan to Unlock
-                  </Link>
                 </div>
               ) : aiStatus === "limit_exceeded" ? (
                 <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 text-center space-y-2">

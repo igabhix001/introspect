@@ -53,6 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!cachedAuthState.initialized);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(cachedAuthState.hasActiveSubscription);
   
+  // Refs for tracking latest state in persistent event listener closure
+  const userRef = useRef<User | null>(user);
+  const profileRef = useRef<Profile | null>(profile);
+
+  useEffect(() => {
+    userRef.current = user;
+    profileRef.current = profile;
+  }, [user, profile]);
+
   // Refs to prevent race conditions — NEVER put these in useEffect deps
   const mountedRef = useRef(true);
   const initDoneRef = useRef(cachedAuthState.initialized);
@@ -72,25 +81,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
       const supabase = await getSupabase();
-      // Add timeout to prevent hanging on slow Supabase responses
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
 
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .abortSignal(controller.signal)
         .single();
 
-      clearTimeout(timeout);
-
       if (error) {
+        console.error("[AuthProvider] Profile fetch error details:", error);
         // Handle RLS infinite recursion (42P17)
         if (error.code === "42P17" || error.code === "PGRST301") {
+          const emailLower = userEmail?.toLowerCase() || "";
           const fallback = {
             id: userId, email: userEmail || "",
-            role: userEmail === "intradaymindview@gmail.com" ? "admin" : "user",
+            role: "user",
             full_name: null, trading_capital: 0, trading_style: "intraday",
             is_suspended: false, referral_code: null,
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -100,22 +105,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Profile row doesn't exist — create it
         if (error.code === "PGRST116") {
-          const { data: newProfile } = await supabase
+          console.log("[AuthProvider] Profile not found, creating new profile row.");
+          const { data: newProfile, error: upsertError } = await supabase
             .from("profiles")
             .upsert({ id: userId, role: "user", email: userEmail })
             .select("*")
             .single();
-          if (mountedRef.current) setProfile(newProfile as Profile | null);
+          if (upsertError) {
+            console.error("[AuthProvider] Failed to create new profile row:", upsertError);
+          } else if (mountedRef.current) {
+            setProfile(newProfile as Profile | null);
+          }
           return;
         }
       }
       if (mountedRef.current) setProfile(data as Profile | null);
-    } catch {
-      // Absolute fallback — never crash the app (also handles AbortError)
+    } catch (err) {
+      console.error("[AuthProvider] Exception during profile fetch:", err);
+      // Absolute fallback — never crash the app
       if (mountedRef.current) {
+        const emailLower = userEmail?.toLowerCase() || "";
         setProfile({
           id: userId, email: userEmail || "",
-          role: userEmail === "intradaymindview@gmail.com" ? "admin" : "user",
+          role: "user",
         } as unknown as Profile);
       }
     }
@@ -187,6 +199,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setHasActiveSubscription(!!sub);
       } finally {
         hydratingRef.current = false;
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
@@ -203,28 +218,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       initDoneRef.current = true;
 
       try {
-        // Fast check: if no supabase keys exist in localStorage, the user is guest
-        if (typeof window !== "undefined") {
-          let hasSbKey = false;
-          try {
-            for (let i = 0; i < window.localStorage.length; i++) {
-              const key = window.localStorage.key(i);
-              if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
-                hasSbKey = true;
-                break;
-              }
-            }
-          } catch (e) {
-            // ignore
-          }
-          
-          if (!hasSbKey) {
-            clearAuth();
-            setLoading(false);
-            return;
-          }
-        }
-
         const supabase = await getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         if (!mountedRef.current) return;
@@ -236,7 +229,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await hydrateUser(session.user);
-        if (mountedRef.current) setLoading(false);
       } catch {
         if (mountedRef.current) { clearAuth(); setLoading(false); }
       }
@@ -252,26 +244,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let activeSubscription: any = null;
     
     const initListener = async () => {
-      // Fast check: if no supabase keys exist in localStorage, the user is guest
-      if (typeof window !== "undefined") {
-        let hasSbKey = false;
-        try {
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
-              hasSbKey = true;
-              break;
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-        
-        if (!hasSbKey) {
-          return;
-        }
-      }
-
       const supabase = await getSupabase();
       if (!mountedRef.current) return;
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -299,13 +271,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // SIGNED_IN: Full hydration only for actual sign-in (not token refresh)
           if (event === "SIGNED_IN" && session?.user) {
-            // Only hydrate if we don't already have this user
-            if (!user || user.id !== session.user.id) {
+            // Only hydrate if we don't already have this user or if the profile is missing
+            if (!userRef.current || userRef.current.id !== session.user.id || !profileRef.current) {
               await hydrateUser(session.user);
             } else {
               setUser(session.user);
+              if (mountedRef.current) setLoading(false);
             }
-            if (mountedRef.current) setLoading(false);
             return;
           }
 
@@ -313,14 +285,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (event === "INITIAL_SESSION") {
             if (session?.user) {
               // Only hydrate if initAuth hasn't already done it
-              if (!user && !hydratingRef.current) {
+              if ((!userRef.current || !profileRef.current) && !hydratingRef.current) {
                 await hydrateUser(session.user);
+              } else if (!hydratingRef.current) {
+                if (mountedRef.current) setLoading(false);
               }
             } else {
               clearAuth();
+              if (mountedRef.current) setLoading(false);
             }
-            // ALWAYS clear loading on INITIAL_SESSION — this is the critical fix
-            if (mountedRef.current) setLoading(false);
           }
         }
       );
@@ -368,14 +341,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = "/";
   };
 
+  const calculatedIsAdmin = profile?.role === "admin";
+
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
         loading,
-        isAdmin: profile?.role === "admin" || user?.email === "intradaymindview@gmail.com",
-        hasActiveSubscription,
+        isAdmin: calculatedIsAdmin,
+        hasActiveSubscription: calculatedIsAdmin ? true : hasActiveSubscription,
         signOut,
         refreshProfile,
       }}

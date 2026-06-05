@@ -175,6 +175,53 @@ export function BlogContent() {
                 <p className="text-sm mt-1">Check back soon!</p>
               </div>
             )}
+
+            {/* Learning Resources Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mt-20 p-8 sm:p-10 rounded-3xl border border-success/20 bg-success/[0.02] relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent pointer-events-none" />
+              <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                <div className="lg:col-span-2">
+                  <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-3">
+                    Intraday MindView Learning Resources
+                  </h2>
+                  <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
+                    Access direct lectures, training videos, and daily market psychology insights from Venkat Iyer. Subscribe to build your mathematical edge and professional execution mindset.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
+                  <a
+                    href="https://youtube.com/@intraday.mindview?sub_confirmation=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-lg shadow-success/10 text-center"
+                  >
+                    <span>YouTube (English)</span>
+                  </a>
+                  <a
+                    href="https://www.youtube.com/channel/UCTMpGuxQcWKzDtA0TeQsdWQ?sub_confirmation=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-lg shadow-success/10 text-center"
+                  >
+                    <span>YouTube (Hindi)</span>
+                  </a>
+                  <a
+                    href="https://www.linkedin.com/in/venkat-iyer-7839883b2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-success/30 hover:border-success/50 bg-background/50 hover:bg-background text-foreground text-xs font-bold transition-all text-center"
+                  >
+                    <span>LinkedIn Profile</span>
+                  </a>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>

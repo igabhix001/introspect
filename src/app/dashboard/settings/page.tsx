@@ -13,17 +13,40 @@ import {
   Globe,
   Loader2,
   Save,
+  Zap,
+  AlertTriangle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useProfileSettings } from "@/lib/hooks/use-dashboard-data";
+import { useToast } from "@/components/ui/toast";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut, refreshProfile } = useAuth();
   const { profile, updateProfile } = useProfileSettings();
+  const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [aiLimits, setAiLimits] = useState<{
+    daily_insights_remaining: number;
+    weekly_review_available: boolean;
+    monthly_review_available: boolean;
+    deep_patterns_remaining: number;
+    total_monthly_cost: number;
+    hard_limit: number;
+    isAdmin: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/user/ai-limits")
+      .then((res) => res.json())
+      .then((data) => {
+        setAiLimits(data);
+      })
+      .catch((err) => console.error("Error fetching AI limits:", err));
+  }, []);
 
   // Editable fields
   const [fullName, setFullName] = useState("");
@@ -38,6 +61,15 @@ export default function SettingsPage() {
     "End-of-Day Report": true,
     "Weekly Analytics Email": false,
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Force-refresh profile on page mount to ensure settings fields are populated
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
 
   // Load profile data
   useEffect(() => {
@@ -56,7 +88,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    await updateProfile({
+    const { error } = await updateProfile({
       full_name: fullName,
       phone: phone || null,
       trading_capital: parseFloat(tradingCapital) || 100000,
@@ -64,8 +96,13 @@ export default function SettingsPage() {
       default_risk: parseFloat(defaultRisk) || 1,
     });
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (error) {
+      showToast(error.message || "Failed to update profile settings.", "error");
+    } else {
+      showToast("Profile settings successfully updated.", "success");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -73,6 +110,14 @@ export default function SettingsPage() {
     // In production, call a server-side function to delete the user
     await signOut();
   };
+
+  if (!mounted || loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -232,6 +277,73 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Coaching Quotas & Limits */}
+      {aiLimits && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/50 bg-muted/20">
+            <Zap className="h-4 w-4 text-success" />
+            <h3 className="text-sm font-semibold">AI Coaching Plan & Quotas</h3>
+          </div>
+          <div className="divide-y divide-border/50">
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div>
+                <p className="text-sm font-medium">AI Coaching Insights Remaining Today</p>
+                <p className="text-xs text-muted-foreground">End-of-day summary and reflection insights</p>
+              </div>
+              <span className="text-sm font-semibold font-mono text-success">
+                {aiLimits.isAdmin ? "Unlimited (Admin)" : `${aiLimits.daily_insights_remaining} / 5`}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div>
+                <p className="text-sm font-medium">Weekly Review Available</p>
+                <p className="text-xs text-muted-foreground">In-depth weekly discipline analysis</p>
+              </div>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                aiLimits.weekly_review_available 
+                  ? "bg-success/15 text-success" 
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {aiLimits.weekly_review_available ? "Available" : "Limit Reached"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div>
+                <p className="text-sm font-medium">Monthly Review Available</p>
+                <p className="text-xs text-muted-foreground">Comprehensive monthly behavioral synthesis</p>
+              </div>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                aiLimits.monthly_review_available 
+                  ? "bg-success/15 text-success" 
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {aiLimits.monthly_review_available ? "Available" : "Limit Reached"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div>
+                <p className="text-sm font-medium">Deep Pattern Analyses Remaining</p>
+                <p className="text-xs text-muted-foreground">Detailed psychological trigger audits</p>
+              </div>
+              <span className="text-sm font-semibold font-mono text-success">
+                {aiLimits.isAdmin ? "Unlimited (Admin)" : `${aiLimits.deep_patterns_remaining} / 5`}
+              </span>
+            </div>
+            {!aiLimits.isAdmin && aiLimits.total_monthly_cost >= 20.0 && (
+              <div className="px-5 py-3.5 bg-destructive/10 text-destructive text-xs flex gap-2 items-start">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">AI cost warning limit reached</p>
+                  <p className="text-[11px] opacity-90 mt-0.5">
+                    Your monthly AI cost is at ₹{aiLimits.total_monthly_cost.toFixed(2)} of ₹{aiLimits.hard_limit.toFixed(2)}. Once you reach the limit, AI generations will be disabled but rule-based alerts and cached coaching remain available.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Danger Zone */}
       <div className="rounded-2xl border border-destructive/20 bg-destructive/[0.03] overflow-hidden">

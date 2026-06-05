@@ -40,53 +40,7 @@ const allFeatures = [
   { name: "Challenge History & Analytics", monthly: false, sixMonth: true, yearly: true },
   { name: "Journal Export (PDF/CSV)", monthly: false, sixMonth: true, yearly: true },
   { name: "Priority Support", monthly: false, sixMonth: true, yearly: true },
-  { name: "Loyalty Points (earn free months)", monthly: "10 pts", sixMonth: "75 pts", yearly: "150 pts" },
   { name: "All Future Feature Updates", monthly: false, sixMonth: false, yearly: true },
-];
-
-const loyaltyInfo = [
-  { action: "Annual Purchase", points: 150 },
-  { action: "Annual Renewal", points: 150 },
-  { action: "6-Month Purchase", points: 75 },
-  { action: "Monthly Renewal", points: 10 },
-  { action: "Referral (after payment)", points: 25 },
-];
-
-const referralBadges = [
-  { referrals: 3, badge: "Risk Mentor", bonus: "+20 points" },
-  { referrals: 5, badge: "Discipline Influencer", bonus: "+50 points" },
-  { referrals: 10, badge: "Community Builder", bonus: "+100 points" },
-];
-
-const pricingFAQs = [
-  {
-    q: "Is there a free trial?",
-    a: "Yes, all plans include a 7-day free trial. No credit card required. Cancel anytime.",
-  },
-  {
-    q: "Do I need to connect my broker?",
-    a: "No. INTROSPECT™ works completely independently. No broker connection needed.",
-  },
-  {
-    q: "Can I switch or cancel my plan?",
-    a: "Yes. Upgrade, downgrade, or cancel anytime from your dashboard. Monthly plans have no lock-in.",
-  },
-  {
-    q: "What's the refund policy?",
-    a: "14-day money-back guarantee on all annual plans. Full refund if not satisfied.",
-  },
-  {
-    q: "Is there a discount for paying annually?",
-    a: "Yes. Yearly plan is ₹3,999/year - just ₹333/month. Compared to paying monthly (₹499 × 12 = ₹5,988), you save ₹1,989. That's almost 2 months free.",
-  },
-  {
-    q: "How do loyalty points work?",
-    a: "Earn points on every purchase and renewal. 150 points = 1 free month.",
-  },
-  {
-    q: "Can I use INTROSPECT™ with any trading platform?",
-    a: "Yes. Platform-independent. Works alongside any broker or trading software.",
-  },
 ];
 
 declare global {
@@ -102,9 +56,9 @@ interface PricingData {
 }
 
 const DEFAULT_PRICES: PricingData = {
-  monthly: { amount: 499, amount_paise: 49900 },
-  "6-month": { amount: 2499, amount_paise: 249900 },
-  yearly: { amount: 3999, amount_paise: 399900 },
+  monthly: { amount: 333, amount_paise: 33300 },
+  "6-month": { amount: 1836, amount_paise: 183600 },
+  yearly: { amount: 3654, amount_paise: 365400 },
 };
 
 export function PricingContent() {
@@ -113,6 +67,33 @@ export function PricingContent() {
   const [prices, setPrices] = useState<PricingData>(DEFAULT_PRICES);
   const router = useRouter();
   const { showToast } = useToast();
+
+  const pricingFAQs = [
+    {
+      q: "Is there a free trial?",
+      a: "Yes, all plans include a 5 trading days free trial. No credit card required. Cancel anytime.",
+    },
+    {
+      q: "Do I need to connect my broker?",
+      a: "No. INTROSPECT™ works completely independently. No broker connection needed.",
+    },
+    {
+      q: "Can I switch or cancel my plan?",
+      a: "Yes. Upgrade, downgrade, or cancel anytime from your dashboard. Monthly plans have no lock-in.",
+    },
+    {
+      q: "Is there a discount for paying annually?",
+      a: `Yes. Yearly plan is ₹${prices.yearly.amount.toLocaleString("en-IN")}/year - just ₹${Math.round(prices.yearly.amount / 12).toLocaleString("en-IN")}/month. Compared to paying monthly (₹${prices.monthly.amount.toLocaleString("en-IN")} × 12 = ₹${(prices.monthly.amount * 12).toLocaleString("en-IN")}), you save ₹${((prices.monthly.amount * 12) - prices.yearly.amount).toLocaleString("en-IN")}. That's almost 2 months free.`,
+    },
+    {
+      q: "Do you have a referral program?",
+      a: "Yes! Refer a friend who subscribes and earn 25 referral points. Accumulate 150 points to redeem 1 free month. Points can only be earned via referrals.",
+    },
+    {
+      q: "Can I use INTROSPECT™ with any trading platform?",
+      a: "Yes. Platform-independent. Works alongside any broker or trading software.",
+    },
+  ];
 
   // Fetch dynamic pricing from admin settings
   useEffect(() => {
@@ -491,66 +472,6 @@ export function PricingContent() {
           </div>
         </motion.div>
 
-        {/* Loyalty Program */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="max-w-4xl mx-auto mb-20"
-        >
-          <div className="rounded-2xl bg-card/50 border border-border/50 glass-card p-8 sm:p-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-amber-500/10">
-                <Gift className="h-5 w-5 text-amber-400" />
-              </div>
-              <h2 className="font-heading text-2xl font-bold">
-                Loyalty Program
-              </h2>
-            </div>
-            <p className="text-muted-foreground mb-6">
-              <strong>150 points = 1 free month.</strong> Earn points with every
-              action. Points expire after 24 months.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-              {loyaltyInfo.map((item) => (
-                <div
-                  key={item.action}
-                  className="p-4 rounded-xl bg-muted/30 border border-border/30 text-center"
-                >
-                  <p className="font-heading text-2xl font-bold text-success">
-                    +{item.points}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {item.action}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <h3 className="font-heading font-semibold mb-4 flex items-center gap-2">
-              <Award className="h-4 w-4 text-success" />
-              Referral Milestones
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {referralBadges.map((item) => (
-                <div
-                  key={item.badge}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/30"
-                >
-                  <Users className="h-5 w-5 text-success flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">{item.badge}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.referrals} referrals • {item.bonus}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
 
         {/* Value Comparison Table */}
         <motion.div
@@ -628,7 +549,7 @@ export function PricingContent() {
                 </li>
                 <li className="flex items-center gap-2.5">
                   <span className="text-success font-bold">✓</span>
-                  <span className="font-semibold text-success">Starts at just ₹499/month</span>
+                  <span className="font-semibold text-success">Starts at just ₹{prices.monthly.amount.toLocaleString("en-IN")}/month</span>
                 </li>
               </ul>
             </div>

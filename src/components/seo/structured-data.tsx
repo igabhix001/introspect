@@ -80,7 +80,7 @@ export function StructuredData() {
           "name": "What features are included in INTROSPECT™?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "The platform includes: 1) Diagnostic Assessment to evaluate trading psychology. 2) Advanced Trade Journal with automated mistake tagging. 3) AI Reflection Coach for CBT feedback on mistakes. 4) Position Size Calculator integrated with live market sentiment. 5) Daily End-of-Day Performance Reports. 6) 30, 60, and 90-Day Discipline Challenges with points and rewards.",
+            "text": "The platform includes: 1) Diagnostic Assessment to evaluate trading psychology. 2) Advanced Trade Journal with automated mistake tagging. 3) AI Reflection Coach for CBT feedback on mistakes. 4) Position Size Calculator integrated with live market sentiment. 5) Daily End-of-Day Performance Reports. 6) 30, 60, and 90-Day Discipline Challenges to build consistency.",
           },
         },
       ],

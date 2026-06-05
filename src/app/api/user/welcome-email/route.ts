@@ -14,8 +14,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const emailType = body.type || "welcome_trial";
     const adminDb = createAdminClient();
-    const cacheKey = `welcome_email_sent:${user.id}`;
+    const cacheKey = `welcome_email_sent:${user.id}:${emailType}`;
 
     // 1. Check if email was already sent
     const { data: existing } = await adminDb
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     // 2. Fetch subscription details to check for trial status and get end date
     const { data: sub } = await adminDb
       .from("subscriptions")
-      .select("plan, current_period_end")
+      .select("plan, current_period_end, created_at")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -53,7 +55,9 @@ export async function POST(req: NextRequest) {
     const emailSent = await sendWelcomeTrialEmail({
       userEmail: user.email!,
       userName,
-      trialEndDate,
+      type: emailType,
+      trialStartDate: body.trialStartDate || sub?.created_at || new Date(),
+      trialEndDate: body.trialEndDate || trialEndDate,
     });
 
     if (emailSent) {

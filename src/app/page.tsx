@@ -47,13 +47,26 @@ const FinalCtaSection = dynamic(() => import("@/components/homepage/final-cta"),
   loading: () => <SectionSkeleton />,
 });
 
+import { redirect } from "next/navigation";
+
 export const metadata: Metadata = {
   title: "Stop Blowing Accounts | INTROSPECT™ AI Trading Companion",
   description: "Improve your trading discipline with INTROSPECT™. A behavioral trading companion that tracks execution habits, calculates ATR-based sizes, and prevents emotional errors.",
   keywords: ["trading discipline", "trading psychology", "behavioral journal", "stop blowing accounts", "intraday options trading", "Nifty options", "capital protection"],
 };
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedParams = await searchParams;
+  const authCode = resolvedParams.auth_code || resolvedParams.code;
+  
+  if (authCode && typeof authCode === "string" && authCode !== "200" && authCode !== "ok") {
+    redirect(`/auth/fyers/callback?auth_code=${authCode}&code=200`);
+  }
+
   return (
     <div className="overflow-hidden">
       <HeroSection />

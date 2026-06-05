@@ -217,6 +217,22 @@ export function DashboardSidebar({
         </div>
       )}
 
+      {isAdmin && collapsed && (
+        <div className="flex justify-center mt-3">
+          <Link
+            href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
+            title={isOnAdminPage ? "Switch to User Dashboard" : "Switch to Admin Panel"}
+            className={`p-2 rounded-xl border flex items-center justify-center transition-colors ${
+              isOnAdminPage
+                ? "bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20"
+                : "bg-success/10 border border-success/20 text-success hover:bg-success/20"
+            }`}
+          >
+            <Shield className="h-[18px] w-[18px]" />
+          </Link>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-2.5 space-y-1">
         {navItems.map((item) => {

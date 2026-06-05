@@ -6,9 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  // Email-based admin check (bypasses RLS issues)
-  if (user.email === "intradaymindview@gmail.com") return user;
-  // Try profile check as fallback
+  // Try profile check
   try {
     const adminDb = createAdminClient();
     const { data: profile } = await adminDb
@@ -18,7 +16,7 @@ async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
       .single();
     if (profile?.role === "admin") return user;
   } catch {
-    // If check fails, fall back to email only
+    // If check fails, return null
   }
   return null;
 }

@@ -19,16 +19,13 @@ export async function GET() {
     
     console.log("[Admin Stats] User:", user.email);
 
-    // Email-based admin check (avoids RLS)
-    const isAdmin = user.email === "intradaymindview@gmail.com";
-    if (!isAdmin) {
-      try {
-        const adminDb = createAdminClient();
-        const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
-        if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      } catch {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    // Role-based admin check
+    try {
+      const adminDb = createAdminClient();
+      const { data: profile } = await adminDb.from("profiles").select("role").eq("id", user.id).single();
+      if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Use admin client for all queries (bypasses RLS)

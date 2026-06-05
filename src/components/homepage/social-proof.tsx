@@ -17,18 +17,8 @@ export default function SocialProofSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mb-16">
+        <div className="max-w-md mx-auto mb-16">
           {[
-            {
-              text: "Reduced my overtrading behaviour by 70% in the first 14 days of using the risk engine feedback.",
-              author: "Rahul M.",
-              style: "Options Scalper"
-            },
-            {
-              text: "The ATR position size calculator is a massive game-changer. I don't calculate sizes manually anymore.",
-              author: "Anita S.",
-              style: "Intraday Equity"
-            },
             {
               text: "Finally stopped revenge averaging on bad trades after seeing the AI report quantify how much it cost me.",
               author: "David K.",

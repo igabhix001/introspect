@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function FinalCtaSection() {
   return (
@@ -32,14 +32,11 @@ export default function FinalCtaSection() {
           </Link>
 
           <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-1 text-amber-400">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="h-4 w-4 fill-current text-yellow-500" />
-              ))}
-              <span className="text-white text-xs font-bold ml-1.5">4.9/5 Rating</span>
-            </div>
-            <p className="text-xs text-white/40 font-mono uppercase tracking-widest">
-              Join 12,000+ Disciplined Traders • Broker Independent
+            <p className="text-sm text-[#00c853] font-semibold">
+              Join community of disciplined traders
+            </p>
+            <p className="text-xs text-white/50 font-mono uppercase tracking-widest">
+              High value and affordable solution for traders
             </p>
           </div>
         </div>

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if admin
-    const isAdmin = profile?.role === "admin" || data.user.email === "intradaymindview@gmail.com";
+    const isAdmin = profile?.role === "admin";
 
     if (isAdmin) {
       return NextResponse.redirect(new URL("/dashboard/admin", requestUrl.origin));

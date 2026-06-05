@@ -8,7 +8,7 @@ export function useProfileSettings() {
   const { user, profile, refreshProfile } = useAuth();
 
   const updateProfile = async (updates: Record<string, unknown>) => {
-    if (!user) return;
+    if (!user) return { error: new Error("User not authenticated") };
     const supabase = createClient();
 
     const { error } = await supabase
