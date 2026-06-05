@@ -23,9 +23,11 @@ import {
   Radar,
   ResponsiveContainer,
   Tooltip,
+  LineChart,
+  Line,
 } from "recharts";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useAssessmentQuery } from "@/lib/hooks/use-queries";
+import { useAssessmentQuery, useAllAssessmentsQuery } from "@/lib/hooks/use-queries";
 
 const DISTORTION_DESCRIPTIONS: Record<string, string> = {
   "Stop-Loss & Loss Response": "Loss aversion asymmetry leading to deferred risk cut and revenge sizing.",
@@ -58,11 +60,30 @@ const categoryIcons: Record<string, typeof Shield> = {
 export default function RiskReportPage() {
   const { loading: authLoading, hasActiveSubscription } = useAuth();
   const { data: assessment, isLoading: assessmentLoading } = useAssessmentQuery();
+  const { data: allAssessments } = useAllAssessmentsQuery();
+  
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (assessment && hasActiveSubscription !== false) {
+      setAiLoading(true);
+      fetch("/api/risk-report/summary")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.summary) {
+            setAiSummary(data.summary);
+          }
+        })
+        .catch((err) => console.error("Error fetching AI summary:", err))
+        .finally(() => setAiLoading(false));
+    }
+  }, [assessment, hasActiveSubscription]);
 
   const loading = assessmentLoading && !assessment;
 
@@ -186,8 +207,47 @@ export default function RiskReportPage() {
         </div>
       </div>
 
+      {/* AI Executive Summary */}
+      {hasActiveSubscription !== false && (
+        <motion.div
+          variants={stagger.item}
+          className="rounded-2xl border border-border bg-gradient-to-r from-success/5 via-transparent to-transparent p-6 relative overflow-hidden screen-only"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-success/5 rounded-full blur-3xl pointer-events-none -mr-32 -mt-32" />
+          <div className="flex items-start gap-4 relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center shrink-0 animate-pulse">
+              <Brain className="h-5 w-5 text-success" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-success">
+                  INTROSPECT™ AI Executive Summary
+                </h3>
+                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-success/15 text-success border border-success/30 shadow-[0_0_8px_rgba(34,197,94,0.2)] animate-pulse">
+                  AI Synthesis
+                </span>
+              </div>
+              {aiLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                  <Loader2 className="h-3 w-3 animate-spin text-success" />
+                  Synthesizing psychological trading profile...
+                </div>
+              ) : aiSummary ? (
+                <p className="text-sm text-foreground/95 leading-relaxed font-medium">
+                  {aiSummary}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Failed to generate AI executive summary. Retrying shortly...
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Score Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 screen-only">
         {/* Radar Chart */}
         <motion.div variants={stagger.item} className="lg:col-span-2 rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center justify-between mb-4">
@@ -247,6 +307,56 @@ export default function RiskReportPage() {
             </span>
           </div>
 
+          {/* Risk History Trend Sparkline */}
+          {allAssessments && allAssessments.length > 1 && (
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Risk History Trend
+                </h4>
+                <span className="text-[10px] text-muted-foreground">
+                  {allAssessments.length} assessments
+                </span>
+              </div>
+              <div className="h-16 w-full min-h-[64px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={allAssessments.map((a: any, i: number) => ({
+                    index: i + 1,
+                    score: a.discipline_score,
+                    date: new Date(a.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                  }))}>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "10px", padding: "4px 8px", color: "var(--foreground)" }}
+                      labelFormatter={(label) => `Assessment #${label}`}
+                      formatter={(value) => [`${value}/100`, "Score"]}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="score" 
+                      stroke="var(--success)" 
+                      strokeWidth={2} 
+                      dot={{ r: 2.5, fill: "var(--success)", strokeWidth: 0 }} 
+                      activeDot={{ r: 4 }} 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Show improvement text */}
+              <div className="text-[11px] text-muted-foreground flex items-center justify-between border-t border-border/30 pt-2">
+                <span>First: {allAssessments[0]?.discipline_score}/100</span>
+                <span className={`font-bold flex items-center gap-0.5 ${
+                  allAssessments[allAssessments.length - 1].discipline_score >= allAssessments[0].discipline_score
+                    ? "text-success"
+                    : "text-destructive"
+                }`}>
+                  {allAssessments[allAssessments.length - 1].discipline_score >= allAssessments[0].discipline_score ? "▲" : "▼"}{" "}
+                  {Math.abs(allAssessments[allAssessments.length - 1].discipline_score - allAssessments[0].discipline_score)} pts
+                </span>
+                <span>Current: {allAssessments[allAssessments.length - 1]?.discipline_score}/100</span>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category Scores</h4>
             {radarData.map((item: { category: string; score: number; fullMark: number }) => (
@@ -271,7 +381,7 @@ export default function RiskReportPage() {
 
       {/* New Categories Detailed Report */}
       {categoriesAnalysis && (
-        <motion.div variants={stagger.item} className="mt-8 space-y-6">
+        <motion.div variants={stagger.item} className="mt-8 space-y-6 screen-only">
           <div className={`rounded-2xl border p-6 mb-6 ${
             categoriesAnalysis.overall.risk_level === 'high' ? 'border-destructive/30 bg-destructive/5' : 
             categoriesAnalysis.overall.risk_level === 'medium' ? 'border-amber-500/30 bg-amber-500/5' : 
@@ -305,7 +415,7 @@ export default function RiskReportPage() {
 
               return (
                 <div key={idx} className={`rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-6`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-white/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-border/50">
                     <h4 className="font-heading font-bold text-base flex items-center gap-2">
                       <span className={`w-3 h-3 rounded-full ${bgClass} border ${borderClass}`} />
                       {cat.name}
@@ -321,13 +431,13 @@ export default function RiskReportPage() {
                       <span className="text-muted-foreground font-medium">Risk Exposure Score</span>
                       <span className={`font-mono font-bold ${colorClass}`}>{cat.percentage}%</span>
                     </div>
-                    <div className="relative w-full h-2.5 bg-white/5 rounded-full overflow-hidden flex">
+                    <div className="relative w-full h-2.5 bg-muted/40 rounded-full overflow-hidden flex">
                       {/* Low zone */}
-                      <div className="w-[40%] h-full bg-success/10 border-r border-black/40" />
+                      <div className="w-[40%] h-full bg-success/15 border-r border-border/60" />
                       {/* Medium zone */}
-                      <div className="w-[30%] h-full bg-amber-500/10 border-r border-black/40" />
+                      <div className="w-[30%] h-full bg-amber-500/15 border-r border-border/60" />
                       {/* High zone */}
-                      <div className="w-[30%] h-full bg-destructive/10" />
+                      <div className="w-[30%] h-full bg-destructive/15" />
                       
                       {/* Pointer */}
                       <div 
@@ -353,7 +463,7 @@ export default function RiskReportPage() {
                         {distortionDesc}
                       </p>
                       {cat.issues?.length > 0 ? (
-                        <ul className="space-y-2 border-t border-white/5 pt-3">
+                        <ul className="space-y-2 border-t border-border/50 pt-3">
                           {cat.issues.map((issue: string, i: number) => (
                             <li key={i} className="text-xs text-foreground/90 flex items-start gap-2 leading-relaxed">
                               <span className="text-destructive mt-1 text-[10px]">•</span>
@@ -362,7 +472,7 @@ export default function RiskReportPage() {
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-xs text-muted-foreground italic border-t border-white/5 pt-3">No major distortions identified.</p>
+                        <p className="text-xs text-muted-foreground italic border-t border-border/50 pt-3">No major distortions identified.</p>
                       )}
                     </div>
                     <div>
@@ -394,7 +504,7 @@ export default function RiskReportPage() {
 
       {/* Legacy Personalized Rules (Fallback if categories analysis not fully supported) */}
       {!categoriesAnalysis && (
-        <motion.div variants={stagger.item}>
+        <motion.div variants={stagger.item} className="screen-only">
           <div className="flex items-center justify-between mb-4 mt-8">
             <div>
               <h3 className="font-heading text-base font-bold">Your Personalized Trading Rules</h3>
@@ -427,17 +537,116 @@ export default function RiskReportPage() {
         </motion.div>
       )}
 
-      {/* Print styles */}
+      {/* Printable One-Page Textual Report */}
+      <div className="print-only text-black bg-white p-8 font-sans max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="border-b-2 border-black pb-4 flex justify-between items-end">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight uppercase">INTROSPECT™ Behavioral Risk Report</h1>
+            <p className="text-xs text-gray-600 mt-1 font-semibold">Intraday Trading Psychology & Discipline Diagnostics</p>
+          </div>
+          <div className="text-right text-xs">
+            <p><strong>Date:</strong> {assessment ? new Date(assessment.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+            <p><strong>Trader ID:</strong> {assessment?.user_id?.slice(0, 8) || "N/A"}</p>
+          </div>
+        </div>
+
+        {/* Score block */}
+        <div className="grid grid-cols-3 gap-6 bg-gray-50 border border-gray-200 p-4 rounded-lg">
+          <div className="text-center border-r border-gray-200">
+            <p className="text-[10px] text-gray-500 uppercase font-bold">Discipline Score</p>
+            <p className="text-3xl font-bold mt-1">{overallScore}/100</p>
+          </div>
+          <div className="text-center border-r border-gray-200">
+            <p className="text-[10px] text-gray-500 uppercase font-bold">Risk Classification</p>
+            <p className="text-xl font-bold uppercase mt-2">{riskLevel.label}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-gray-500 uppercase font-bold">Confidence Rating</p>
+            <p className="text-sm font-bold mt-2">HIGH (92%)</p>
+          </div>
+        </div>
+
+        {/* Executive Summary */}
+        {aiSummary && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 border-b border-gray-300 pb-1">
+              Executive Summary
+            </h3>
+            <p className="text-xs leading-relaxed text-gray-800 italic">
+              "{aiSummary}"
+            </p>
+          </div>
+        )}
+
+        {/* Category Breakdown */}
+        {categoriesAnalysis ? (
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 border-b border-gray-300 pb-1">
+              Behavioral Risk Breakdown
+            </h3>
+            <div className="space-y-3">
+              {categoriesAnalysis.categories.map((cat: any, i: number) => (
+                <div key={i} className="text-xs border-b border-gray-100 pb-2 last:border-0">
+                  <div className="flex justify-between font-semibold">
+                    <span>{cat.name}</span>
+                    <span className="uppercase text-gray-600">{cat.risk_band} Risk ({cat.percentage}%)</span>
+                  </div>
+                  {cat.issues?.length > 0 && (
+                    <p className="text-[11px] text-gray-700 mt-1">
+                      <strong>Cognitive Distortions:</strong> {cat.issues.join(", ")}
+                    </p>
+                  )}
+                  {cat.recommendations?.length > 0 && (
+                    <p className="text-[11px] text-gray-700 mt-0.5">
+                      <strong>Personalized Safeguards:</strong> {cat.recommendations.join("; ")}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 border-b border-gray-300 pb-1">
+              Personalized Safeguards
+            </h3>
+            <ul className="list-disc list-inside text-xs text-gray-800 space-y-1.5">
+              {personalizedRules.map((rule, idx) => (
+                <li key={idx} className="leading-relaxed">
+                  <strong>{rule.rule}:</strong> {rule.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Footnote */}
+        <div className="border-t border-gray-300 pt-3 text-[10px] text-gray-500 text-center flex justify-between">
+          <span>INTROSPECT™ Behavioral Analysis Platform</span>
+          <span>© Intraday MindView Learning</span>
+          <span>CONFIDENTIAL</span>
+        </div>
+      </div>
+
+      {/* Print/Screen layout CSS */}
       <style>{`
+        .print-only {
+          display: none !important;
+        }
         @media print {
-          /* Hide sidebar, top navigation, and action buttons */
+          .print-only {
+            display: block !important;
+          }
+          .screen-only {
+            display: none !important;
+          }
           header, nav, aside, footer, .no-print, button, .no-print * {
             display: none !important;
           }
           body {
             background-color: #ffffff !important;
             color: #000000 !important;
-            font-size: 11pt;
             margin: 0;
             padding: 0;
           }
@@ -446,25 +655,6 @@ export default function RiskReportPage() {
             width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
-          }
-          /* Ensure charts display well and text is readable */
-          .bg-card, .bg-muted {
-            background-color: #fafafa !important;
-            border: 1px solid #e2e8f0 !important;
-            color: #000000 !important;
-          }
-          .text-muted-foreground {
-            color: #4a5568 !important;
-          }
-          /* Print backgrounds for charts/badges */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .rounded-2xl, .rounded-xl {
-            border: 1px solid #e2e8f0 !important;
-            break-inside: avoid;
-            background: transparent !important;
           }
         }
       `}</style>

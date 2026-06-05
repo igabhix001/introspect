@@ -225,7 +225,7 @@ export async function sendWelcomeTrialEmail(params: WelcomeEmailParams): Promise
       </p>
 
       <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
-        Choose from our plans starting at just ₹399/month.
+        Choose from our plans starting at just ₹333/month.
       </p>
 
       <!-- CTA -->
@@ -244,7 +244,9 @@ export async function sendWelcomeTrialEmail(params: WelcomeEmailParams): Promise
   }
 
   try {
-    const isSandbox = !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.includes("re_");
+    const isSandbox = !process.env.RESEND_API_KEY || 
+                      process.env.RESEND_API_KEY.includes("re_temp") || 
+                      !process.env.NEXT_PUBLIC_SITE_URL?.includes("intradaymindview.com");
     const fromSender = isSandbox 
       ? "INTROSPECT <onboarding@resend.dev>" 
       : "INTROSPECT <noreply@intradaymindview.com>";

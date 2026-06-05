@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const mountedRef = useRef(true);
   // Mutex: prevents concurrent hydrations
-  const hydrationStartedRef = useRef(initialCache.initialized);
+  const hydrationStartedRef = useRef(false);
   const hydrationDoneRef = useRef(initialCache.initialized);
 
   // Keep sessionStorage cache in sync with state
@@ -106,9 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, userEmail?: string): Promise<void> => {
     try {
       // Primary: server route with admin client — guarantees correct `role` field
-      const res = await fetch("/api/user/profile", {
+      const res = await fetch(`/api/user/profile?t=${Date.now()}`, {
         method: "GET",
         credentials: "include", // Send session cookies for auth verification
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Pragma": "no-cache",
+        },
         signal: AbortSignal.timeout(5000), // 5s timeout to prevent hanging
       });
 

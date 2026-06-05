@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { MarketingShell } from "@/components/layout/marketing-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { AuthErrorBoundary } from "@/components/providers/error-boundary";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics, Hotjar } from "@/components/analytics";
@@ -121,11 +122,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <ToastProvider>
-              <MarketingShell>{children}</MarketingShell>
-            </ToastProvider>
-          </AuthProvider>
+          <AuthErrorBoundary>
+            <AuthProvider>
+              <ToastProvider>
+                <MarketingShell>{children}</MarketingShell>
+              </ToastProvider>
+            </AuthProvider>
+          </AuthErrorBoundary>
           <GoogleAnalytics />
           <Hotjar />
           {process.env.NODE_ENV === "production" && process.env.VERCEL && (

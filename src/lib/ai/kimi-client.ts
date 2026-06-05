@@ -453,3 +453,42 @@ function getFallbackAiProfile(
     defensePlan
   };
 }
+
+/**
+ * Generates an AI Risk Report Summary using Kimi 2.6.
+ */
+export async function generateRiskReportSummary(data: {
+  overallScore: number;
+  riskLevel: string;
+  categories: Array<{ name: string; risk_percent: number; risk_band: string; issues?: string[] }>;
+}): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
+  const categoriesStr = data.categories.map(c => 
+    `- ${c.name}: ${c.risk_band} Risk (${Math.round(c.risk_percent * 100)}% exposure). Issues: ${c.issues?.join(", ") || "None"}`
+  ).join("\n");
+
+  const systemPrompt = `You are INTROSPECT™ AI Risk Profiler.
+Provide a high-impact, professional 3-4 sentence paragraph executive summary diagnosing the trader's psychological profile and risk exposure based on their recent diagnostic assessment:
+- Overall Discipline Score: ${data.overallScore}/100
+- Risk Level: ${data.riskLevel.toUpperCase()}
+- Category Breakdown:
+${categoriesStr}
+
+You speak with clinical authority, directness, and absolute objectivity. Avoid generic opening phrases like "Based on...", "This report suggests...", or "As an AI...". Provide a direct, synthesized narrative explaining how their psychological archetype impacts their trading, their core cognitive distortions (e.g. loss aversion, action bias), and the single most critical behavioral guardrail they must enforce to protect their capital. 
+
+Keep the response strictly under 120 words, formatted as a single cohesive paragraph.`;
+
+  try {
+    return await callKimi([
+      { role: "system", content: systemPrompt },
+      { role: "user", content: "Generate my risk report executive summary." }
+    ], MODEL_COMPLEX, 400);
+  } catch (err) {
+    // Return a professional rule-based fallback if API fails
+    const fallbackText = `Your overall risk profile is classified as ${data.riskLevel.toUpperCase()} with an execution discipline score of ${data.overallScore}/100. Diagnostic analysis identifies primary vulnerabilities in ${data.categories.filter(c => c.risk_band === "High" || c.risk_band === "Medium").map(c => c.name).join(", ") || "risk planning"}. These patterns indicate susceptibility to execution deviations, specifically stop-loss adjustments and size expansion during drawdown cycles. To safeguard capital, you must implement bracket order entries with locked stop-losses and enforce an absolute daily trade limit.`;
+    return {
+      content: fallbackText,
+      promptTokens: 0,
+      completionTokens: 0
+    };
+  }
+}

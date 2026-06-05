@@ -1,32 +1,31 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
-
-// Singleton Supabase client — shared across all hooks, never recreated per render
-const supabase = createClient();
+import { useRef } from "react";
 
 /**
- * Helper to get stable user ID that doesn't cause query key changes during auth loading
+ * Helper hook to get stable user ID that doesn't cause query key changes during auth loading
  * Returns cached userId if auth is still loading to prevent query restarts
  * IMPORTANT: Clear cache when user is explicitly null (signed out) to prevent stale data
  */
-let cachedUserId: string | null = null;
-function getStableUserId(user: { id: string } | null, loading: boolean): string | null {
+function useStableUserId(): string | null {
+  const { user, loading } = useAuth();
+  const cachedUserIdRef = useRef<string | null>(null);
+
   if (user?.id) {
-    cachedUserId = user.id;
+    cachedUserIdRef.current = user.id;
     return user.id;
   }
   // If NOT loading and user is null, clear cache (user signed out)
   if (!loading && !user) {
-    cachedUserId = null;
+    cachedUserIdRef.current = null;
     return null;
   }
   // If loading, return cached ID to prevent query key changes
-  // But only for a short time - if loading takes too long, return null
-  if (loading && cachedUserId) {
-    return cachedUserId;
+  if (loading && cachedUserIdRef.current) {
+    return cachedUserIdRef.current;
   }
   return null;
 }
@@ -45,8 +44,8 @@ export const queryKeys = {
 
 // ─── Dashboard Overview Data ───
 export function useDashboardQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.dashboard(userId || ""),
@@ -208,14 +207,14 @@ export function useDashboardQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 0, // Always fetch fresh dashboard data
+    staleTime: 30 * 1000, // 30 seconds — fresh enough for dashboard
   });
 }
 
 // ─── Trade Journal Data ───
 export function useTradesQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.trades(userId || ""),
@@ -233,14 +232,14 @@ export function useTradesQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 0, // Always fetch fresh trades data
+    staleTime: 30 * 1000, // 30 seconds — trades don't change that fast
   });
 }
 
 // ─── Assessment Data ───
 export function useAssessmentQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.assessment(userId || ""),
@@ -259,14 +258,38 @@ export function useAssessmentQuery() {
       return data;
     },
     enabled: !!userId,
-    staleTime: 0, // Always fetch fresh assessment data - no stale cache
+    staleTime: 10 * 60 * 1000, // 10 minutes — assessment rarely changes
+  });
+}
+
+// ─── All Assessments Data (Historical) ───
+export function useAllAssessmentsQuery() {
+  const userId = useStableUserId();
+  const supabase = createClient();
+
+  return useQuery({
+    queryKey: ["assessmentsAll", userId || ""] as const,
+    queryFn: async ({ signal }) => {
+      if (!userId) return [];
+
+      const { data } = await supabase
+        .from("assessments")
+        .select("id, discipline_score, created_at, risk_level")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true })
+        .abortSignal(signal);
+
+      return data || [];
+    },
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000, // 10 minutes — assessment rarely changes
   });
 }
 
 // ─── Challenges Data ───
 export function useChallengesQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.challenges(userId || ""),
@@ -299,7 +322,7 @@ export function useChallengesQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 0, // Always fetch fresh challenges data
+    staleTime: 60 * 1000, // 1 minute
   });
 }
 
@@ -326,8 +349,8 @@ export function useMarketQuery() {
 
 // ─── Loyalty Points Data ───
 export function useLoyaltyQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.loyalty(userId || ""),
@@ -350,8 +373,8 @@ export function useLoyaltyQuery() {
 
 // ─── Daily Reports Data ───
 export function useDailyReportsQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.dailyReports(userId || ""),
@@ -375,8 +398,8 @@ export function useDailyReportsQuery() {
 
 // ─── Loyalty Data with Transactions ───
 export function useLoyaltyWithTransactionsQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: ["loyaltyFull", userId || ""] as const,
@@ -413,8 +436,8 @@ export function useLoyaltyWithTransactionsQuery() {
 
 // ─── Daily Report Data ───
 export function useDailyReportQuery(date: string) {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: ["dailyReport", userId || "", date] as const,
@@ -438,8 +461,8 @@ export function useDailyReportQuery(date: string) {
 
 // ─── Recent Daily Reports ───
 export function useRecentDailyReportsQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: ["recentDailyReports", userId || ""] as const,
@@ -466,8 +489,8 @@ export function useRecentDailyReportsQuery() {
 
 // ─── Analytics Data ───
 export function useAnalyticsQuery() {
-  const { user, loading: authLoading } = useAuth();
-  const userId = getStableUserId(user, authLoading);
+  const userId = useStableUserId();
+  const supabase = createClient();
 
   return useQuery({
     queryKey: ["analytics", userId || ""] as const,
@@ -616,7 +639,7 @@ export function useAnalyticsQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 0, // Always fetch fresh analytics data
+    staleTime: 2 * 60 * 1000, // 2 minutes — analytics are aggregate and stable
   });
 }
 
@@ -625,6 +648,7 @@ export function useAnalyticsQuery() {
 export function useAddTradeMutation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (trade: Record<string, unknown>) => {
@@ -694,7 +718,9 @@ export function useAdminStatsQuery() {
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -709,7 +735,9 @@ export function useAdminUsersQuery() {
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -724,7 +752,9 @@ export function useAdminSubscriptionsQuery() {
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -739,6 +769,8 @@ export function useAdminNotificationsQuery() {
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }

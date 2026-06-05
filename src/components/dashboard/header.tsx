@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DashboardHeaderProps {
   onMobileMenuToggle: () => void;
@@ -103,6 +104,19 @@ export function DashboardHeader({
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const { profile, signOut, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const prefetchAdminStats = () => {
+    if (!isAdmin) return;
+    queryClient.prefetchQuery({
+      queryKey: ["adminStats"],
+      queryFn: async () => {
+        const res = await fetch("/api/admin/stats");
+        if (!res.ok) throw new Error("Failed to fetch admin stats");
+        return res.json();
+      },
+      staleTime: 60 * 1000,
+    });
+  };
   const isOnAdminPage = pathname.startsWith("/dashboard/admin");
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -280,6 +294,7 @@ export function DashboardHeader({
                         <Link
                           href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
                           onClick={() => setProfileOpen(false)}
+                          onMouseEnter={prefetchAdminStats}
                           className="flex items-center gap-2.5 px-4 py-2 text-sm text-amber-500 font-semibold hover:bg-muted transition-colors"
                         >
                           <Shield className="h-4 w-4" />

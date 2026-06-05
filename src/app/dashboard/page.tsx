@@ -206,7 +206,7 @@ function RiskLimitStatusBar({ todayTradeCount, todayPnl, capitalUsed }: { todayT
                     ? todayTradeCount > maxTrades
                       ? "bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]"
                       : "bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]"
-                    : "bg-white/5"
+                    : "bg-muted/40"
                 }`}
               />
             ))}
@@ -225,7 +225,7 @@ function RiskLimitStatusBar({ todayTradeCount, todayPnl, capitalUsed }: { todayT
               {todayPnl < 0 ? `-₹${Math.abs(todayPnl).toLocaleString("en-IN")}` : "₹0"} ({currentDrawdownPct.toFixed(2)}%)
             </span>
           </div>
-          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden relative">
+          <div className="w-full h-2 bg-muted/40 rounded-full overflow-hidden relative">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 currentDrawdownPct >= maxDrawdownPct
@@ -249,7 +249,7 @@ function RiskLimitStatusBar({ todayTradeCount, todayPnl, capitalUsed }: { todayT
             <span className="text-muted-foreground font-medium">Active SL Capital-at-Risk</span>
             <span className="font-mono text-foreground font-semibold">{capitalAtRiskPct}% of capital</span>
           </div>
-          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-muted/40 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-500 rounded-full transition-all duration-500"
               style={{ width: `${(capitalAtRiskPct / 5) * 100}%` }}
@@ -583,7 +583,7 @@ function DashboardContent() {
         variants={staggerItem}
         className="rounded-2xl border border-border bg-card p-5 space-y-4"
       >
-        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <div className="flex items-center gap-2">
             <Flame className="h-4.5 w-4.5 text-success" />
             <h3 className="font-heading text-xs font-bold uppercase tracking-wider">
@@ -596,7 +596,7 @@ function DashboardContent() {
         <div className="flex flex-col space-y-4">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none snap-x justify-start md:justify-between">
             {last30Days.map((day) => {
-              let colorClass = "bg-white/5 border border-white/10 hover:border-white/20";
+              let colorClass = "bg-muted/30 border border-border hover:border-border/70";
               let glowColor = "";
               if (day.score !== null) {
                 if (day.score >= 75) {
@@ -631,9 +631,9 @@ function DashboardContent() {
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 flex-wrap text-[10px] text-muted-foreground pt-1 border-t border-white/5">
+          <div className="flex items-center gap-4 flex-wrap text-[10px] text-muted-foreground pt-1 border-t border-border/50">
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-white/5 border border-white/10" />
+              <span className="w-3.5 h-3.5 rounded bg-muted/40 border border-border" />
               No Trades
             </span>
             <span className="flex items-center gap-1.5">

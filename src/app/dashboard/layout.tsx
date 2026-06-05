@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { QueryProvider } from "@/lib/query-client";
+import { useRealtimeInvalidation } from "@/lib/hooks/use-realtime-invalidation";
+
+function RealtimeInvalidator() {
+  useRealtimeInvalidation();
+  return null;
+}
 
 export default function DashboardLayout({
   children,
@@ -27,6 +33,7 @@ export default function DashboardLayout({
 
   return (
     <QueryProvider>
+      <RealtimeInvalidator />
       <div className="flex h-screen overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         <DashboardSidebar

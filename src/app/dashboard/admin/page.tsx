@@ -95,9 +95,32 @@ function SystemOperationsStatus() {
 
   const runDiagnostics = async () => {
     setChecking(true);
-    // Simulate diagnostic check
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setChecking(false);
+    try {
+      const res = await fetch("/api/admin/health", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.health) {
+          setStatus(data.health);
+        }
+      } else {
+        setStatus({ database: "error", resend: "error", razorpay: "error", marketFeed: "error" });
+      }
+    } catch {
+      setStatus({ database: "timeout", resend: "error", razorpay: "error", marketFeed: "error" });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const getStatusColor = (val: string) => {
+    const v = val.toLowerCase();
+    if (v === "connected" || v === "configured" || v === "active" || v === "live") {
+      return "bg-success";
+    }
+    if (v === "unknown" || v === "checking") {
+      return "bg-amber-500";
+    }
+    return "bg-destructive";
   };
 
   return (
@@ -123,50 +146,50 @@ function SystemOperationsStatus() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/* DB */}
-        <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="p-3 rounded-xl border border-border/50 bg-muted/10 flex items-center justify-between">
           <div>
             <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Database</span>
             <span className="text-xs font-bold text-foreground capitalize">{status.database}</span>
           </div>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getStatusColor(status.database)} opacity-75`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor(status.database)}`} />
           </span>
         </div>
 
         {/* Resend */}
-        <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="p-3 rounded-xl border border-border/50 bg-muted/10 flex items-center justify-between">
           <div>
             <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Resend Email</span>
             <span className="text-xs font-bold text-foreground capitalize">{status.resend}</span>
           </div>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getStatusColor(status.resend)} opacity-75`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor(status.resend)}`} />
           </span>
         </div>
 
         {/* Razorpay */}
-        <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="p-3 rounded-xl border border-border/50 bg-muted/10 flex items-center justify-between">
           <div>
             <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Razorpay API</span>
             <span className="text-xs font-bold text-foreground capitalize">{status.razorpay}</span>
           </div>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getStatusColor(status.razorpay)} opacity-75`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor(status.razorpay)}`} />
           </span>
         </div>
 
         {/* Market Data */}
-        <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="p-3 rounded-xl border border-border/50 bg-muted/10 flex items-center justify-between">
           <div>
             <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Market Feed</span>
             <span className="text-xs font-bold text-foreground capitalize">{status.marketFeed}</span>
           </div>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getStatusColor(status.marketFeed)} opacity-75`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor(status.marketFeed)}`} />
           </span>
         </div>
       </div>

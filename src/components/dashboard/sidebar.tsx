@@ -29,6 +29,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
 
 const userNavItems = [
   {
@@ -157,6 +158,19 @@ export function DashboardSidebar({
 }) {
   const pathname = usePathname();
   const { profile, isAdmin, signOut } = useAuth();
+  const queryClient = useQueryClient();
+  const prefetchAdminStats = () => {
+    if (!isAdmin) return;
+    queryClient.prefetchQuery({
+      queryKey: ["adminStats"],
+      queryFn: async () => {
+        const res = await fetch("/api/admin/stats");
+        if (!res.ok) throw new Error("Failed to fetch admin stats");
+        return res.json();
+      },
+      staleTime: 60 * 1000,
+    });
+  };
 
   const isOnAdminPage = pathname.startsWith("/dashboard/admin");
   const navItems = isOnAdminPage && isAdmin ? adminNavItems : userNavItems;
@@ -199,7 +213,6 @@ export function DashboardSidebar({
         </AnimatePresence>
       </Link>
 
-      {/* Admin/User toggle banner */}
       {isAdmin && !collapsed && (
         <div className={`mx-2.5 mt-3 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2 transition-colors ${
           isOnAdminPage
@@ -210,6 +223,7 @@ export function DashboardSidebar({
           {isOnAdminPage ? "Admin Panel" : "User Dashboard"}
           <Link
             href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
+            onMouseEnter={prefetchAdminStats}
             className="ml-auto text-[10px] underline underline-offset-2 opacity-80 hover:opacity-100"
           >
             Switch →
@@ -222,6 +236,7 @@ export function DashboardSidebar({
           <Link
             href={isOnAdminPage ? "/dashboard" : "/dashboard/admin"}
             title={isOnAdminPage ? "Switch to User Dashboard" : "Switch to Admin Panel"}
+            onMouseEnter={prefetchAdminStats}
             className={`p-2 rounded-xl border flex items-center justify-center transition-colors ${
               isOnAdminPage
                 ? "bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20"
