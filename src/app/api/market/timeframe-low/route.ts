@@ -31,17 +31,26 @@ export async function GET(request: NextRequest) {
     const fyersResolution = TIMEFRAME_MAPPING[tf] || "15";
 
     let fyersSymbol = "NSE:NIFTY50-INDEX";
-    if (symbol === "Bank Nifty") {
+    if (symbol === "Bank Nifty" || symbol === "Nifty Bank") {
       fyersSymbol = "NSE:NIFTYBANK-INDEX";
     } else if (symbol === "Fin Nifty") {
       fyersSymbol = "NSE:NIFTYFINSERVICE-INDEX";
     } else if (symbol === "Midcap Nifty") {
       fyersSymbol = "NSE:MIDCPNIFTY-INDEX";
+    } else if (symbol === "Nifty Next 50") {
+      fyersSymbol = "NSE:NIFTYNEXT50-INDEX";
+    } else if (symbol === "Nifty 50") {
+      fyersSymbol = "NSE:NIFTY50-INDEX";
+    } else if (symbol.includes(":")) {
+      fyersSymbol = symbol;
+    } else {
+      fyersSymbol = `NSE:${symbol.toUpperCase()}-EQ`;
     }
 
     let closePrice: number;
     let lowPrice: number;
     let highPrice: number;
+    let atrVal = 0;
     let dataSource: "fyers_live" | "simulated" = "simulated";
 
     const token = await getFyersToken();
@@ -63,8 +72,9 @@ export async function GET(request: NextRequest) {
           }
         );
 
+        let data: any = null;
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
           if (data.s === "ok" && data.candles && data.candles.length > 0) {
             const latestCandle = data.candles[data.candles.length - 1];
             // Candle format: [timestamp, open, high, low, close, volume]
@@ -72,6 +82,25 @@ export async function GET(request: NextRequest) {
             lowPrice = latestCandle[3];
             closePrice = latestCandle[4];
             dataSource = "fyers_live";
+
+            // Calculate ATR from historical candles
+            if (data.candles.length >= 15) {
+              let trSum = 0;
+              for (let i = data.candles.length - 14; i < data.candles.length; i++) {
+                const high = data.candles[i][2];
+                const low = data.candles[i][3];
+                const prevClose = data.candles[i - 1][4];
+                const tr = Math.max(
+                  high - low,
+                  Math.abs(high - prevClose),
+                  Math.abs(low - prevClose)
+                );
+                trSum += tr;
+              }
+              atrVal = trSum / 14;
+            } else {
+              atrVal = closePrice * 0.015;
+            }
           }
         }
       } catch (err) {
@@ -83,7 +112,7 @@ export async function GET(request: NextRequest) {
     if (dataSource === "simulated") {
       let basePrice = 22450;
       let volMultiplier = 1.0;
-      if (symbol === "Bank Nifty") {
+      if (symbol === "Bank Nifty" || symbol === "Nifty Bank") {
         basePrice = 48000;
         volMultiplier = 3.0;
       } else if (symbol === "Fin Nifty") {
@@ -92,18 +121,31 @@ export async function GET(request: NextRequest) {
       } else if (symbol === "Midcap Nifty") {
         basePrice = 10800;
         volMultiplier = 0.75;
+      } else if (symbol === "Nifty Next 50") {
+        basePrice = 62000;
+        volMultiplier = 1.5;
+      } else {
+        // Deterministic simulated price based on symbol name
+        let hash = 0;
+        const cleanSymbol = symbol.split(":")[1] || symbol;
+        for (let i = 0; i < cleanSymbol.length; i++) {
+          hash = cleanSymbol.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        basePrice = 100 + (Math.abs(hash) % 2000); // price between 100 and 2100
+        volMultiplier = 0.5 + ((Math.abs(hash) >> 4) % 3); // vol between 0.5 and 3.5
       }
 
-      closePrice = basePrice + Math.floor(Math.random() * 60 * volMultiplier - 30 * volMultiplier);
+      closePrice = basePrice + Math.floor(Math.random() * 6 * volMultiplier - 3 * volMultiplier);
       const tfMinutes = tf.endsWith("m") ? parseInt(tf) : tf.endsWith("h") ? parseInt(tf) * 60 : 1440;
       // Low is close price minus a simulated buffer relative to the timeframe
-      const range = (20 + Math.sqrt(tfMinutes) * 8) * volMultiplier;
+      const range = (2 + Math.sqrt(tfMinutes) * 0.8) * volMultiplier;
       lowPrice = closePrice - (Math.random() * 0.4 + 0.6) * range;
       highPrice = closePrice + (Math.random() * 0.4 + 0.6) * range;
       
       closePrice = Math.round(closePrice * 100) / 100;
       lowPrice = Math.round(lowPrice * 100) / 100;
       highPrice = Math.round(highPrice * 100) / 100;
+      atrVal = closePrice * 0.015; // Simulated ATR: 1.5% of stock price
     }
 
     return NextResponse.json({
@@ -111,6 +153,7 @@ export async function GET(request: NextRequest) {
       close: closePrice!,
       low: lowPrice!,
       high: highPrice!,
+      atr: Math.round(atrVal * 100) / 100,
       data_source: dataSource,
       timestamp: new Date().toISOString()
     });

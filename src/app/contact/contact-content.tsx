@@ -238,7 +238,7 @@ export function ContactContent() {
 
               {/* WhatsApp */}
               <a
-                href="https://wa.me/917880040678?text=Hi%2C%20I%20have%20a%20question%20about%20INTROSPECT"
+                href="https://wa.me/919009906032?text=Hi%2C%20I%20have%20a%20question%20about%20INTROSPECT"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block p-5 rounded-2xl bg-[#25D366]/10 border border-[#25D366]/30 hover:border-[#25D366]/50 transition-colors cursor-pointer"

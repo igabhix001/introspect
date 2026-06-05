@@ -24,7 +24,10 @@ import {
   Zap,
   Search,
   ChevronDown,
+  ChevronRight,
+  X,
 } from "lucide-react";
+import { FYERS_SYMBOLS_MASTER } from "@/lib/fyers/symbols";
 
 export default function CalculatorPage() {
   const [accountSize, setAccountSize] = useState<string>("100000");
@@ -33,6 +36,11 @@ export default function CalculatorPage() {
   const [entryPrice, setEntryPrice] = useState<string>("");
   const [stopLossPrice, setStopLossPrice] = useState<string>("");
   const [copied, setCopied] = useState(false);
+
+  // Layout & Autocomplete States
+  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  const [symbolSearchOpen, setSymbolSearchOpen] = useState<boolean>(false);
+  const [activeSearchCategory, setActiveSearchCategory] = useState<"all" | "stocks" | "futures" | "options" | "etfs" | "indices">("all");
 
   // Advanced Stop Loss Helper States
   const [slMethod, setSlMethod] = useState<"manual" | "atr" | "timeframe">("atr");
@@ -89,9 +97,15 @@ export default function CalculatorPage() {
       const data = await res.json();
       if (data && !data.error) {
         setTimeframeData(data);
-        // Auto-fill entry price with Nifty close
-        setEntryPrice(data.close.toString());
-        // Auto-fill stop loss price: low for LONG, high for SHORT
+        // Auto-fill entry price
+        if (data.close) {
+          setEntryPrice(data.close.toString());
+        }
+        // Auto-fill ATR value
+        if (data.atr) {
+          setAtrVal(data.atr.toString());
+        }
+        // Auto-fill stop loss price
         const sl = tradeDirection === "long" ? data.low : data.high;
         setStopLossPrice(sl.toString());
       }
@@ -166,15 +180,13 @@ export default function CalculatorPage() {
     }
   };
 
-  // Fetch timeframe prices when method, timeframe, direction, or instrument changes
+  // Fetch prices and ATR when timeframe, direction, or instrument changes
   useEffect(() => {
-    if (slMethod === "timeframe") {
-      const inst = selectedInstrument === "Custom" ? customInstrument : selectedInstrument;
-      if (inst) {
-        fetchTimeframePrices(selectedTimeframe, inst);
-      }
+    const inst = selectedInstrument === "Custom" ? customInstrument : selectedInstrument;
+    if (inst) {
+      fetchTimeframePrices(selectedTimeframe, inst);
     }
-  }, [slMethod, selectedTimeframe, tradeDirection, selectedInstrument, customInstrument]);
+  }, [selectedTimeframe, tradeDirection, selectedInstrument, customInstrument]);
 
   const comboboxOptions = useMemo(() => {
     const standardOptions = ["Nifty 50", "Nifty Bank", "Fin Nifty", "Nifty Next 50", "Midcap Nifty"];
@@ -232,6 +244,27 @@ export default function CalculatorPage() {
       setComboboxOpen(false);
     }
   };
+
+  // Filtered symbols for autocomplete search modal
+  const filteredSymbols = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    
+    // Filter by tab type first
+    let list = FYERS_SYMBOLS_MASTER;
+    if (activeSearchCategory !== "all") {
+      list = list.filter(item => item.type === activeSearchCategory);
+    }
+    
+    if (query === "") {
+      return list.slice(0, 15);
+    }
+    
+    return list.filter(
+      item =>
+        item.symbol.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query)
+    );
+  }, [searchQuery, activeSearchCategory]);
 
   // Compute dynamic stop loss price
   const computedStopLossPrice = useMemo(() => {
@@ -583,211 +616,34 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            {/* Trading Instrument Selector (Searchable Autocomplete Combobox) */}
-            <div className="relative" ref={comboboxRef}>
-              <label className="text-xs font-medium mb-1.5 block">Trading Instrument</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={comboboxOpen ? searchQuery : (selectedInstrument === "Custom" ? (customInstrument || "Custom Symbol") : selectedInstrument)}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setComboboxOpen(true);
-                    setHighlightedIndex(0);
-                  }}
-                  onFocus={() => {
-                    setSearchQuery(selectedInstrument === "Custom" ? customInstrument : selectedInstrument);
-                    setComboboxOpen(true);
-                    setHighlightedIndex(0);
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Search or enter custom symbol..."
-                  className="w-full px-4 py-3 pr-10 rounded-xl bg-background/50 border border-border text-sm font-medium focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all cursor-text placeholder:text-muted-foreground/50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setComboboxOpen(!comboboxOpen)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {comboboxOpen ? <Search className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-              </div>
-
-              <AnimatePresence>
-                {comboboxOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute left-0 right-0 z-50 mt-1.5 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-2xl py-1.5 max-h-60 overflow-y-auto overflow-x-hidden"
-                  >
-                    {comboboxOptions.length === 0 ? (
-                      <div className="px-4 py-2.5 text-xs text-muted-foreground text-center">
-                        No matches found.
-                      </div>
-                    ) : (
-                      comboboxOptions.map((option, index) => {
-                        const isHighlighted = highlightedIndex === index;
-                        const isCustom = option === "Custom";
-                        
-                        return (
-                          <div
-                            key={option}
-                            onClick={() => {
-                              if (isCustom) {
-                                const symbol = searchQuery.trim() !== "" ? searchQuery.trim().toUpperCase() : "";
-                                setSelectedInstrument("Custom");
-                                if (symbol) {
-                                  setCustomInstrument(symbol);
-                                }
-                                handleInstrumentChange("Custom");
-                              } else {
-                                handleInstrumentChange(option);
-                              }
-                              setComboboxOpen(false);
-                            }}
-                            onMouseEnter={() => setHighlightedIndex(index)}
-                            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
-                              isHighlighted 
-                                ? "bg-success/10 text-success font-semibold" 
-                                : "text-foreground hover:bg-muted/40"
-                            }`}
-                          >
-                            <span>
-                              {isCustom 
-                                ? (searchQuery.trim() !== "" ? `Add Custom "${searchQuery.toUpperCase()}"` : "Custom Stock / Instrument...")
-                                : option
-                              }
-                            </span>
-                            {selectedInstrument === option && !isCustom && (
-                              <Check className="h-3.5 w-3.5 text-success" />
-                            )}
-                            {isCustom && selectedInstrument === "Custom" && (
-                              <span className="text-[10px] bg-success/15 text-success px-1.5 py-0.5 rounded font-bold">
-                                {customInstrument || "Custom"}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {selectedInstrument === "Custom" && (
-                <div className="relative mt-2">
-                  <input
-                    type="text"
-                    value={customInstrument}
-                    onChange={(e) => setCustomInstrument(e.target.value.toUpperCase())}
-                    placeholder="Enter stock symbol (e.g., RELIANCE, TATASTEEL)"
-                    className="w-full px-4 py-3 rounded-xl bg-background/50 border border-success/30 text-sm font-medium focus:outline-none focus:border-success/60 focus:ring-1 focus:ring-success/20 transition-all placeholder:text-muted-foreground/50 font-mono"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-success font-bold bg-success/10 px-1.5 py-0.5 rounded pointer-events-none">
-                    CUSTOM SYMBOL
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Account Capital */}
-            <div>
-              <label htmlFor="account-size" className="text-xs font-medium mb-1.5 block">
-                Account Capital
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                <input
-                  id="account-size"
-                  type="number"
-                  value={accountSize}
-                  onChange={(e) => setAccountSize(e.target.value)}
-                  className="w-full pl-7 pr-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
-                  placeholder="100000"
-                />
-              </div>
-            </div>
-
-            {/* Daily Max Loss % Slider */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="daily-max-loss" className="text-xs font-medium">Daily Max Loss Limit</label>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${riskLevel.bg} ${riskLevel.color}`}>
-                  {riskLevel.label}
+            {/* Trading Instrument Selector (Triggers Popup Modal) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold mb-1 block">Trading Instrument</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery(selectedInstrument === "Custom" ? customInstrument : selectedInstrument);
+                  setSymbolSearchOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-medium hover:border-success/40 transition-all text-left cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  {selectedInstrument === "Custom" 
+                    ? (customInstrument || "Enter custom symbol...") 
+                    : (selectedInstrument || "Select Instrument...")}
                 </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  id="daily-max-loss"
-                  type="range"
-                  min="1"
-                  max="10"
-                  step="0.5"
-                  value={dailyMaxLossPercent}
-                  onChange={(e) => setDailyMaxLossPercent(e.target.value)}
-                  className="flex-1 h-2 bg-muted rounded-full appearance-none cursor-pointer accent-success"
-                />
-                <div className="w-16 text-right">
-                  <span className="text-base font-bold font-heading">{dailyMaxLossPercent}</span>
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
-              {result && (
-                <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-xl bg-muted/30 border border-border text-xs">
-                  <span className="text-muted-foreground">Max Daily Loss Exposure</span>
-                  <span className="font-mono font-semibold text-destructive">
-                    ₹{result.dailyMaxLossAmount.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              )}
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
             </div>
 
-            {/* Trades Planned Per Day */}
-            <div>
-              <label htmlFor="trades-per-day" className="text-xs font-medium mb-1.5 block">
-                Planned Trades Per Day
-              </label>
-              <input
-                id="trades-per-day"
-                type="number"
-                min="1"
-                max="50"
-                value={tradesPlannedPerDay}
-                onChange={(e) => setTradesPlannedPerDay(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40 focus:ring-1 focus:ring-success/20 transition-all"
-                placeholder="5"
-              />
-              {result && (
-                <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-xl bg-success/5 border border-success/10 text-xs">
-                  <span className="text-muted-foreground">Risk Budget Per Trade</span>
-                  <span className="font-mono font-semibold text-success">
-                    ₹{result.riskPerTrade.toLocaleString("en-IN")} ({result.riskPerTradePercent}%)
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Stop Loss Method Selector */}
-            <div>
-              <label className="text-xs font-medium mb-1.5 block">Stop Loss Strategy</label>
-              <div className="flex gap-1.5 p-1 rounded-xl bg-background/50 border border-border">
-                {["manual", "atr", "timeframe"].map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => handleSlMethodChange(method as any)}
-                    className={`flex-1 py-2 rounded-lg text-[11px] font-semibold capitalize transition-colors cursor-pointer ${
-                      slMethod === method
-                        ? "bg-card text-foreground border border-border shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {method === "manual" ? "Manual" : method === "atr" ? "ATR-Based" : "Timeframe Low"}
-                  </button>
-                ))}
-              </div>
+            {/* Active Stop Loss Strategy Display */}
+            <div className="rounded-xl border border-success/20 bg-success/[0.03] p-3.5 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground font-semibold">Active Stop Loss Strategy</span>
+              <span className="font-bold text-success flex items-center gap-1.5 uppercase tracking-wide">
+                <Shield className="h-4 w-4" />
+                {slMethod === "manual" ? "Manual" : slMethod === "atr" ? "ATR-Based" : `${selectedTimeframe} Timeframe`}
+              </span>
             </div>
 
             {/* Entry / Stop Loss inputs */}
@@ -933,6 +789,107 @@ export default function CalculatorPage() {
                 )}
               </div>
             )}
+
+            {/* Account & Sizing Configuration Accordion */}
+            <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+              <button
+                type="button"
+                onClick={() => setSettingsExpanded(!settingsExpanded)}
+                className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Shield className="h-4 w-4 text-primary" />
+                  Account & Risk Configuration
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${settingsExpanded ? "rotate-180" : ""}`} />
+              </button>
+
+              {settingsExpanded && (
+                <div className="space-y-4 pt-3 border-t border-border/40 animate-fade-down-custom">
+                  {/* Stop Loss Sizing Method Selector */}
+                  <div>
+                    <label className="text-xs font-semibold mb-1.5 block">Stop Loss Strategy</label>
+                    <div className="flex gap-1.5 p-1 rounded-xl bg-background/50 border border-border">
+                      {["manual", "atr", "timeframe"].map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => handleSlMethodChange(method as any)}
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold capitalize transition-colors cursor-pointer ${
+                            slMethod === method
+                              ? "bg-card text-foreground border border-border shadow-sm font-bold"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {method === "manual" ? "Manual" : method === "atr" ? "ATR-Based" : "Timeframe Low"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Account Capital */}
+                  <div>
+                    <label htmlFor="account-size" className="text-xs font-semibold mb-1.5 block">
+                      Account Capital
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <input
+                        id="account-size"
+                        type="number"
+                        value={accountSize}
+                        onChange={(e) => setAccountSize(e.target.value)}
+                        className="w-full pl-7 pr-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none focus:border-success/40"
+                        placeholder="100000"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Daily Max Loss % Slider */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="daily-max-loss" className="text-xs font-semibold">Daily Max Loss Limit</label>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${riskLevel.bg} ${riskLevel.color}`}>
+                        {riskLevel.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="daily-max-loss"
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="0.5"
+                        value={dailyMaxLossPercent}
+                        onChange={(e) => setDailyMaxLossPercent(e.target.value)}
+                        className="flex-1 h-2 bg-muted rounded-full appearance-none cursor-pointer accent-success"
+                      />
+                      <div className="w-12 text-right">
+                        <span className="text-sm font-bold font-heading">{dailyMaxLossPercent}</span>
+                        <span className="text-xs text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trades Planned Per Day */}
+                  <div>
+                    <label htmlFor="trades-per-day" className="text-xs font-semibold mb-1.5 block">
+                      Planned Trades Per Day
+                    </label>
+                    <input
+                      id="trades-per-day"
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={tradesPlannedPerDay}
+                      onChange={(e) => setTradesPlannedPerDay(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-background/50 border border-border text-sm font-mono focus:outline-none"
+                      placeholder="5"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
         </div>
 
         {/* Column 3: Sizing Recommendation */}
@@ -1032,6 +989,198 @@ export default function CalculatorPage() {
           )}
         </div>
       </div>
+
+      {/* Symbol Search Modal */}
+      <AnimatePresence>
+        {symbolSearchOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-3xl h-[80vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+                <h2 className="font-heading text-lg font-bold text-foreground">Symbol Search</h2>
+                <button
+                  type="button"
+                  onClick={() => setSymbolSearchOpen(false)}
+                  className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Search input */}
+              <div className="px-6 pt-4 pb-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by symbol or description (e.g. TATA)..."
+                    className="w-full pl-9 pr-10 py-3 rounded-xl bg-background border border-border text-sm font-medium focus:outline-none focus:border-success/40 transition-all"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-md hover:bg-muted"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Categories Tabs */}
+              <div className="px-6 py-2 flex flex-wrap gap-1.5 border-b border-border/30">
+                {(
+                  [
+                    { id: "all", label: "All types" },
+                    { id: "stocks", label: "Stocks" },
+                    { id: "futures", label: "Futures" },
+                    { id: "options", label: "Options" },
+                    { id: "etfs", label: "ETFs" },
+                    { id: "indices", label: "Indices" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveSearchCategory(tab.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      activeSearchCategory === tab.id
+                        ? "bg-foreground text-background font-bold shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* List Headers */}
+              <div className="px-6 py-2 bg-muted/20 border-b border-border/20 flex text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                <span className="w-1/3">Symbol</span>
+                <span className="flex-1">Description</span>
+                <span className="w-24 text-right">Source</span>
+              </div>
+
+              {/* List Results */}
+              <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+                {/* Custom Add Ticker Card */}
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sym = searchQuery.trim().toUpperCase();
+                      setSelectedInstrument("Custom");
+                      setCustomInstrument(sym);
+                      setAtrVal(""); // User will set or API will fetch
+                      fetchTimeframePrices(selectedTimeframe, sym);
+                      setSymbolSearchOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted/30 transition-all text-left text-xs border border-dashed border-border/40 hover:border-success/30"
+                  >
+                    <span className="text-success font-semibold flex items-center gap-1.5">
+                      <Zap className="h-3.5 w-3.5" />
+                      Add Custom &quot;{searchQuery.trim().toUpperCase()}&quot;
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground font-mono">
+                      {searchQuery.trim().toUpperCase()}
+                    </span>
+                  </button>
+                )}
+
+                {/* Filtered symbols list */}
+                {filteredSymbols.length > 0 ? (
+                  filteredSymbols.map((item) => {
+                    const isSelected = selectedInstrument === item.symbol;
+                    
+                    // Highlight matching text in symbol and description
+                    const highlightText = (text: string, highlight: string) => {
+                      if (!highlight.trim()) return <span>{text}</span>;
+                      const regex = new RegExp(`(${highlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, "gi");
+                      const parts = text.split(regex);
+                      return (
+                        <span>
+                          {parts.map((part, i) =>
+                            regex.test(part) ? (
+                              <mark key={i} className="bg-success/20 text-success font-bold rounded px-0.5">
+                                {part}
+                              </mark>
+                            ) : (
+                              part
+                            )
+                          )}
+                        </span>
+                      );
+                    };
+
+                    return (
+                      <button
+                        key={item.symbol}
+                        type="button"
+                        onClick={() => {
+                          setSelectedInstrument(item.symbol);
+                          // Trigger direct fetch
+                          fetchTimeframePrices(selectedTimeframe, item.symbol);
+                          setSymbolSearchOpen(false);
+                        }}
+                        className={`w-full flex items-center px-4 py-3 rounded-xl transition-all text-left cursor-pointer ${
+                          isSelected
+                            ? "bg-success/10 border border-success/20"
+                            : "hover:bg-muted/40 border border-transparent"
+                        }`}
+                      >
+                        {/* Symbol */}
+                        <div className="w-1/3 font-mono text-xs font-bold text-foreground">
+                          {highlightText(item.symbol, searchQuery)}
+                        </div>
+                        {/* Description */}
+                        <div className="flex-1 text-xs text-muted-foreground font-medium truncate">
+                          {highlightText(item.description, searchQuery)}
+                        </div>
+                        {/* Badge / Exchange */}
+                        <div className="w-24 text-right flex items-center justify-end gap-1.5">
+                          <span className="text-[10px] text-muted-foreground capitalize">
+                            {item.type.slice(0, -1)}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            item.exchange === "NSE" 
+                              ? "bg-blue-500/10 text-blue-400" 
+                              : item.exchange === "BSE"
+                              ? "bg-red-500/10 text-red-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {item.exchange}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  !searchQuery.trim() && (
+                    <div className="text-center py-10 text-xs text-muted-foreground">
+                      Type above to search for symbols.
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Footer text */}
+              <div className="px-6 py-3 bg-muted/10 border-t border-border/30 text-[10px] text-muted-foreground/60 text-center font-mono">
+                Simply start typing while on the chart to pull up this search box
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

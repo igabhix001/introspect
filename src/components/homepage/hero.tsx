@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Shield, TrendingUp, Target, Brain, Trophy, FileText, Check, AlertTriangle } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
@@ -18,6 +21,19 @@ const rules = [
 ];
 
 export default function HeroSection() {
+  const [monthlyPrice, setMonthlyPrice] = useState<number>(499);
+
+  useEffect(() => {
+    fetch("/api/pricing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.pricing?.monthly?.amount) {
+          setMonthlyPrice(data.pricing.monthly.amount);
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch dynamic monthly price:", err));
+  }, []);
+
   return (
     <AuroraBackground>
       <section className="relative min-h-screen flex items-center pt-28 pb-20 overflow-hidden">
@@ -94,7 +110,7 @@ export default function HeroSection() {
                     </p>
                     <p className="text-sm">
                       <Link href="/pricing" className="text-success hover:text-success/90 font-semibold transition-colors inline-flex items-center gap-1 group/pricing">
-                        See pricing plans starting at ₹499/month 
+                        See pricing plans starting at ₹{monthlyPrice}/month 
                         <span className="inline-block transition-transform group-hover/pricing:translate-x-0.5">→</span>
                       </Link>
                     </p>

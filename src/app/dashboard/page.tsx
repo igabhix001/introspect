@@ -273,6 +273,7 @@ function DashboardContent() {
   const [subscriptionVerified, setSubscriptionVerified] = useState<boolean | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [scoreCopied, setScoreCopied] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -458,45 +459,50 @@ function DashboardContent() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Discipline Score
               </p>
-              {hasJournaledToday && hasTodayReport && (
+              {hasJournaledToday && hasTodayReport ? (
                 <div className="flex items-center gap-1 text-success text-xs font-semibold">
                   <ArrowUpRight className="h-3 w-3" />
                   Today
                 </div>
+              ) : (
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase">Overall</span>
               )}
             </div>
-            {hasJournaledToday ? (
-              <div className="flex items-center justify-between gap-4 mt-2">
-                <div className="flex-1">
-                  <div className="flex items-end gap-1">
-                    <span className="text-3xl font-bold font-heading text-foreground">{disciplineScore}</span>
-                    <span className="text-xs text-muted-foreground mb-1">/100</span>
-                  </div>
-                  {/* Share button */}
-                  <button
-                    onClick={() => {
-                      const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
-                      const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
-                      navigator.clipboard.writeText(text);
-                    }}
-                    className="text-[9px] font-semibold text-muted-foreground hover:text-success px-2 py-1 rounded border border-border hover:border-success/30 transition-all mt-2.5 block"
-                  >
-                    Copy Share Card
-                  </button>
+
+            <div className="flex items-center justify-between gap-4 mt-2">
+              <div className="flex-1">
+                <div className="flex items-end gap-1">
+                  <span className="text-3xl font-bold font-heading text-foreground">{disciplineScore}</span>
+                  <span className="text-xs text-muted-foreground mb-1">/100</span>
                 </div>
-                <div className="shrink-0">
-                  <DisciplineGauge score={disciplineScore} />
-                </div>
+                {/* Share button */}
+                <button
+                  onClick={() => {
+                    const referralCode = profile?.referral_code || user?.id?.slice(0, 8) || "";
+                    const text = `My Trading Discipline Score\n\nINTROSPECT Score: ${disciplineScore}/100\n\nImproving my trading psychology and risk discipline.\n\nJoin INTROSPECT here:\nhttps://www.intradaymindview.com/auth/signup?ref=${referralCode}\n\nPowered by INTROSPECT\nwww.intradaymindview.com`;
+                    navigator.clipboard.writeText(text);
+                    setScoreCopied(true);
+                    setTimeout(() => setScoreCopied(false), 2000);
+                  }}
+                  className="text-[9px] font-semibold text-muted-foreground hover:text-success px-2 py-1 rounded border border-border hover:border-success/30 transition-all mt-2.5 block text-center w-full"
+                >
+                  {scoreCopied ? "Copied!" : "Copy Share Card"}
+                </button>
               </div>
-            ) : (
-              <div className="py-2">
-                <p className="text-xs text-muted-foreground mb-2">No trades logged today</p>
+              <div className="shrink-0">
+                <DisciplineGauge score={disciplineScore} />
+              </div>
+            </div>
+
+            {!hasJournaledToday && (
+              <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">No trades logged today</span>
                 <Link
                   href="/dashboard/journal?new=true"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-success hover:text-success/80 transition-colors"
+                  className="inline-flex items-center gap-1 font-semibold text-success hover:text-success/80 transition-colors"
                 >
                   <BookOpen className="h-3 w-3" />
-                  Log trade to score
+                  Log trade
                 </Link>
               </div>
             )}
@@ -611,14 +617,14 @@ function DashboardContent() {
                 }
               }
               return (
-                <div key={day.dateStr} className="relative group/day snap-center shrink-0">
+                <div key={day.dateStr} className="relative group snap-center shrink-0" title={`${formatDate(day.date)}: ${day.score !== null ? `Score: ${day.score}/100` : "No trades logged"}`}>
                   <div className={`w-8 h-8 rounded-lg transition-all duration-200 cursor-pointer ${colorClass} ${glowColor} hover:scale-105`} />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/day:block bg-popover text-popover-foreground text-xs rounded-lg px-2.5 py-1.5 shadow-xl border border-border whitespace-nowrap z-30">
-                    <p className="font-semibold text-foreground">{formatDate(day.date)}</p>
-                    <p className="text-muted-foreground mt-0.5">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none bg-zinc-900 text-zinc-100 text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl border border-zinc-800 whitespace-nowrap z-30 font-sans">
+                    <p className="font-semibold text-zinc-100">{formatDate(day.date)}</p>
+                    <p className="text-zinc-400 mt-0.5">
                       {day.score !== null ? (
                         <>
-                          Score: <span className="font-mono font-bold text-foreground">{day.score}</span>/100
+                          Score: <span className="font-mono font-bold text-zinc-100">{day.score}</span>/100
                         </>
                       ) : (
                         "No trades logged"
