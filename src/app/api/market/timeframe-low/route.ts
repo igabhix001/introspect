@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
       fyersSymbol = `NSE:${symbol.toUpperCase()}-EQ`;
     }
 
-    let closePrice: number;
-    let lowPrice: number;
-    let highPrice: number;
+    let closePrice = 0;
+    let lowPrice = 0;
+    let highPrice = 0;
     let atrVal = 0;
     let dataSource: "fyers_live" | "simulated" = "simulated";
 
@@ -77,12 +77,13 @@ export async function GET(request: NextRequest) {
           data = await res.json();
           if (data.s === "ok" && data.candles && data.candles.length > 0) {
             const latestCandle = data.candles[data.candles.length - 1];
+            const completedCandle = data.candles.length >= 2 ? data.candles[data.candles.length - 2] : latestCandle;
             // Candle format: [timestamp, open, high, low, close, volume]
-            highPrice = latestCandle[2];
-            lowPrice = latestCandle[3];
             closePrice = latestCandle[4];
+            highPrice = completedCandle[2];
+            lowPrice = completedCandle[3];
             dataSource = "fyers_live";
-
+ 
             // Calculate ATR from historical candles
             if (data.candles.length >= 15) {
               let trSum = 0;
@@ -147,6 +148,19 @@ export async function GET(request: NextRequest) {
       highPrice = Math.round(highPrice * 100) / 100;
       atrVal = closePrice * 0.015; // Simulated ATR: 1.5% of stock price
     }
+
+    // Safety check: ensure stop loss gap is never zero or too small
+    const minGap = atrVal > 0 ? atrVal * 0.5 : closePrice * 0.005; // at least 0.5 ATR or 0.5% of price
+    if (Math.abs(closePrice - lowPrice) < minGap) {
+      lowPrice = closePrice - minGap;
+    }
+    if (Math.abs(highPrice - closePrice) < minGap) {
+      highPrice = closePrice + minGap;
+    }
+
+    closePrice = Math.round(closePrice * 100) / 100;
+    lowPrice = Math.round(lowPrice * 100) / 100;
+    highPrice = Math.round(highPrice * 100) / 100;
 
     return NextResponse.json({
       timeframe: tf,

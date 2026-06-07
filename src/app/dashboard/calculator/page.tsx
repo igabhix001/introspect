@@ -27,7 +27,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { FYERS_SYMBOLS_MASTER } from "@/lib/fyers/symbols";
+import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
 
 export default function CalculatorPage() {
   const [accountSize, setAccountSize] = useState<string>("100000");
@@ -38,7 +38,7 @@ export default function CalculatorPage() {
   const [copied, setCopied] = useState(false);
 
   // Layout & Autocomplete States
-  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(true);
   const [symbolSearchOpen, setSymbolSearchOpen] = useState<boolean>(false);
   const [activeSearchCategory, setActiveSearchCategory] = useState<"all" | "stocks" | "futures" | "options" | "etfs" | "indices">("all");
 
@@ -299,6 +299,10 @@ export default function CalculatorPage() {
     const riskPerTrade = dailyMaxLossAmount / tradesPerDay;
     const riskPerTradePercent = (riskPerTrade / account) * 100;
 
+    const instSymbol = selectedInstrument === "Custom" ? customInstrument : selectedInstrument;
+    const matchedSymbolInfo = FYERS_SYMBOLS_MASTER.find(item => item.symbol === instSymbol);
+    const lotSize = getLotSize(instSymbol, matchedSymbolInfo?.type);
+
     if (!entry || !sl || entry === sl) {
       return {
         dailyMaxLossAmount: Math.round(dailyMaxLossAmount),
@@ -310,11 +314,21 @@ export default function CalculatorPage() {
         slDistance: null,
         direction: null,
         riskOfCapital: null,
+        lotSize,
+        lots: 0,
       };
     }
 
     const slDistance = Math.abs(entry - sl);
-    const quantity = Math.floor(riskPerTrade / slDistance);
+    const rawQuantity = Math.floor(riskPerTrade / slDistance);
+    
+    let quantity = rawQuantity;
+    let lots = 0;
+    if (lotSize > 1) {
+      lots = Math.floor(rawQuantity / lotSize);
+      quantity = lots * lotSize;
+    }
+
     const actualRisk = quantity * slDistance;
 
     return {
@@ -327,13 +341,16 @@ export default function CalculatorPage() {
       actualRisk: Math.round(actualRisk),
       direction: tradeDirection.toUpperCase(),
       riskOfCapital: ((actualRisk / account) * 100).toFixed(2),
+      lotSize,
+      lots,
     };
-  }, [accountSize, dailyMaxLossPercent, tradesPlannedPerDay, entryPrice, stopLossPrice, slMethod, computedStopLossPrice, tradeDirection]);
+  }, [accountSize, dailyMaxLossPercent, tradesPlannedPerDay, entryPrice, stopLossPrice, slMethod, computedStopLossPrice, tradeDirection, selectedInstrument, customInstrument]);
 
   const handleCopy = () => {
-    if (!result || !result.quantity) return;
+    if (!result || result.quantity === null) return;
     const slVal = slMethod === "manual" || slMethod === "timeframe" ? stopLossPrice : computedStopLossPrice;
-    const text = `Position Size: ${result.quantity} qty | Direction: ${result.direction} | Entry: ₹${entryPrice} | SL: ₹${slVal} | Risk: ₹${result.actualRisk} (${result.riskOfCapital}%) | Daily Limit: ₹${result.dailyMaxLossAmount}`;
+    const lotsText = result.lotSize && result.lotSize > 1 ? ` (${result.lots} Lots)` : "";
+    const text = `Position Size: ${result.quantity} qty${lotsText} | Direction: ${result.direction} | Entry: ₹${entryPrice} | SL: ₹${slVal} | Risk: ₹${result.actualRisk} (${result.riskOfCapital}%) | Daily Limit: ₹${result.dailyMaxLossAmount}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -894,7 +911,7 @@ export default function CalculatorPage() {
 
         {/* Column 3: Sizing Recommendation */}
         <div className="space-y-4 lg:sticky lg:top-6">
-          {result && result.quantity ? (
+          {result && result.quantity !== null ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -924,6 +941,11 @@ export default function CalculatorPage() {
                   {result.quantity}
                 </span>
                 <span className="text-base text-muted-foreground ml-2">qty</span>
+                {result.lotSize > 1 && (
+                  <div className="text-xs text-success font-semibold mt-1">
+                    ({result.lots} {result.lots === 1 ? "Lot" : "Lots"} of {result.lotSize} qty)
+                  </div>
+                )}
               </div>
 
               {/* Position Details */}
@@ -1082,7 +1104,6 @@ export default function CalculatorPage() {
                       setSelectedInstrument("Custom");
                       setCustomInstrument(sym);
                       setAtrVal(""); // User will set or API will fetch
-                      fetchTimeframePrices(selectedTimeframe, sym);
                       setSymbolSearchOpen(false);
                     }}
                     className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted/30 transition-all text-left text-xs border border-dashed border-border/40 hover:border-success/30"
@@ -1128,8 +1149,6 @@ export default function CalculatorPage() {
                         type="button"
                         onClick={() => {
                           setSelectedInstrument(item.symbol);
-                          // Trigger direct fetch
-                          fetchTimeframePrices(selectedTimeframe, item.symbol);
                           setSymbolSearchOpen(false);
                         }}
                         className={`w-full flex items-center px-4 py-3 rounded-xl transition-all text-left cursor-pointer ${

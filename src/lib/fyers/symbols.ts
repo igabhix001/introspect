@@ -75,3 +75,52 @@ export const FYERS_SYMBOLS_MASTER: FyersSymbolInfo[] = [
   { symbol: "NSE:BANKBEES-EQ", description: "NIPPON INDIA ETF BANK BEES", type: "etfs", exchange: "NSE" },
   { symbol: "NSE:GOLDBEES-EQ", description: "NIPPON INDIA ETF GOLD BEES", type: "etfs", exchange: "NSE" },
 ];
+
+export function getLotSize(symbol: string, type?: string): number {
+  const sym = symbol.toUpperCase();
+  
+  if (type === "stocks" || type === "etfs" || type === "indices") {
+    return 1;
+  }
+  
+  const isDerivative = type === "options" || type === "futures" || sym.includes("CE") || sym.includes("PE") || sym.includes("FUT");
+  if (!isDerivative) {
+    return 1;
+  }
+  
+  if (sym.includes("BANKNIFTY") || sym.includes("NIFTYBANK")) return 15;
+  if (sym.includes("FINNIFTY") || sym.includes("NIFTYFINSERVICE")) return 25;
+  if (sym.includes("MIDCPNIFTY")) return 50;
+  if (sym.includes("NIFTYNEXT50")) return 25;
+  if (sym.includes("NIFTY")) return 25;
+  
+  if (sym.includes("TATASTEEL")) return 5500;
+  if (sym.includes("TCS")) return 175;
+  if (sym.includes("RELIANCE")) return 250;
+  if (sym.includes("INFY")) return 400;
+  if (sym.includes("SBIN")) return 750;
+  if (sym.includes("ITC")) return 1600;
+  if (sym.includes("LT")) return 300;
+  if (sym.includes("KOTAKBANK")) return 400;
+  if (sym.includes("AXISBANK")) return 625;
+  if (sym.includes("HINDUNILVR")) return 300;
+  if (sym.includes("BHARTIARTL")) return 950;
+  if (sym.includes("BAJFINANCE")) return 125;
+  if (sym.includes("MARUTI")) return 50;
+  if (sym.includes("ASIANPAINT")) return 200;
+  if (sym.includes("HCLTECH")) return 350;
+  if (sym.includes("SUNPHARMA")) return 350;
+  if (sym.includes("TITAN")) return 175;
+  if (sym.includes("WIPRO")) return 1500;
+  if (sym.includes("M&M")) return 350;
+  if (sym.includes("JSWSTEEL")) return 675;
+  if (sym.includes("POWERGRID")) return 3600;
+  if (sym.includes("NTPC")) return 3000;
+  if (sym.includes("ADANIENT")) return 300;
+  if (sym.includes("ADANIPORTS")) return 800;
+  if (sym.includes("COALINDIA")) return 4200;
+  if (sym.includes("ONGC")) return 3850;
+  if (sym.includes("ULTRACEMCO")) return 100;
+
+  return 1;
+}
