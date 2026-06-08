@@ -29,6 +29,12 @@ import {
 } from "lucide-react";
 import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
 
+function getCleanSymbolName(symbol: string, customSym?: string): string {
+  if (symbol === "Custom") return customSym || "Custom";
+  const clean = symbol.includes(":") ? symbol.split(":")[1] : symbol;
+  return clean.includes("-") ? clean.split("-")[0] : clean;
+}
+
 export default function CalculatorPage() {
   const [accountSize, setAccountSize] = useState<string>("100000");
   const [dailyMaxLossPercent, setDailyMaxLossPercent] = useState<string>("3");
@@ -784,17 +790,22 @@ export default function CalculatorPage() {
                 {fetchingTimeframe ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
                     <RefreshCw className="h-3 w-3 animate-spin" />
-                    <span>Fetching index levels...</span>
+                    <span>Fetching {getCleanSymbolName(selectedInstrument, customInstrument)} levels...</span>
                   </div>
                 ) : timeframeData ? (
                   <div className="text-[11px] text-muted-foreground font-mono bg-background/40 p-2.5 rounded-lg border border-border/30 space-y-1">
                     <div className="flex justify-between">
-                      <span>Nifty Close (Entry):</span>
+                      <span>{getCleanSymbolName(selectedInstrument, customInstrument)} Close (Entry):</span>
                       <span className="font-semibold text-foreground">₹{timeframeData.close}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Nifty Low (Stop):</span>
-                      <span className="font-semibold text-destructive">₹{timeframeData.low}</span>
+                      <span>
+                        {getCleanSymbolName(selectedInstrument, customInstrument)}{" "}
+                        {tradeDirection === "long" ? "Low" : "High"} (Stop):
+                      </span>
+                      <span className="font-semibold text-destructive">
+                        ₹{tradeDirection === "long" ? timeframeData.low : timeframeData.high}
+                      </span>
                     </div>
                     <div className="flex justify-between border-t border-border/30 pt-1 mt-1 font-semibold text-foreground">
                       <span>Stop Loss Gap:</span>
@@ -802,7 +813,7 @@ export default function CalculatorPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[10px] text-destructive italic">Failed to retrieve index metrics. Falling back to manual parameters.</p>
+                  <p className="text-[10px] text-destructive italic">Failed to retrieve {getCleanSymbolName(selectedInstrument, customInstrument)} metrics. Falling back to manual parameters.</p>
                 )}
               </div>
             )}

@@ -12,6 +12,18 @@ const TIMEFRAME_MAPPING: Record<string, string> = {
   "1d": "1D"
 };
 
+interface CacheEntry {
+  close: number;
+  low: number;
+  high: number;
+  atr: number;
+  data_source: "fyers_live" | "simulated";
+  timestamp: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 15000; // 15 seconds Cache-TTL
+
 export async function GET(request: NextRequest) {
   // Rate limit check
   const identifier = getRateLimitIdentifier(request);
@@ -29,6 +41,21 @@ export async function GET(request: NextRequest) {
     const tf = searchParams.get("timeframe") || "15m";
     const symbol = searchParams.get("symbol") || "Nifty 50";
     const fyersResolution = TIMEFRAME_MAPPING[tf] || "15";
+
+    const cacheKey = `${symbol.toUpperCase()}_${tf}`;
+    const cached = responseCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json({
+        timeframe: tf,
+        close: cached.close,
+        low: cached.low,
+        high: cached.high,
+        atr: cached.atr,
+        data_source: cached.data_source,
+        cached: true,
+        timestamp: new Date(cached.timestamp).toISOString()
+      });
+    }
 
     let fyersSymbol = "NSE:NIFTY50-INDEX";
     if (symbol === "Bank Nifty" || symbol === "Nifty Bank") {
@@ -161,6 +188,15 @@ export async function GET(request: NextRequest) {
     closePrice = Math.round(closePrice * 100) / 100;
     lowPrice = Math.round(lowPrice * 100) / 100;
     highPrice = Math.round(highPrice * 100) / 100;
+
+    responseCache.set(cacheKey, {
+      close: closePrice,
+      low: lowPrice,
+      high: highPrice,
+      atr: Math.round(atrVal * 100) / 100,
+      data_source: dataSource,
+      timestamp: Date.now()
+    });
 
     return NextResponse.json({
       timeframe: tf,
