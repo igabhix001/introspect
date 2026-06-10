@@ -318,7 +318,7 @@ export async function fetchNiftyPrice(token: string): Promise<{
 export async function fetchVIX(token: string): Promise<number | null> {
   try {
     const res = await fetch(
-      `${FYERS_API_BASE}/quotes?symbols=NSE:INDIA_VIX-INDEX`,
+      `${FYERS_API_BASE}/quotes?symbols=NSE:INDIAVIX-INDEX`,
       {
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
@@ -342,34 +342,44 @@ export async function fetchMarketBreadth(token: string): Promise<{
   pcr: number;
 } | null> {
   try {
-    // Fetch Nifty option chain for PCR
-    const now = new Date();
+    // Fetch Nifty option chain for PCR using Options Chain v3 API
     const res = await fetch(
-      `${FYERS_API_BASE}/options/chain?symbol=NSE:NIFTYBANK-INDEX&strikecount=20`,
+      `${FYERS_API_BASE}/options-chain-v3?symbol=NSE:NIFTY50-INDEX&strikecount=20`,
       {
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
     );
 
-    if (!res.ok) return null;
-    const data = await res.json();
-
     let totalPutOI = 0;
     let totalCallOI = 0;
-    
-    if (data.s === "ok" && data.d?.optionsChain) {
-      for (const option of data.d.optionsChain) {
-        totalPutOI += option.put?.oi || 0;
-        totalCallOI += option.call?.oi || 0;
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.s === "ok" && Array.isArray(data.data?.optionsChain)) {
+        for (const contract of data.data.optionsChain) {
+          if (contract.option_type === "PE") {
+            totalPutOI += contract.oi || 0;
+          } else if (contract.option_type === "CE") {
+            totalCallOI += contract.oi || 0;
+          }
+        }
       }
     }
 
     const pcr = totalCallOI > 0 ? totalPutOI / totalCallOI : 1.0;
 
-    // Advance/Decline from Nifty 50 stocks breadth
-    // Using market data breadth endpoint
+    // Advance/Decline calculated dynamically from 30 index heavyweight constituents
+    const breadthSymbols = [
+      "NSE:RELIANCE-EQ", "NSE:TCS-EQ", "NSE:INFY-EQ", "NSE:SBIN-EQ", "NSE:HDFCBANK-EQ",
+      "NSE:ICICIBANK-EQ", "NSE:TATAMOTORS-EQ", "NSE:TATASTEEL-EQ", "NSE:ITC-EQ", "NSE:LT-EQ",
+      "NSE:KOTAKBANK-EQ", "NSE:AXISBANK-EQ", "NSE:HINDUNILVR-EQ", "NSE:BHARTIARTL-EQ", "NSE:BAJFINANCE-EQ",
+      "NSE:MARUTI-EQ", "NSE:ASIANPAINT-EQ", "NSE:HCLTECH-EQ", "NSE:SUNPHARMA-EQ", "NSE:TITAN-EQ",
+      "NSE:ADANIENT-EQ", "NSE:ULTRACEMCO-EQ", "NSE:WIPRO-EQ", "NSE:NTPC-EQ", "NSE:POWERGRID-EQ",
+      "NSE:JSWSTEEL-EQ", "NSE:M%26M-EQ", "NSE:ONGC-EQ", "NSE:COALINDIA-EQ", "NSE:ADANIPORTS-EQ"
+    ];
+
     const breadthRes = await fetch(
-      `${FYERS_API_BASE}/quotes?symbols=NSE:NIFTY50-INDEX`,
+      `${FYERS_API_BASE}/quotes?symbols=${encodeURIComponent(breadthSymbols.join(","))}`,
       {
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
@@ -380,11 +390,25 @@ export async function fetchMarketBreadth(token: string): Promise<{
 
     if (breadthRes.ok) {
       const breadthData = await breadthRes.json();
-      const adv = breadthData.d?.[0]?.v?.advances || 0;
-      const dec = breadthData.d?.[0]?.v?.declines || 0;
-      if (adv + dec > 0) {
-        advances = adv;
-        declines = dec;
+      if (breadthData.s === "ok" && Array.isArray(breadthData.d)) {
+        let advCount = 0;
+        let decCount = 0;
+        for (const item of breadthData.d) {
+          const lp = item.v?.lp || 0;
+          const prevClose = item.v?.prev_close_price || 0;
+          if (lp > 0 && prevClose > 0) {
+            if (lp > prevClose) {
+              advCount++;
+            } else if (lp < prevClose) {
+              decCount++;
+            }
+          }
+        }
+        const totalValid = advCount + decCount;
+        if (totalValid > 0) {
+          advances = Math.round((advCount / totalValid) * 50);
+          declines = 50 - advances;
+        }
       }
     }
 
