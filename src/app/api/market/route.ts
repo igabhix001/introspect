@@ -58,11 +58,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // Check Cache first for cached user response
+    // Check Cache first for cached response to avoid Auth network latency on cache hit
     const responseCacheKey = "market:sentiment:live";
     const cachedResponse = cache.get<Record<string, unknown>>(responseCacheKey);
     if (cachedResponse && !cachedResponse.isStale) {
@@ -70,6 +66,10 @@ export async function GET(request: NextRequest) {
         headers: getCacheHeaders({ maxAge: CACHE_TTL_SECONDS, staleWhileRevalidate: CACHE_STALE_SECONDS, private: true }),
       });
     }
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Initialize/Retrieve History State
     let historyState = cache.get<SentimentHistoryState>(HISTORY_CACHE_KEY)?.data;

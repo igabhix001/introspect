@@ -33,16 +33,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
     const tf = searchParams.get("timeframe") || "15m";
     const symbol = searchParams.get("symbol") || "Nifty 50";
-    const fyersResolution = TIMEFRAME_MAPPING[tf] || "15";
-
     const cacheKey = `${symbol.toUpperCase()}_${tf}`;
+
+    // Check cache first to avoid Auth network latency on cache hit
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return NextResponse.json({
@@ -56,6 +52,12 @@ export async function GET(request: NextRequest) {
         timestamp: new Date(cached.timestamp).toISOString()
       });
     }
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const fyersResolution = TIMEFRAME_MAPPING[tf] || "15";
 
     let fyersSymbol = "NSE:NIFTY50-INDEX";
     if (symbol === "Bank Nifty" || symbol === "Nifty Bank") {

@@ -54,7 +54,7 @@ export function useDashboardQuery() {
 
       const today = new Date().toISOString().split("T")[0];
 
-      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes, allTradesRes] = await Promise.all([
+      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes, totalClosedRes, winsRes] = await Promise.all([
         supabase
           .from("trades")
           .select("*")
@@ -95,8 +95,16 @@ export function useDashboardQuery() {
           .maybeSingle(),
         supabase
           .from("trades")
-          .select("pnl, exit_price")
+          .select("id", { count: "exact", head: true })
           .eq("user_id", userId)
+          .not("exit_price", "is", null)
+          .abortSignal(signal),
+        supabase
+          .from("trades")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .not("exit_price", "is", null)
+          .gt("pnl", 0)
           .abortSignal(signal),
       ]);
 
@@ -104,7 +112,6 @@ export function useDashboardQuery() {
       const assessment = assessmentRes.data;
       const reports = reportsRes.data || [];
       const activeChallenge = challengeRes.data;
-      const allTrades = allTradesRes.data || [];
       const todayFullReport = todayReportRes.data as {
         discipline_score?: number;
         mistakes_count?: number;
@@ -161,9 +168,8 @@ export function useDashboardQuery() {
       const rulesFollowed = todayFullReport?.rules_followed || 0;
       const totalRules = todayFullReport?.total_rules || 4;
 
-      const closedTrades = allTrades.filter(t => t.exit_price !== null && t.exit_price !== undefined);
-      const totalClosed = closedTrades.length;
-      const wins = closedTrades.filter(t => (t.pnl || 0) > 0).length;
+      const totalClosed = totalClosedRes.count || 0;
+      const wins = winsRes.count || 0;
       const winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
 
       return {

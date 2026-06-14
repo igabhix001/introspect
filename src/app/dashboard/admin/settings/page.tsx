@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -23,7 +23,7 @@ import {
   Save,
 } from "lucide-react";
 
-export default function AdminSettingsPage() {
+function AdminSettingsContent() {
   const searchParams = useSearchParams();
   const [pricing, setPricing] = useState({ monthly: 399, sixMonth: 1999, yearly: 3499 });
   const [pricingSaved, setPricingSaved] = useState(false);
@@ -493,5 +493,17 @@ export default function AdminSettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-3" />
+      </div>
+    }>
+      <AdminSettingsContent />
+    </Suspense>
   );
 }
