@@ -228,7 +228,13 @@ export async function GET(request: NextRequest) {
     let zone_status: "CONFIRMED" | "WATCH" = "WATCH";
     let confirmation_count = historyState.zone_history.length;
 
-    if (historyState.zone_history.length === 3) {
+    // Cold-start/empty-cache initialization: immediately confirm the first zone
+    if (historyState.zone_history.length === 1) {
+      confirmed_zone = raw_zone;
+      zone_status = "CONFIRMED";
+      confirmation_count = 3;
+      historyState.zone_history = [raw_zone, raw_zone, raw_zone];
+    } else if (historyState.zone_history.length === 3) {
       const allSame = historyState.zone_history.every(z => z === raw_zone);
       if (allSame) {
         confirmed_zone = raw_zone;
