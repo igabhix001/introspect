@@ -530,6 +530,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Context-aware daily checks for overtrading and revenge trading in bulk imports
+    let capital = 100000;
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("capital")
+        .eq("id", user.id)
+        .single();
+      if (profile?.capital) {
+        capital = Number(profile.capital);
+      }
+    } catch (err) {
+      console.error("Error fetching profile capital for import rules:", err);
+    }
+
+    for (const d of dates) {
+      const existingOnDate = existingTrades.filter(ext => ext.date === d);
+      const newOnDate = uniqueTradesToInsert.filter(t => t.date === d);
+
+      const totalTrades = existingOnDate.length + newOnDate.length;
+      
+      const existingPnl = existingOnDate.reduce((sum, ext) => sum + Number(ext.pnl || 0), 0);
+      const newPnl = newOnDate.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+      const netDailyPnl = existingPnl + newPnl;
+
+      const existingLosing = existingOnDate.filter(ext => Number(ext.pnl || 0) < 0).length;
+      const newLosing = newOnDate.filter(t => Number(t.pnl || 0) < 0).length;
+      const totalLosingTrades = existingLosing + newLosing;
+
+      // Overtrading check: more than 5 trades per day
+      const isOvertrading = totalTrades > 5;
+
+      // Revenge trading check: 2 or more losses and daily drawdown exceeding 3% of capital
+      const isRevengeTrading = totalLosingTrades >= 2 && netDailyPnl < -0.03 * capital;
+
+      if (isOvertrading || isRevengeTrading) {
+        for (const t of newOnDate) {
+          if (isOvertrading && !t.mistakes.includes("overtrading")) {
+            t.mistakes.push("overtrading");
+          }
+          if (isRevengeTrading && !t.mistakes.includes("revenge_trading")) {
+            t.mistakes.push("revenge_trading");
+          }
+        }
+      }
+    }
+
     // Insert new unique trades into Supabase
     let insertedCount = 0;
     if (uniqueTradesToInsert.length > 0) {
