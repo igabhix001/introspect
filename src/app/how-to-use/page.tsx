@@ -15,57 +15,57 @@ const platformSteps = [
     step: "1", 
     title: "Assessment – Diagnose Your Risk Profile", 
     icon: Target,
-    description: "Answer behavioral questions honestly to get your Discipline Score, behavioral bias indicators, and personalized trading rules.",
-    actions: ["Complete the risk assessment", "Review your Trader Personality Profile", "Get your Risk DNA analysis"]
+    description: "Answer the behavioral assessment honestly to get your Discipline Score and identify psychological biases. (1 free assessment included, Pro unlocks unlimited assessments).",
+    actions: ["Complete the risk assessment", "Identify psychological biases", "Pro unlocks unlimited diagnostic runs"]
   },
   { 
     step: "2", 
     title: "Risk Report – Your Personalized Rules", 
     icon: Shield,
-    description: "Get maximum risk per trade, daily loss limits, max trades per day, and discipline guidelines.",
+    description: "Get personalized risk guidelines, including maximum risk per trade, daily loss caps, and trade counts. (Unlocks with Pro subscription).",
     actions: ["Review rules before trading each day", "Follow position sizing limits", "Respect daily loss caps"]
   },
   { 
     step: "3", 
     title: "Position Sizer – Calculate Lot Size", 
     icon: BarChart3,
-    description: "Input your capital, stop-loss distance, and risk per trade to get recommended position size.",
-    actions: ["Use before every trade", "Maintain proper risk control", "Never exceed calculated size"]
+    description: "Calculate recommended position sizes based on capital, stop-loss distance, and live ATR. Supports standard indices & custom NSE stock symbols.",
+    actions: ["Size standard indices or custom NSE stocks", "ATR-based automatic stop-loss levels", "Check SEBI compliance education box"]
   },
   { 
     step: "4", 
     title: "Market Sentiment – Understand Context", 
     icon: Award,
-    description: "View market bias, volatility conditions, and momentum signals. Informational only, not a trading signal.",
-    actions: ["Check market conditions", "Understand volatility levels", "Use as context, not signals"]
+    description: "Check compliance-mapped bias regimes: Positive, Negative, or Neutral Market Bias. Volatility and momentum signals are informational only.",
+    actions: ["Identify Positive/Negative/Neutral market bias", "VIX-based volatility status", "Use strictly as context, not signals"]
   },
   { 
     step: "5", 
-    title: "Trade Journal – Log Every Trade", 
+    title: "Trade Journal – Friction-Free Broker Import", 
     icon: BookOpen,
-    description: "Record entry/exit prices, stop loss, reasoning, and emotional state to identify decision-making patterns.",
-    actions: ["Log every trade immediately", "Record emotional state", "Review patterns weekly"]
+    description: "Upload a simple 5-column CSV order book (Symbol, Type, Quantity, Price, Time). INTROSPECT automatically reconstructs completed trades using Weighted Average, matches entries/exits, and tags emotional mistakes.",
+    actions: ["Import 5-column CSV order books", "Automatic matching and reversal splitting", "CBT coaching insights on violations"]
   },
   { 
     step: "6", 
     title: "Analytics – Behavioral Insights", 
     icon: BarChart3,
-    description: "Analyze discipline score, rule violations, behavioral trends, and performance insights.",
-    actions: ["Review analytics weekly", "Identify improvement areas", "Track progress over time"]
+    description: "Analyze rule violations, discipline trends, performance metrics, and net projected P&L (incorporating estimated charges).",
+    actions: ["Review analytics weekly", "Identify emotional pitfalls", "Track progress over time"]
   },
   { 
     step: "7", 
     title: "Challenges – Build Discipline", 
     icon: Trophy,
-    description: "Complete 30/60/90-day structured programs to build consistent habits and psychological resilience.",
-    actions: ["Start with 30-day challenge", "Follow daily requirements", "Earn badge on completion"]
+    description: "Complete structured 30/60/90-day discipline challenges. Follow daily parameters and log check-ins to build psychological resilience.",
+    actions: ["Start with 30-day challenge", "Log daily check-ins to remain active", "Earn discipline badges on completion"]
   },
   { 
     step: "8", 
     title: "Referral Portal – Refer & Earn", 
     icon: Gift,
-    description: "Earn points on REFERRALS. Accumulate 150 points to get a free month. Points can only be earned via referrals.",
-    actions: ["Refer other traders", "Earn 25 points per subscription", "Redeem 150 points for a free month"]
+    description: "Earn points by referring traders. Accumulate 150 points for a free month. Tiers (Bronze, Silver, Gold, Platinum) build lifetime status.",
+    actions: ["Share unique referral link", "Earn 25 points per subscription", "Unlock lifetime status tiers & badges"]
   },
 ];
 
@@ -328,6 +328,57 @@ export default function HowToUsePage() {
                   </p>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Lifetime Status Tiers */}
+            <div className="mt-12 mb-12 max-w-4xl mx-auto">
+              <h3 className="text-xl font-bold mb-3 text-center flex items-center justify-center gap-2">
+                <Award className="w-5 h-5 text-success" />
+                Lifetime Status Tiers
+              </h3>
+              <p className="text-center text-sm text-muted-foreground mb-6">
+                Your lifetime earned points determine your status tier. Lifetime points never expire.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-card/40 border-amber-700/20 text-center hover:border-amber-700/40 transition-all">
+                  <CardContent className="p-4">
+                    <span className="text-[10px] font-bold text-amber-700 tracking-wider">BRONZE</span>
+                    <p className="text-lg font-extrabold mt-1 text-foreground">0 - 299 pts</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Starting level for all traders</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/40 border-slate-400/20 text-center hover:border-slate-400/40 transition-all">
+                  <CardContent className="p-4">
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider">SILVER</span>
+                    <p className="text-lg font-extrabold mt-1 text-foreground">300 - 599 pts</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Unlocks Silver Status & Badges</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/40 border-yellow-500/20 text-center hover:border-yellow-500/40 transition-all">
+                  <CardContent className="p-4">
+                    <span className="text-[10px] font-bold text-yellow-500 tracking-wider">GOLD</span>
+                    <p className="text-lg font-extrabold mt-1 text-foreground">600 - 899 pts</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Unlocks Gold Status & Badges</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/40 border-cyan-400/20 text-center hover:border-cyan-400/40 transition-all">
+                  <CardContent className="p-4">
+                    <span className="text-[10px] font-bold text-cyan-400 tracking-wider">PLATINUM</span>
+                    <p className="text-lg font-extrabold mt-1 text-foreground">900+ pts</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Unlocks Elite Platinum Trophies</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 text-center max-w-2xl mx-auto">
+                <span className="text-xs font-bold text-primary block mb-1">🏅 REFERRAL MILESTONE BADGES</span>
+                <p className="text-xs text-muted-foreground">
+                  Earn lifetime profile badges as you grow the community: 
+                  <span className="text-foreground font-semibold"> Risk Mentor</span> (3 referrals) • 
+                  <span className="text-foreground font-semibold"> Discipline Influencer</span> (5 referrals) • 
+                  <span className="text-foreground font-semibold"> Community Builder</span> (10 referrals)
+                </p>
+              </div>
             </div>
           </div>
         </div>
