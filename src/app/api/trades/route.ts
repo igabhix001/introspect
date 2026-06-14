@@ -163,21 +163,14 @@ export async function POST(request: NextRequest) {
 
     const today = new Date().toISOString().split("T")[0];
     
-    // Check daily trade count
-    const { count: tradeCount } = await supabase
-      .from("trades")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("date", today);
-
-    // Check daily loss limit
+    // Check daily trades and loss limit in a single consolidated query
     const { data: todayTrades } = await supabase
       .from("trades")
       .select("pnl, exit_price")
       .eq("user_id", user.id)
       .eq("date", today);
 
-    const todayTradeCount = tradeCount || 0;
+    const todayTradeCount = todayTrades?.length || 0;
     const todayLosingTradesCount = (todayTrades || []).filter(t => t.exit_price !== null && (t.pnl || 0) < 0).length;
     const todayNetPnl = (todayTrades || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
     const dailyLossPct = Math.abs(Math.min(todayNetPnl, 0)) / capital * 100;
@@ -207,7 +200,7 @@ export async function POST(request: NextRequest) {
     if (dailyLossPct >= 2) {
       violations.push("Daily loss limit (2%) exceeded - trading blocked for today");
     }
-    if ((tradeCount || 0) >= 5) {
+    if (todayTradeCount >= 5) {
       violations.push("Maximum daily trades (5) reached - no more trades allowed today");
     }
     if (riskPct > 2) {
@@ -307,7 +300,7 @@ export async function POST(request: NextRequest) {
     }
 
     const warnings: string[] = [];
-    if ((tradeCount || 0) > 3) warnings.push("overtrading");
+    if (todayTradeCount > 3) warnings.push("overtrading");
     if (dailyLossPct >= 1) warnings.push("daily_loss_limit_warning");
 
     // AUTOMATIC CHALLENGE CHECK-IN

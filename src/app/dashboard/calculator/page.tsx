@@ -561,11 +561,11 @@ export default function CalculatorPage() {
                 </div>
 
                 <div className="border-t border-border/30 pt-2.5 space-y-2">
-                  <div className="flex items-center justify-between text-[9px] text-muted-foreground/60 font-mono">
+                  <div className="flex items-center justify-between text-[10px] text-white/80 font-mono">
                     <span>Source: Third-party data providers</span>
                     <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
                   </div>
-                  <p className="text-[8px] text-muted-foreground/45 leading-normal text-justify">
+                  <p className="text-[9px] text-white/70 leading-normal text-justify">
                     This assessment is generated using quantitative market indicators and is provided for informational and educational purposes only. It does not constitute investment advice, a recommendation, research report, or a solicitation to buy or sell any security. Users should exercise independent judgment before making trading decisions.
                   </p>
                 </div>
