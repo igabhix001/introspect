@@ -25,28 +25,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === "" ? 1 : route === "/pricing" ? 0.9 : 0.8,
   }));
 
-  // Dashboard pages (lower priority, require auth)
-  const dashboardPages = [
-    "/dashboard",
-    "/dashboard/assessment",
-    "/dashboard/risk-report",
-    "/dashboard/journal",
-    "/dashboard/calculator",
-    "/dashboard/challenges",
-    "/dashboard/analytics",
-    "/dashboard/loyalty",
-    "/dashboard/payments",
-    "/dashboard/daily-report",
-    "/dashboard/settings",
-  ];
-
-  const dashboardRoutes = dashboardPages.map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: currentDate,
-    changeFrequency: "weekly" as const,
-    priority: 0.5,
-  }));
-
   // Blog posts (local, SEO-optimized)
   const blogPostSlugs = [
     "revenge-trading-destruction",
@@ -63,5 +41,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.85,
   }));
 
-  return [...staticRoutes, ...blogRoutes, ...dashboardRoutes];
+  return [...staticRoutes, ...blogRoutes];
 }

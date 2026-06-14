@@ -49,11 +49,11 @@ function MarketZoneWidget() {
   const marketStatus = marketData?.market_status as "OPEN" | "CLOSED" | undefined;
 
   const zoneMap: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
-    BULLISH: { label: "Bullish", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
-    BEARISH: { label: "Bearish", color: "text-destructive", bg: "bg-destructive/[0.07]", emoji: "🔴" },
-    NO_TRADE: { label: "No Trade", color: "text-muted-foreground", bg: "bg-muted/30", emoji: "⚪" },
+    "Positive Market Bias": { label: "Positive Market Bias", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
+    "Negative Market Bias": { label: "Negative Market Bias", color: "text-destructive", bg: "bg-destructive/[0.07]", emoji: "🔴" },
+    "Neutral Market Bias": { label: "Neutral Market Bias", color: "text-muted-foreground", bg: "bg-muted/30", emoji: "⚪" },
   };
-  const z = zone ? zoneMap[zone] || zoneMap.NO_TRADE : null;
+  const z = zone ? zoneMap[zone] || zoneMap["Neutral Market Bias"] : null;
 
   return (
     <motion.div
@@ -502,7 +502,7 @@ function DashboardContent() {
                   className="inline-flex items-center gap-1 font-semibold text-success hover:text-success/80 transition-colors"
                 >
                   <BookOpen className="h-3 w-3" />
-                  Log trade
+                  Import / Log trade
                 </Link>
               </div>
             )}
@@ -921,11 +921,14 @@ function DashboardContent() {
                 <BookOpen className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-sm font-medium group-hover:text-success transition-colors">
-                  Log a Trade
+                <p className="text-sm font-medium group-hover:text-success transition-colors flex items-center gap-1.5 flex-wrap">
+                  Log / Import Trades
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-success/15 text-success uppercase tracking-wider animate-pulse border border-success/20">
+                    Easy Import
+                  </span>
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Record your latest entry
+                  Upload broker CSV in 60s or log manually
                 </p>
               </div>
             </Link>

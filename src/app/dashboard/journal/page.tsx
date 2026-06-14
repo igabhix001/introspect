@@ -19,6 +19,7 @@ import {
   Sparkles,
   Upload,
   Download,
+  Info,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -108,7 +109,31 @@ export default function JournalPage() {
   
   // Bulk upload state
   const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getHoldingDuration = (entry: string | null, exit: string | null) => {
+    if (!entry || !exit) return null;
+    try {
+      const parseTime = (t: string) => {
+        if (t.includes("T") || t.includes("-")) return new Date(t);
+        const [h, m, s] = t.split(":").map(Number);
+        const d = new Date();
+        d.setHours(h, m, s || 0, 0);
+        return d;
+      };
+      const t1 = parseTime(entry);
+      const t2 = parseTime(exit);
+      const diffMins = Math.round((t2.getTime() - t1.getTime()) / 60000);
+      if (isNaN(diffMins) || diffMins < 0) return null;
+      if (diffMins < 60) return `${diffMins} min`;
+      const hrs = Math.floor(diffMins / 60);
+      const mins = diffMins % 60;
+      return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+    } catch {
+      return null;
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -229,12 +254,7 @@ export default function JournalPage() {
       if (!response.ok) {
         alert(data.error || "Failed to import trades. Please check your CSV format.");
       } else {
-        let msg = `Successfully imported ${data.insertedCount} trades!`;
-        if (data.failedCount > 0) {
-          msg += `\nSkipped ${data.failedCount} rows due to errors. Check console for details.`;
-          console.warn("Import errors:", data.errors);
-        }
-        alert(msg);
+        setImportResult(data);
         queryClient.invalidateQueries({ queryKey: queryKeys.trades(user.id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
         queryClient.invalidateQueries({ queryKey: ["analytics", user.id] });
@@ -408,17 +428,43 @@ export default function JournalPage() {
 
       {/* Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-border bg-card p-3.5">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
-            Total P&L
-          </p>
+        <div className="rounded-xl border border-border bg-card p-3.5 space-y-1 relative group">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Total Gross P&L
+            </p>
+            <div className="relative cursor-pointer">
+              <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-foreground transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-900 border border-zinc-800 text-zinc-300 text-[9px] p-2 rounded-lg shadow-xl hidden group-hover:block z-50 pointer-events-none leading-normal normal-case font-normal">
+                Projected Net P&L is a conservative estimate: 5% charges applied on winning sessions. Actual broker-reported charges may vary depending on Brokerage, STT, Exchange, GST, SEBI charges, and Stamp Duty.
+              </div>
+            </div>
+          </div>
           <p
-            className={`text-lg font-bold font-heading font-mono ${
+            className={`text-lg font-bold font-heading font-mono leading-none ${
               totalPnl >= 0 ? "text-success" : "text-destructive"
             }`}
           >
             {totalPnl >= 0 ? "+" : ""}₹{Math.abs(totalPnl).toLocaleString("en-IN")}
           </p>
+          {(() => {
+            const estimatedCharges = totalPnl > 0 ? totalPnl * 0.05 : 0;
+            const projectedNetPnl = totalPnl > 0 ? totalPnl * 0.95 : totalPnl;
+            return (
+              <div className="border-t border-border/40 pt-1 mt-1 text-[9px] text-muted-foreground space-y-0.5 font-mono">
+                <div className="flex justify-between">
+                  <span>Est. Charges:</span>
+                  <span>₹{Math.round(estimatedCharges).toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-foreground/80">
+                  <span>Proj. Net P&L:</span>
+                  <span className={projectedNetPnl >= 0 ? "text-success/90" : "text-destructive/90"}>
+                    {projectedNetPnl >= 0 ? "+" : ""}₹{Math.round(projectedNetPnl).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <div className="rounded-xl border border-border bg-card p-3.5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
@@ -443,6 +489,38 @@ export default function JournalPage() {
           >
             {rulesFollowed}%
           </p>
+        </div>
+      </div>
+
+      {/* Friction-Free Broker Trade Book Import Guide */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm mb-2">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-success/10 text-success mt-0.5 shrink-0">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              Journal Your Trades in Under 60 Seconds
+              <span className="px-2 py-0.5 rounded-full text-[8px] font-extrabold bg-success/15 text-success tracking-wide uppercase">New</span>
+            </h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Export your Trade Book from your broker (Zerodha, FYERS, Upstox, Angel One, Dhan, etc.), copy the required columns, and paste into our simplified template. INTROSPECT automatically reconstructs your trades, matches execution times, and calculates Gross P&L, holding duration, and detects revenge trading or averaging down.
+            </p>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-[10px] text-muted-foreground font-semibold">
+              <span className="flex items-center gap-1">
+                <span className="h-3.5 w-3.5 flex items-center justify-center rounded-full bg-muted text-[9px] text-foreground font-bold">1</span>
+                Export Trade Book
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-3.5 w-3.5 flex items-center justify-center rounded-full bg-muted text-[9px] text-foreground font-bold">2</span>
+                Copy 5 Columns (Symbol, Trade Type, Quantity, Price, Execution Time)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-3.5 w-3.5 flex items-center justify-center rounded-full bg-muted text-[9px] text-foreground font-bold">3</span>
+                Paste & Upload Template
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -575,7 +653,7 @@ export default function JournalPage() {
           <div className="col-span-1 text-right">Entry</div>
           <div className="col-span-1 text-right">Exit</div>
           <div className="col-span-1 text-right">Qty</div>
-          <div className="col-span-2 text-right">P&L</div>
+          <div className="col-span-2 text-right">Gross P&L</div>
           <div className="col-span-1">Emotion</div>
           <div className="col-span-1 text-center">Rules</div>
           <div className="col-span-2">Mistake</div>
@@ -599,6 +677,11 @@ export default function JournalPage() {
                     {(trade.entry_time || trade.exit_time) && (
                       <span className="font-mono text-foreground/75 text-[9px]">
                         🕒 {trade.entry_time || "--:--"} - {trade.exit_time || "--:--"}
+                      </span>
+                    )}
+                    {trade.entry_time && trade.exit_time && (
+                      <span className="text-muted-foreground/60 text-[9px] block">
+                        ⏱️ {getHoldingDuration(trade.entry_time, trade.exit_time)}
                       </span>
                     )}
                   </p>
@@ -777,9 +860,12 @@ export default function JournalPage() {
                   )}
                 </div>
                 {(trade.entry_time || trade.exit_time) && (
-                  <p className="text-[10px] text-muted-foreground font-mono">
-                    🕒 {trade.entry_time || "--:--"} - {trade.exit_time || "--:--"}
-                  </p>
+                  <div className="flex flex-wrap gap-x-2 text-[10px] text-muted-foreground font-mono">
+                    <span>🕒 {trade.entry_time || "--:--"} - {trade.exit_time || "--:--"}</span>
+                    {trade.entry_time && trade.exit_time && (
+                      <span>• ⏱️ {getHoldingDuration(trade.entry_time, trade.exit_time)}</span>
+                    )}
+                  </div>
                 )}
                 {/* Mobile mistake tag & AI Coach */}
                 {(() => {
@@ -865,6 +951,95 @@ export default function JournalPage() {
           )}
         </div>
       </div>
+
+      {/* Import Result Summary Modal */}
+      <AnimatePresence>
+        {importResult && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col"
+            >
+              <button
+                onClick={() => setImportResult(null)}
+                className="absolute right-4 top-4 p-1.5 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              
+              <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                <h3 className="font-heading text-base font-bold">Import & Analysis Summary</h3>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">Total Executions</span>
+                    <span className="text-lg font-bold">{importResult.processedCount}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-success/[0.04] border border-success/15">
+                    <span className="text-[10px] text-success uppercase font-bold block">Reconstructed Trades</span>
+                    <span className="text-lg font-bold text-success">{importResult.completedCount}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
+                    <span className="text-[10px] text-amber-500 uppercase font-bold block">Open Positions</span>
+                    <span className="text-lg font-bold text-amber-500">{importResult.openPositionsCount}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/30">
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">Skipped Duplicates</span>
+                    <span className="text-lg font-bold text-muted-foreground">{importResult.duplicatesCount}</span>
+                  </div>
+                </div>
+
+                {/* Open Positions List */}
+                {importResult.openPositions && importResult.openPositions.length > 0 && (
+                  <div className="space-y-1.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.02] p-3.5">
+                    <span className="text-[10px] font-bold text-amber-500 uppercase block tracking-wider">Open Positions (Not Journaled)</span>
+                    <div className="divide-y divide-amber-500/10 max-h-[120px] overflow-y-auto pr-1 space-y-1">
+                      {importResult.openPositions.map((op: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-xs py-1 first:pt-0">
+                          <div>
+                            <span className="font-semibold text-foreground">{op.symbol}</span>
+                            <span className={`ml-2 px-1.5 py-0.2 rounded text-[8px] font-bold ${op.direction === "long" ? "bg-success/10 text-success border border-success/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>{op.direction === "long" ? "LONG" : "SHORT"}</span>
+                          </div>
+                          <span className="font-mono text-muted-foreground text-[11px]">{op.netQty} qty @ ₹{op.avgPrice.toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Errors/Ignored List */}
+                {importResult.errors && importResult.errors.filter((e: any) => e.rowNum > 0).length > 0 && (
+                  <div className="space-y-1.5 rounded-xl border border-destructive/20 bg-destructive/[0.02] p-3.5">
+                    <span className="text-[10px] font-bold text-destructive uppercase block tracking-wider">Ignored / Invalid Records</span>
+                    <div className="divide-y divide-destructive/10 max-h-[120px] overflow-y-auto pr-1">
+                      {importResult.errors.filter((e: any) => e.rowNum > 0).map((err: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-xs py-1 first:pt-0">
+                          <span className="text-muted-foreground">Row {err.rowNum} ({err.symbol})</span>
+                          <span className="text-destructive font-medium">{err.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border/40 pt-3 flex justify-end">
+                <button
+                  onClick={() => setImportResult(null)}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Trade Modal */}
       <AnimatePresence>

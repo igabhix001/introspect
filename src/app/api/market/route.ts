@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
           niftyPrice = niftyData.current;
           prevClose = niftyData.prevClose;
           todayOpen = niftyData.open;
-          vix = vixData ?? 14;
+          vix = vixData ?? (historyState.last_valid?.vix ?? 14);
           pcr = breadthData?.pcr ?? 1.0;
           advances = breadthData?.advances ?? 25;
           declines = breadthData?.declines ?? 25;
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
         isDataValid = true;
       } else {
         // Generate simulated data (always valid)
-        const sim = generateSimulatedData();
+        const sim = generateSimulatedData(historyState.last_valid);
         niftyPrice = sim.niftyPrice;
         prevClose = sim.prevClose;
         todayOpen = sim.todayOpen;
@@ -267,7 +267,7 @@ export async function GET(request: NextRequest) {
     const twoMinutesAgo = now - 120000;
     const vixSnapshots2min = historyState.snapshots.filter(s => s.timestamp >= twoMinutesAgo);
     let shock_detected = false;
-    if (vixSnapshots2min.length >= 2) {
+    if (dataSource !== "simulated" && vixSnapshots2min.length >= 2) {
       const oldestVix = vixSnapshots2min[0].vix;
       if (oldestVix > 0) {
         const vix_change = (vix - oldestVix) / oldestVix;
@@ -388,14 +388,20 @@ export async function GET(request: NextRequest) {
     // Save Updated History State back to cache (24 hours TTL)
     cache.set(HISTORY_CACHE_KEY, historyState, 86400);
 
+    const mapZoneToBias = (zone: "BULLISH" | "BEARISH" | "NO_TRADE") => {
+      if (zone === "BULLISH") return "Positive Market Bias";
+      if (zone === "BEARISH") return "Negative Market Bias";
+      return "Neutral Market Bias";
+    };
+
     const responseData = {
       nifty_price: Math.round(niftyPrice * 100) / 100,
       vix: Math.round(vix * 100) / 100,
       pcr: Math.round(pcr * 100) / 100,
       advances,
       declines,
-      market_zone: confirmed_zone,
-      raw_zone,
+      market_zone: mapZoneToBias(confirmed_zone),
+      raw_zone: mapZoneToBias(raw_zone),
       radar_score: Math.max(0, Math.min(100, Math.round(radar_score * 10) / 10)),
       confidence,
       stability,
@@ -424,14 +430,40 @@ export async function GET(request: NextRequest) {
 }
 
 // Simulated data fallback
-function generateSimulatedData() {
+function generateSimulatedData(lastValid: Snapshot | null) {
   const prevClose = 22350;
-  const todayOpen = prevClose + Math.floor(Math.random() * 100 - 50);
-  const niftyPrice = todayOpen + Math.floor(Math.random() * 300 - 100);
-  const atrValue = 100 + Math.random() * 80;
-  const vix = 11 + Math.random() * 16;
-  const pcr = 0.6 + Math.random() * 0.8;
-  const advances = 15 + Math.floor(Math.random() * 30);
+  const todayOpen = 22400;
+  const atrValue = 120;
+  
+  let niftyPrice = 22450;
+  let vix = 14;
+  let pcr = 1.0;
+  let advances = 25;
+  
+  if (lastValid && lastValid.nifty_price > 0) {
+    // Smooth random walk for price
+    const change = (Math.random() * 10 - 4.5); // slight upward bias
+    niftyPrice = lastValid.nifty_price + change;
+    
+    // Smooth random walk for VIX
+    const vixChange = (Math.random() * 0.4 - 0.2);
+    vix = Math.max(10, Math.min(25, lastValid.vix + vixChange));
+    
+    // Smooth random walk for PCR
+    const pcrChange = (Math.random() * 0.04 - 0.02);
+    pcr = Math.max(0.6, Math.min(1.8, lastValid.pcr + pcrChange));
+    
+    // Smooth random walk for advances
+    const advChange = Math.floor(Math.random() * 3 - 1);
+    advances = Math.max(15, Math.min(35, lastValid.advances + advChange));
+  } else {
+    // Initial generation
+    niftyPrice = todayOpen + (Math.random() * 40 - 20);
+    vix = 13 + Math.random() * 2;
+    pcr = 0.9 + Math.random() * 0.2;
+    advances = 23 + Math.floor(Math.random() * 5);
+  }
+  
   const declines = 50 - advances;
   return { niftyPrice, prevClose, todayOpen, vix, pcr, advances, declines, atrValue };
 }

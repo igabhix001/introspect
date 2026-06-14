@@ -107,8 +107,22 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = async () => {
     if (!confirm("Are you sure you want to delete your account? This action is irreversible.")) return;
-    // In production, call a server-side function to delete the user
-    await signOut();
+    try {
+      setSaving(true);
+      const res = await fetch("/api/user/delete-account", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete account");
+      }
+      showToast("Account deleted successfully.", "success");
+      await signOut();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete account. Please try again.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!mounted || loading) {

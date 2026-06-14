@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
         disallow: [
           "/api/",
-          "/dashboard/admin/",
+          "/dashboard/",
           "/auth/verify",
           "/auth/forgot-password",
         ],
@@ -18,7 +18,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "Googlebot",
         allow: "/",
-        disallow: ["/api/", "/dashboard/admin/"],
+        disallow: ["/api/", "/dashboard/"],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const headers = [
-    "Date", "Symbol", "Direction", "Entry Price", "Exit Price", 
-    "Quantity", "Stop Loss", "Target Price", "Followed Plan", "Emotion", 
-    "Notes", "Market Sentiment", "Entry Time", "Exit Time"
+    "Symbol", "Trade Type", "Quantity", "Price", "Execution Time"
   ];
   
-  const sampleRow = [
-    "2026-05-27", "NIFTY 50", "long", "22450.00", "22550.00", 
-    "75", "yes", "yes", "Yes", "Calm", 
-    "Sample trade notes explaining logic", "Bullish", "not required", "not required"
+  const sampleRows = [
+    ["INDRAMEDCO", "BUY", "35", "537.65", "2025-10-07 10:51:16"],
+    ["INDRAMEDCO", "SELL", "35", "539.30", "2025-10-07 10:52:05"],
+    ["DIVISLAB", "BUY", "3", "5931.00", "2025-10-07 10:57:15"],
+    ["DIVISLAB", "SELL", "3", "5949.00", "2025-10-07 10:57:33"]
   ];
 
   const csv = [
     headers.join(","),
-    sampleRow.map(cell => `"${cell}"`).join(",")
+    ...sampleRows.map(row => row.map(cell => `"${cell}"`).join(","))
   ].join("\n");
 
   return new NextResponse(csv, {

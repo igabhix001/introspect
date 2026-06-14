@@ -335,11 +335,38 @@ export default function DailyReportPage() {
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Trades</p>
               <p className="text-2xl font-bold">{report.trades_taken}</p>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">P&L</p>
-              <p className={`text-2xl font-bold ${report.total_pnl >= 0 ? "text-success" : "text-destructive"}`}>
+            <div className="rounded-xl border border-border bg-card p-4 space-y-1 relative group">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Gross P&L</p>
+                <div className="relative cursor-pointer">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-foreground transition-colors" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-900 border border-zinc-800 text-zinc-300 text-[9px] p-2 rounded-lg shadow-xl hidden group-hover:block z-50 pointer-events-none leading-normal normal-case font-normal">
+                    Projected Net P&L is a conservative estimate: 5% charges applied on winning sessions. Actual broker-reported charges may vary depending on Brokerage, STT, Exchange, GST, SEBI charges, and Stamp Duty.
+                  </div>
+                </div>
+              </div>
+              <p className={`text-2xl font-bold font-mono leading-none ${report.total_pnl >= 0 ? "text-success" : "text-destructive"}`}>
                 {report.total_pnl >= 0 ? "+" : ""}₹{report.total_pnl.toLocaleString("en-IN")}
               </p>
+              {(() => {
+                const totalGrossPnl = report.total_pnl;
+                const estimatedCharges = totalGrossPnl > 0 ? totalGrossPnl * 0.05 : 0;
+                const projectedNetPnl = totalGrossPnl > 0 ? totalGrossPnl * 0.95 : totalGrossPnl;
+                return (
+                  <div className="border-t border-border/40 pt-1 mt-1 text-[10px] text-muted-foreground space-y-0.5 font-mono">
+                    <div className="flex justify-between">
+                      <span>Est. Charges:</span>
+                      <span>₹{Math.round(estimatedCharges).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-foreground/80">
+                      <span>Proj. Net P&L:</span>
+                      <span className={projectedNetPnl >= 0 ? "text-success/90" : "text-destructive/90"}>
+                        {projectedNetPnl >= 0 ? "+" : ""}₹{Math.round(projectedNetPnl).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Mistakes</p>

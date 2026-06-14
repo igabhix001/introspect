@@ -415,9 +415,9 @@ export default function CalculatorPage() {
             ) : marketData ? (
               <div className="space-y-4">
                 {/* Zone Classification */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground font-medium">Sentiment Zone</span>
+                    <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
                     <div className="flex items-center gap-2">
                       {marketData.failsafe_mode ? (
                         <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-destructive/15 text-destructive animate-pulse uppercase">
@@ -432,10 +432,10 @@ export default function CalculatorPage() {
                           CONFIRMED
                         </span>
                       )}
-                                      <span className={`px-4 py-1.5 rounded-xl text-sm sm:text-base font-black tracking-wider uppercase border ${
-                        marketData.market_zone === "BULLISH" 
+                      <span className={`px-3 py-1.5 rounded-xl text-xs font-black tracking-wider border uppercase ${
+                        marketData.market_zone === "Positive Market Bias" 
                           ? "bg-success/20 text-success border-success/30 shadow-[0_0_12px_rgba(34,197,94,0.15)]" 
-                          : marketData.market_zone === "BEARISH" 
+                          : marketData.market_zone === "Negative Market Bias" 
                           ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
                           : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
@@ -444,11 +444,34 @@ export default function CalculatorPage() {
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between border-t border-border/30 pt-2 text-xs">
+                    <span className="text-muted-foreground">Confidence</span>
+                    <span className={`font-bold uppercase ${
+                      marketData.confidence === "HIGH" ? "text-success" :
+                      marketData.confidence === "MODERATE" ? "text-amber-500" :
+                      "text-muted-foreground"
+                    }`}>
+                      {marketData.confidence || "LOW"}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-xl border border-border/40">
+                    {marketData.market_zone === "Positive Market Bias" && (
+                      "Current market indicators show positive directional alignment. Market conditions may be supportive of bullish market behavior."
+                    )}
+                    {marketData.market_zone === "Negative Market Bias" && (
+                      "Current market indicators show negative directional alignment. Market conditions may be supportive of bearish market behavior."
+                    )}
+                    {marketData.market_zone === "Neutral Market Bias" && (
+                      "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                    )}
+                  </div>
+
                   {/* Watch State Progress Bar */}
                   {marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
                     <div className="rounded-lg bg-amber-500/[0.03] border border-amber-500/10 p-2.5 space-y-1.5 animate-pulse">
                       <div className="flex items-center justify-between text-[10px] text-amber-500 font-semibold">
-                        <span>Stabilizing Zone...</span>
+                        <span>Stabilizing Bias...</span>
                         <span>{marketData.confirmation_count} / 3 Confirmations</span>
                       </div>
                       <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
@@ -463,7 +486,7 @@ export default function CalculatorPage() {
                   {/* Persistence Timer */}
                   {marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
                     <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border/30 px-3 py-1 rounded-lg">
-                      <span>Zone Stability:</span>
+                      <span>Bias Stability:</span>
                       <span className="text-foreground font-semibold flex items-center gap-1">
                         <span className="h-1.5 w-1.5 rounded-full bg-success animate-ping" />
                         Stable for {marketData.stability_duration}
@@ -537,9 +560,14 @@ export default function CalculatorPage() {
                   </ul>
                 </div>
 
-                <div className="flex items-center justify-between text-[9px] text-muted-foreground/60 border-t border-border/30 pt-2 font-mono">
-                  <span>Source: Third-party data providers</span>
-                  <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
+                <div className="border-t border-border/30 pt-2.5 space-y-2">
+                  <div className="flex items-center justify-between text-[9px] text-muted-foreground/60 font-mono">
+                    <span>Source: Third-party data providers</span>
+                    <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
+                  </div>
+                  <p className="text-[8px] text-muted-foreground/45 leading-normal text-justify">
+                    This assessment is generated using quantitative market indicators and is provided for informational and educational purposes only. It does not constitute investment advice, a recommendation, research report, or a solicitation to buy or sell any security. Users should exercise independent judgment before making trading decisions.
+                  </p>
                 </div>
               </div>
             ) : (

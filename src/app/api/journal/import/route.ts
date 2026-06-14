@@ -1,97 +1,31 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { tradeSchema } from "@/lib/validation/schemas";
+import { autoCheckInChallenge } from "@/lib/services/challenge-service";
+import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
-function detectMistakes(
-  trade: {
-    direction: string;
-    entry_price: number;
-    exit_price?: number | null;
-    stop_loss?: number | null;
-    followed_plan: boolean;
-    pnl: number;
-    risk_pct: number;
-    quantity: number;
-    entry_time?: string | null;
-    exit_time?: string | null;
-    notes?: string | null;
-    stock?: string | null;
-    date?: string | null;
-  },
-  context: {
-    capital: number;
-    todayTradeCount: number;
-    todayLosingTradesCount: number;
-    todayNetPnl: number;
-  }
-): string[] {
-  const mistakes: string[] = [];
+interface Execution {
+  symbol: string;
+  tradeType: "BUY" | "SELL";
+  quantity: number;
+  price: number;
+  time: Date;
+  rowNum: number;
+}
 
-  // 1. Risk per trade breached: Trade risk > 1% of capital
-  if (trade.risk_pct > 1) {
-    mistakes.push("risk_breached");
-  }
-
-  // 2. Daily loss breached: Realized loss > 3% of capital
-  const netDailyPnl = context.todayNetPnl + trade.pnl;
-  if (netDailyPnl < -0.03 * context.capital) {
-    mistakes.push("daily_loss_breached");
-  }
-
-  // 3. No stop loss set: stop_set? = No
-  if (trade.stop_loss === null || trade.stop_loss === undefined) {
-    mistakes.push("no_stop_loss");
-  }
-
-  // 4. Revenge trading: (losses today >= 2) AND (daily loss > 3% of capital)
-  const isCurrentLoss = trade.exit_price !== null && trade.pnl < 0;
-  const totalLosingTrades = context.todayLosingTradesCount + (isCurrentLoss ? 1 : 0);
-  if (totalLosingTrades >= 2 && netDailyPnl < -0.03 * context.capital) {
-    mistakes.push("revenge_trading");
-  }
-
-  // 5. Overtrading: Trades > planned_trades_per_day (5)
-  const totalTradesCount = context.todayTradeCount + 1;
-  if (totalTradesCount > 5) {
-    mistakes.push("overtrading");
-  }
-
-  // 6. Missing critical fields: entry_time / exit_time / stop_set? / setup empty
-  const hasExit = trade.exit_price !== null && trade.exit_price !== undefined;
-  const isEntryTimeMissing = !trade.entry_time || trade.entry_time.trim() === "";
-  const isExitTimeMissing = hasExit && (!trade.exit_time || trade.exit_time.trim() === "");
-  const isStopLossMissing = trade.stop_loss === null || trade.stop_loss === undefined;
-  const isNotesMissing = !trade.notes || trade.notes.trim() === "";
-  if (isEntryTimeMissing || isExitTimeMissing || isStopLossMissing || isNotesMissing) {
-    mistakes.push("missing_fields");
-  }
-
-  // 7. Buy price > sell price (long): entry > exit for long direction
-  if (trade.direction === "long" && trade.exit_price !== null && trade.exit_price !== undefined) {
-    if (trade.entry_price > trade.exit_price) {
-      mistakes.push("data_integrity_buy_sell");
-    }
-  }
-
-  // 8. Missing/wrong symbol or date: symbol empty OR date invalid
-  const isSymbolEmpty = !trade.stock || trade.stock.trim() === "";
-  const isDateInvalid = !trade.date || isNaN(Date.parse(trade.date));
-  if (isSymbolEmpty || isDateInvalid) {
-    mistakes.push("data_integrity_symbol_date");
-  }
-
-  // Backward compatibility legacy rules
-  if (trade.risk_pct > 1) {
-    if (!mistakes.includes("over_risk")) mistakes.push("over_risk");
-  }
-  if (!trade.followed_plan) {
-    if (!mistakes.includes("plan_not_followed")) mistakes.push("plan_not_followed");
-  }
-  if (trade.pnl < 0 && trade.risk_pct > 1.5) {
-    if (!mistakes.includes("over_leveraged")) mistakes.push("over_leveraged");
-  }
-
-  return mistakes;
+interface ReconstructedTrade {
+  stock: string;
+  direction: "long" | "short";
+  entry_price: number;
+  exit_price: number;
+  quantity: number;
+  pnl: number;
+  entry_time: string;
+  exit_time: string;
+  date: string;
+  holding_duration_mins: number;
+  holding_duration_str: string;
+  mistakes: string[];
 }
 
 function parseCSV(text: string): string[][] {
@@ -133,11 +67,147 @@ function parseCSV(text: string): string[][] {
   return lines;
 }
 
+function parseExecutionTime(val: string): Date | null {
+  if (!val) return null;
+  const trimmed = val.trim();
+  let d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d;
+
+  // Try parsing DD-MM-YYYY HH:MM:SS or DD/MM/YYYY HH:MM:SS
+  const parts = trimmed.split(/[\sT]+/);
+  if (parts.length >= 1) {
+    const dateParts = parts[0].split(/[\-\/]/);
+    const timeParts = (parts[1] || "00:00:00").split(":");
+    if (dateParts.length === 3) {
+      let day = parseInt(dateParts[0]);
+      let month = parseInt(dateParts[1]) - 1; // 0-indexed
+      let year = parseInt(dateParts[2]);
+
+      if (year < 100) year += 2000;
+
+      // Handle YYYY-MM-DD instead of DD-MM-YYYY
+      if (dateParts[0].length === 4) {
+        year = parseInt(dateParts[0]);
+        month = parseInt(dateParts[1]) - 1;
+        day = parseInt(dateParts[2]);
+      }
+
+      const hour = parseInt(timeParts[0] || "0");
+      const minute = parseInt(timeParts[1] || "0");
+      const second = parseInt(timeParts[2] || "0");
+
+      d = new Date(year, month, day, hour, minute, second);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+}
+
+function formatHoldingDuration(mins: number): string {
+  if (mins < 0) return "0 min";
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+}
+
+function formatTimeOnly(d: Date): string {
+  return d.toTimeString().split(" ")[0]; // "HH:MM:SS"
+}
+
+function formatDateOnly(d: Date): string {
+  return d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+}
+
+function finalizeReconstructedTrade(trade: {
+  direction: "long" | "short";
+  executions: Execution[];
+  totalBuyQty: number;
+  totalBuyVal: number;
+  totalSellQty: number;
+  totalSellVal: number;
+  entryTime: Date;
+}, exitTime: Date): ReconstructedTrade {
+  const isLong = trade.direction === "long";
+  const qty = isLong ? trade.totalBuyQty : trade.totalSellQty;
+  const avgEntry = isLong 
+    ? trade.totalBuyVal / trade.totalBuyQty 
+    : trade.totalSellVal / trade.totalSellQty;
+  const avgExit = isLong 
+    ? trade.totalSellVal / trade.totalSellQty 
+    : trade.totalBuyVal / trade.totalBuyQty;
+
+  const grossPnl = isLong 
+    ? (avgExit - avgEntry) * qty 
+    : (avgEntry - avgExit) * qty;
+
+  const holdingDurationMinutes = Math.round((exitTime.getTime() - trade.entryTime.getTime()) / 60000);
+  const holdingDurationStr = formatHoldingDuration(holdingDurationMinutes);
+
+  // Behavioral detection engine rules (Self-contained logic)
+  const mistakes: string[] = [];
+
+  // Averaging Down Detection: adding entries at worse price
+  let lastPrice = -1;
+  let isAveragingDown = false;
+  for (const exec of trade.executions) {
+    if (trade.direction === "long" && exec.tradeType === "BUY") {
+      if (lastPrice !== -1 && exec.price < lastPrice) {
+        isAveragingDown = true;
+      }
+      lastPrice = exec.price;
+    } else if (trade.direction === "short" && exec.tradeType === "SELL") {
+      if (lastPrice !== -1 && exec.price > lastPrice) {
+        isAveragingDown = true;
+      }
+      lastPrice = exec.price;
+    }
+  }
+  if (isAveragingDown) {
+    mistakes.push("averaging_down");
+  }
+
+  // Early Profit Booking: winning trade duration is < 5 mins (significantly short)
+  if (grossPnl > 0 && holdingDurationMinutes <= 5) {
+    mistakes.push("early_profit_booking");
+  }
+
+  // Holding Losers Too Long: losing trade duration is > 45 mins
+  if (grossPnl < 0 && holdingDurationMinutes >= 45) {
+    mistakes.push("holding_losers_too_long");
+  }
+
+  return {
+    stock: trade.executions[0].symbol,
+    direction: trade.direction,
+    entry_price: Math.round(avgEntry * 100) / 100,
+    exit_price: Math.round(avgExit * 100) / 100,
+    quantity: qty,
+    pnl: Math.round(grossPnl * 100) / 100,
+    entry_time: formatTimeOnly(trade.entryTime),
+    exit_time: formatTimeOnly(exitTime),
+    date: formatDateOnly(trade.entryTime),
+    holding_duration_mins: holdingDurationMinutes,
+    holding_duration_str: holdingDurationStr,
+    mistakes,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Rate limiting
+    const identifier = getRateLimitIdentifier(request, user.id);
+    const rateLimitResult = await apiRateLimit(identifier);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -153,265 +223,345 @@ export async function POST(request: NextRequest) {
     const headers = parsed[0].map(h => h.trim().toLowerCase());
     const dataRows = parsed.slice(1);
 
-    const validTrades: any[] = [];
-    const errors: string[] = [];
-
-    // Helper to find column index (case-insensitive, allows space or underscore)
-    const colIndex = (name: string) => {
-      const normalizedName = name.toLowerCase().replace(/[\s_]+/g, "");
-      return headers.findIndex(h => h.replace(/[\s_]+/g, "") === normalizedName);
+    // Find columns using robust name matching
+    const colIndex = (keywords: string[]) => {
+      return headers.findIndex(h => keywords.some(kw => h.includes(kw)));
     };
 
-    const stockIdx = colIndex("stock") !== -1 ? colIndex("stock") : colIndex("symbol");
-    const dateIdx = colIndex("date");
-    const directionIdx = colIndex("direction");
-    const entryPriceIdx = colIndex("entryprice");
-    const exitPriceIdx = colIndex("exitprice");
-    const quantityIdx = colIndex("quantity");
-    const stopLossIdx = colIndex("stoploss");
-    const targetIdx = colIndex("targetprice") !== -1 ? colIndex("targetprice") : colIndex("target");
-    const followedPlanIdx = colIndex("followedplan");
-    const emotionIdx = colIndex("emotion") !== -1 ? colIndex("emotion") : colIndex("emotionbefore");
-    const notesIdx = colIndex("notes");
-    const sentimentIdx = colIndex("marketsentiment");
-    const entryTimeIdx = colIndex("entrytime");
-    const exitTimeIdx = colIndex("exittime");
+    const stockIdx = colIndex(["symbol", "stock", "instrument"]);
+    const typeIdx = colIndex(["trade type", "tradetype", "trade_type", "type", "direction", "transaction", "transaction_type", "buy/sell", "action"]);
+    const qtyIdx = colIndex(["quantity", "qty", "vol", "volume"]);
+    const priceIdx = colIndex(["price", "rate", "avg price", "avg_price", "value"]);
+    const timeIdx = colIndex(["execution time", "executiontime", "time", "date", "datetime", "execution_time", "trade_time", "order_execution_time"]);
 
-    // Fetch user profile trading capital to calculate risk_pct
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("trading_capital")
-      .eq("id", user.id)
-      .single();
-    const capital = profile?.trading_capital || 100000;
-
-    const cleanFloat = (val: string | undefined): string => {
-      if (!val) return "";
-      return val.replace(/["',\s]/g, "");
-    };
-
-    const cleanTime = (val: string | undefined): string | null => {
-      if (!val) return null;
-      const trimmed = val.trim();
-      const lower = trimmed.toLowerCase();
-      if (lower === "" || lower === "not required" || lower === "not_required" || lower === "null" || lower === "undefined" || lower === "not required?") {
-        return null;
-      }
-      return trimmed;
-    };
-
-    const parseYesNoOrNumber = (val: string | undefined, isStopLoss: boolean, entry: number, direction: string): number | null => {
-      if (!val) return null;
-      const cleaned = val.trim().toLowerCase();
-      if (cleaned === "" || cleaned === "not required" || cleaned === "not_required" || cleaned === "null" || cleaned === "undefined") return null;
-      if (cleaned === "yes" || cleaned === "y" || cleaned === "true") {
-        if (isStopLoss) {
-          return direction === "long" ? entry * 0.99 : entry * 1.01;
-        } else {
-          return direction === "long" ? entry * 1.02 : entry * 0.98;
-        }
-      }
-      if (cleaned === "no" || cleaned === "n" || cleaned === "false") {
-        return null;
-      }
-      const num = parseFloat(cleaned.replace(/["',\s]/g, ""));
-      return isNaN(num) ? null : num;
-    };
-
-    // Date context caching helper for multi-trade and revenge trading checks on imported rows
-    const dateContexts: Record<string, { dbTradeCount: number; dbLosingCount: number; dbNetPnl: number; importedList: any[] }> = {};
-
-    const getDateContext = async (dateStr: string) => {
-      if (!dateContexts[dateStr]) {
-        // Query DB for this date
-        const { count: dbTradeCount } = await supabase
-          .from("trades")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("date", dateStr);
-
-        const { data: dbTrades } = await supabase
-          .from("trades")
-          .select("pnl, exit_price")
-          .eq("user_id", user.id)
-          .eq("date", dateStr);
-
-        const losingCount = (dbTrades || []).filter(t => t.exit_price !== null && (t.pnl || 0) < 0).length;
-        const netPnl = (dbTrades || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
-
-        dateContexts[dateStr] = {
-          dbTradeCount: dbTradeCount || 0,
-          dbLosingCount: losingCount,
-          dbNetPnl: netPnl,
-          importedList: []
-        };
-      }
-      
-      const ctx = dateContexts[dateStr];
-      const importedTradeCount = ctx.importedList.length;
-      const importedLosingCount = ctx.importedList.filter(t => t.exit_price !== null && t.pnl < 0).length;
-      const importedNetPnl = ctx.importedList.reduce((sum, t) => sum + t.pnl, 0);
-
-      return {
-        tradeCount: ctx.dbTradeCount + importedTradeCount,
-        losingCount: ctx.dbLosingCount + importedLosingCount,
-        netPnl: ctx.dbNetPnl + importedNetPnl,
-        addImportedTrade: (trade: any) => {
-          ctx.importedList.push(trade);
-        }
-      };
-    };
-
-    for (let i = 0; i < dataRows.length; i++) {
-      const row = dataRows[i];
-      // Skip empty or spacer rows
-      if (row.length === 0 || (row.length === 1 && !row[0])) continue;
-
-      const rowNum = i + 2; // Row number in Excel/CSV (1-indexed + header)
-
-      try {
-        const rawStock = stockIdx !== -1 ? row[stockIdx] : "";
-        const rawDirection = directionIdx !== -1 ? row[directionIdx]?.trim().toLowerCase() : "";
-        
-        // Parse date first
-        let dateVal = new Date().toISOString().split("T")[0];
-        if (dateIdx !== -1 && row[dateIdx]) {
-          const d = new Date(row[dateIdx]);
-          if (!isNaN(d.getTime())) {
-            dateVal = d.toISOString().split("T")[0];
-          }
-        }
-
-        const entryStr = entryPriceIdx !== -1 ? cleanFloat(row[entryPriceIdx]) : "";
-        const rawEntryPrice = entryStr ? parseFloat(entryStr) : NaN;
-
-        const exitStr = exitPriceIdx !== -1 ? cleanFloat(row[exitPriceIdx]) : "";
-        const rawExitPrice = exitStr ? parseFloat(exitStr) : null;
-
-        const qtyStr = quantityIdx !== -1 ? cleanFloat(row[quantityIdx]) : "";
-        const rawQty = qtyStr ? parseInt(qtyStr) : NaN;
-
-        const directionVal = rawDirection === "short" || rawDirection === "sell" ? "short" : "long";
-
-        const rawSLVal = stopLossIdx !== -1 ? row[stopLossIdx] : undefined;
-        const rawTargetVal = targetIdx !== -1 ? row[targetIdx] : undefined;
-
-        const rawSL = parseYesNoOrNumber(rawSLVal, true, rawEntryPrice, directionVal);
-        const rawTarget = parseYesNoOrNumber(rawTargetVal, false, rawEntryPrice, directionVal);
-
-        const rawFollowedPlan = followedPlanIdx !== -1 ? row[followedPlanIdx]?.trim().toLowerCase() : "";
-        const rawEmotion = emotionIdx !== -1 ? row[emotionIdx] : "Calm";
-        const rawNotes = notesIdx !== -1 ? row[notesIdx] : "";
-        const rawSentiment = sentimentIdx !== -1 ? row[sentimentIdx] : "Neutral";
-        const rawEntryTime = entryTimeIdx !== -1 ? cleanTime(row[entryTimeIdx]) : null;
-        const rawExitTime = exitTimeIdx !== -1 ? cleanTime(row[exitTimeIdx]) : null;
-
-        // Validation mapping
-        const tradeObj: any = {
-          stock: rawStock,
-          direction: directionVal,
-          entry_price: isNaN(rawEntryPrice) ? undefined : rawEntryPrice,
-          quantity: isNaN(rawQty) ? undefined : rawQty,
-        };
-
-        if (rawExitPrice && !isNaN(rawExitPrice)) tradeObj.exit_price = rawExitPrice;
-        if (rawSL && !isNaN(rawSL)) tradeObj.stop_loss = rawSL;
-        if (rawTarget && !isNaN(rawTarget)) tradeObj.target_price = rawTarget;
-        
-        tradeObj.followed_plan = !(rawFollowedPlan === "no" || rawFollowedPlan === "false");
-        if (rawEmotion) tradeObj.emotion_before = rawEmotion;
-        if (rawNotes) tradeObj.notes = rawNotes;
-        if (rawSentiment) tradeObj.market_sentiment = rawSentiment;
-        if (rawEntryTime) tradeObj.entry_time = rawEntryTime;
-        if (rawExitTime) tradeObj.exit_time = rawExitTime;
-
-        // Validate trade object with Zod
-        const validation = tradeSchema.safeParse(tradeObj);
-        if (!validation.success) {
-          const fieldErrors = validation.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ");
-          errors.push(`Row ${rowNum}: ${fieldErrors}`);
-          continue;
-        }
-
-        // Calculations
-        const validated = validation.data;
-        const pnl = validated.exit_price
-          ? validated.direction === "long"
-            ? (validated.exit_price - validated.entry_price) * validated.quantity
-            : (validated.entry_price - validated.exit_price) * validated.quantity
-          : 0;
-
-        const riskAmount = validated.stop_loss
-          ? Math.abs(validated.entry_price - validated.stop_loss) * validated.quantity
-          : 0;
-        const riskPct = (riskAmount / capital) * 100;
-
-        const slFollowed = validated.stop_loss
-          ? validated.direction === "long"
-            ? !validated.exit_price || validated.exit_price >= validated.stop_loss
-            : !validated.exit_price || validated.exit_price <= validated.stop_loss
-          : false;
-
-        // Get daily context for this date
-        const dateCtx = await getDateContext(dateVal);
-
-        // Detect Mistakes with Context
-        const mistakes = detectMistakes({
-          ...validated,
-          pnl,
-          risk_pct: riskPct,
-          date: dateVal
-        }, {
-          capital,
-          todayTradeCount: dateCtx.tradeCount,
-          todayLosingTradesCount: dateCtx.losingCount,
-          todayNetPnl: dateCtx.netPnl
-        });
-
-        const tradeData = {
-          ...validated,
-          user_id: user.id,
-          date: dateVal,
-          pnl: Math.round(pnl * 100) / 100,
-          risk_pct: Math.round(riskPct * 100) / 100,
-          sl_followed: slFollowed,
-          mistakes,
-        };
-
-        // Add this trade to date context running calculations for subsequent trades
-        dateCtx.addImportedTrade(tradeData);
-
-        validTrades.push(tradeData);
-
-      } catch (err: any) {
-        errors.push(`Row ${rowNum}: Exception while parsing (${err.message})`);
-      }
-    }
-
-    if (validTrades.length === 0) {
+    if (stockIdx === -1 || typeIdx === -1 || qtyIdx === -1 || priceIdx === -1 || timeIdx === -1) {
       return NextResponse.json({
-        success: false,
-        error: "No valid trades found to import.",
-        errors
+        error: "Missing required columns in CSV. Template must include: Symbol, Trade Type, Quantity, Price, and Execution Time."
       }, { status: 400 });
     }
 
-    // Insert to database in bulk
-    const { error: dbError } = await supabase
-      .from("trades")
-      .insert(validTrades);
+    const executions: Execution[] = [];
+    const ignoredRecords: Array<{ rowNum: number; symbol: string; reason: string }> = [];
 
-    if (dbError) throw dbError;
+    // Parse CSV rows into executions
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+
+      const rowNum = i + 2; // Row number in Excel/CSV (1-indexed + header)
+      const rawSymbol = row[stockIdx]?.trim().toUpperCase();
+      const rawType = row[typeIdx]?.trim().toUpperCase();
+      const rawQtyStr = row[qtyIdx]?.trim().replace(/["',\s]/g, "");
+      const rawPriceStr = row[priceIdx]?.trim().replace(/["',\s]/g, "");
+      const rawTimeStr = row[timeIdx]?.trim();
+
+      if (!rawSymbol) {
+        ignoredRecords.push({ rowNum, symbol: "Unknown", reason: "Missing Symbol" });
+        continue;
+      }
+
+      const isBuy = rawType === "BUY" || rawType === "B" || rawType === "LONG";
+      const isSell = rawType === "SELL" || rawType === "S" || rawType === "SHORT";
+      if (!isBuy && !isSell) {
+        ignoredRecords.push({ rowNum, symbol: rawSymbol, reason: `Invalid Trade Type: ${row[typeIdx]}` });
+        continue;
+      }
+
+      const qty = parseInt(rawQtyStr);
+      if (isNaN(qty) || qty <= 0) {
+        ignoredRecords.push({ rowNum, symbol: rawSymbol, reason: `Invalid Quantity: ${row[qtyIdx]}` });
+        continue;
+      }
+
+      const price = parseFloat(rawPriceStr);
+      if (isNaN(price) || price <= 0) {
+        ignoredRecords.push({ rowNum, symbol: rawSymbol, reason: `Invalid Price: ${row[priceIdx]}` });
+        continue;
+      }
+
+      const time = parseExecutionTime(rawTimeStr);
+      if (!time) {
+        ignoredRecords.push({ rowNum, symbol: rawSymbol, reason: `Invalid Execution Time: ${row[timeIdx]}` });
+        continue;
+      }
+
+      executions.push({
+        symbol: rawSymbol,
+        tradeType: isBuy ? "BUY" : "SELL",
+        quantity: qty,
+        price: price,
+        time: time,
+        rowNum: rowNum
+      });
+    }
+
+    if (executions.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "No valid execution rows found to process.",
+        ignoredCount: ignoredRecords.length,
+        ignoredRecords
+      }, { status: 400 });
+    }
+
+
+    // Group executions by Symbol
+    const grouped = executions.reduce((acc, exec) => {
+      if (!acc[exec.symbol]) acc[exec.symbol] = [];
+      acc[exec.symbol].push(exec);
+      return acc;
+    }, {} as Record<string, Execution[]>);
+
+    const reconstructedTrades: ReconstructedTrade[] = [];
+    const openPositionsReport: Array<{ symbol: string; direction: string; netQty: number; avgPrice: number; entryTime: string }> = [];
+
+    // Reconstruct trades per symbol
+    for (const symbol of Object.keys(grouped)) {
+      const sorted = grouped[symbol].sort((a, b) => a.time.getTime() - b.time.getTime());
+
+      let currentTrade: {
+        direction: "long" | "short";
+        executions: Execution[];
+        totalBuyQty: number;
+        totalBuyVal: number;
+        totalSellQty: number;
+        totalSellVal: number;
+        entryTime: Date;
+      } | null = null;
+
+      let netQty = 0; // positive for net long, negative for net short
+
+      for (const exec of sorted) {
+        const isBuy = exec.tradeType === "BUY";
+        const execQty = exec.quantity;
+        const execPrice = exec.price;
+
+        if (netQty === 0) {
+          // Start a new trade cycle
+          const dir = isBuy ? "long" : "short";
+          currentTrade = {
+            direction: dir,
+            executions: [exec],
+            totalBuyQty: isBuy ? execQty : 0,
+            totalBuyVal: isBuy ? execQty * execPrice : 0,
+            totalSellQty: isBuy ? 0 : execQty,
+            totalSellVal: isBuy ? 0 : execQty * execPrice,
+            entryTime: exec.time,
+          };
+          netQty = isBuy ? execQty : -execQty;
+        } else {
+          const currentDir = currentTrade!.direction;
+
+          if (currentDir === "long") {
+            if (isBuy) {
+              netQty += execQty;
+              currentTrade!.executions.push(exec);
+              currentTrade!.totalBuyQty += execQty;
+              currentTrade!.totalBuyVal += execQty * execPrice;
+            } else {
+              // SELL reduces the long position
+              if (execQty < netQty) {
+                netQty -= execQty;
+                currentTrade!.executions.push(exec);
+                currentTrade!.totalSellQty += execQty;
+                currentTrade!.totalSellVal += execQty * execPrice;
+              } else if (execQty === netQty) {
+                netQty = 0;
+                currentTrade!.executions.push(exec);
+                currentTrade!.totalSellQty += execQty;
+                currentTrade!.totalSellVal += execQty * execPrice;
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                currentTrade = null;
+              } else {
+                // Reversal: SELL > netQty. Split the trade!
+                const closeQty = netQty;
+                currentTrade!.executions.push({
+                  ...exec,
+                  quantity: closeQty
+                });
+                currentTrade!.totalSellQty += closeQty;
+                currentTrade!.totalSellVal += closeQty * execPrice;
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+
+                // Start new short trade with remainder
+                const remainingQty = execQty - closeQty;
+                currentTrade = {
+                  direction: "short",
+                  executions: [{
+                    ...exec,
+                    quantity: remainingQty
+                  }],
+                  totalBuyQty: 0,
+                  totalBuyVal: 0,
+                  totalSellQty: remainingQty,
+                  totalSellVal: remainingQty * execPrice,
+                  entryTime: exec.time,
+                };
+                netQty = -remainingQty;
+              }
+            }
+          } else {
+            // currentDir === "short"
+            if (!isBuy) {
+              netQty -= execQty;
+              currentTrade!.executions.push(exec);
+              currentTrade!.totalSellQty += execQty;
+              currentTrade!.totalSellVal += execQty * execPrice;
+            } else {
+              // BUY reduces the short position
+              const absNetQty = Math.abs(netQty);
+              if (execQty < absNetQty) {
+                netQty += execQty;
+                currentTrade!.executions.push(exec);
+                currentTrade!.totalBuyQty += execQty;
+                currentTrade!.totalBuyVal += execQty * execPrice;
+              } else if (execQty === absNetQty) {
+                netQty = 0;
+                currentTrade!.executions.push(exec);
+                currentTrade!.totalBuyQty += execQty;
+                currentTrade!.totalBuyVal += execQty * execPrice;
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                currentTrade = null;
+              } else {
+                // Reversal: BUY > absNetQty. Split the trade!
+                const closeQty = absNetQty;
+                currentTrade!.executions.push({
+                  ...exec,
+                  quantity: closeQty
+                });
+                currentTrade!.totalBuyQty += closeQty;
+                currentTrade!.totalBuyVal += closeQty * execPrice;
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+
+                // Start new long trade with remainder
+                const remainingQty = execQty - closeQty;
+                currentTrade = {
+                  direction: "long",
+                  executions: [{
+                    ...exec,
+                    quantity: remainingQty
+                  }],
+                  totalBuyQty: remainingQty,
+                  totalBuyVal: remainingQty * execPrice,
+                  totalSellQty: 0,
+                  totalSellVal: 0,
+                  entryTime: exec.time,
+                };
+                netQty = remainingQty;
+              }
+            }
+          }
+        }
+      }
+
+      // Add to open positions report if not closed
+      if (netQty !== 0 && currentTrade) {
+        const avgPrice = currentTrade.direction === "long"
+          ? currentTrade.totalBuyVal / currentTrade.totalBuyQty
+          : currentTrade.totalSellVal / currentTrade.totalSellQty;
+
+        openPositionsReport.push({
+          symbol,
+          direction: currentTrade.direction,
+          netQty: Math.abs(netQty),
+          avgPrice: Math.round(avgPrice * 100) / 100,
+          entryTime: currentTrade.entryTime.toLocaleString(),
+        });
+      }
+    }
+
+    // Duplicate Protection: Query existing trades on the dates present in the csv
+    const dates = Array.from(new Set(reconstructedTrades.map(t => t.date)));
+    
+    let existingTrades: any[] = [];
+    if (dates.length > 0) {
+      const { data } = await supabase
+        .from("trades")
+        .select("stock, direction, quantity, entry_price, exit_price, entry_time, exit_time, date")
+        .eq("user_id", user.id)
+        .in("date", dates);
+      existingTrades = data || [];
+    }
+
+    const uniqueTradesToInsert: any[] = [];
+    let duplicatesCount = 0;
+
+    for (const t of reconstructedTrades) {
+      // Check if this trade details already match a record in the database
+      const isDuplicate = existingTrades.some(ext =>
+        ext.stock === t.stock &&
+        ext.direction === t.direction &&
+        ext.quantity === t.quantity &&
+        Math.abs(Number(ext.entry_price) - t.entry_price) < 0.05 &&
+        Math.abs(Number(ext.exit_price) - t.exit_price) < 0.05 &&
+        ext.entry_time === t.entry_time &&
+        ext.exit_time === t.exit_time &&
+        ext.date === t.date
+      );
+
+      if (isDuplicate) {
+        duplicatesCount++;
+        ignoredRecords.push({
+          rowNum: 0, // Mark as duplicate from DB comparison
+          symbol: t.stock,
+          reason: `Duplicate Trade: Already imported (${t.date} ${t.entry_time} - ${t.exit_time})`
+        });
+      } else {
+        // Map to DB columns
+        uniqueTradesToInsert.push({
+          user_id: user.id,
+          date: t.date,
+          stock: t.stock,
+          direction: t.direction,
+          entry_price: t.entry_price,
+          exit_price: t.exit_price,
+          quantity: t.quantity,
+          pnl: t.pnl,
+          followed_plan: true,
+          emotion_before: "Calm",
+          notes: `Reconstructed from broker execution logs. Holding Duration: ${t.holding_duration_str}.`,
+          market_sentiment: "Neutral",
+          entry_time: t.entry_time,
+          exit_time: t.exit_time,
+          mistakes: t.mistakes,
+          risk_pct: 0, // default
+          sl_followed: true, // default
+        });
+      }
+    }
+
+    // Insert new unique trades into Supabase
+    let insertedCount = 0;
+    if (uniqueTradesToInsert.length > 0) {
+      const { error: dbError } = await supabase
+        .from("trades")
+        .insert(uniqueTradesToInsert);
+
+      if (dbError) throw dbError;
+      insertedCount = uniqueTradesToInsert.length;
+
+      // Trigger automatic challenge check-in
+      try {
+        await autoCheckInChallenge(supabase, user.id);
+      } catch (err) {
+        console.error("Challenge check-in error during bulk import:", err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      insertedCount: validTrades.length,
-      failedCount: errors.length,
-      errors
+      totalRows: parsed.length - 1,
+      processedCount: executions.length,
+      ignoredCount: ignoredRecords.length,
+      completedCount: insertedCount,
+      duplicatesCount,
+      openPositionsCount: openPositionsReport.length,
+      errors: ignoredRecords,
+      openPositions: openPositionsReport,
     });
 
   } catch (error: any) {
     console.error("Bulk import error:", error);
-    return NextResponse.json({ error: error.message || "Failed to import trades" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to process and import trades" }, { status: 500 });
   }
 }
