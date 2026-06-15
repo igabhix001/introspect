@@ -14,6 +14,7 @@ export function formatMistakeLabel(m: string): string {
     risk_breached: "Risk Limit Breached",
     daily_loss_breached: "Daily Loss Limit Breached",
     no_stop_loss: "No Stop Loss",
+    always_apply_sl: "Always Apply SL & Position Size Risk",
     revenge_trading: "Revenge Trading",
     overtrading: "Overtrading",
     missing_fields: "Missing Fields",

@@ -8,7 +8,7 @@ export function virtualizeTrade(trade: any) {
   if (!trade) return trade;
   const originalMistakes: string[] = Array.isArray(trade.mistakes) ? trade.mistakes : [];
   
-  const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+  const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
   
   const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
   const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
@@ -63,7 +63,13 @@ function detectMistakes(
 
   // 3. No stop loss set: stop_set? = No
   if (trade.stop_loss === null || trade.stop_loss === undefined) {
-    mistakes.push("no_stop_loss");
+    const realizedLoss = (trade.pnl && trade.pnl < 0) ? Math.abs(trade.pnl) : 0;
+    const isOverRisk = realizedLoss > 0.01 * context.capital;
+    if (isOverRisk) {
+      mistakes.push("no_stop_loss");
+    } else {
+      mistakes.push("always_apply_sl");
+    }
   }
 
   // 4. Revenge trading: (losses today >= 2) AND (daily loss > defined% of capital)
@@ -264,6 +270,13 @@ export async function POST(request: NextRequest) {
         mistake: "no_stop_loss",
         feedback: "⚠️ Trading without a stop-loss is extremely risky. Always define your exit before entering.",
         severity: "critical"
+      });
+    }
+    if (mistakes.includes("always_apply_sl")) {
+      mistakeFeedback.push({
+        mistake: "always_apply_sl",
+        feedback: "💡 Note: Always apply a stop loss and position size risk to protect your capital.",
+        severity: "low"
       });
     }
     if (mistakes.includes("over_risk") || mistakes.includes("risk_breached")) {

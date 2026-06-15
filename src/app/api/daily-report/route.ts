@@ -67,7 +67,7 @@ function virtualizeDailyReport(report: any) {
   if (Array.isArray(feedback.tradeScorecard)) {
     feedback.tradeScorecard = feedback.tradeScorecard.map((t: any) => {
       const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
-      const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+      const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
       const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
       const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
       return {
@@ -142,11 +142,21 @@ function runBehavioralAudit(
         tag: `🔴 SIZE VIOLATION (Risked ₹${Math.round(initialRisk)} vs allowed ₹${Math.round(unitRisk)}, ${overPct}% over)`,
       });
     } else if (!t.stop_loss) {
-      mistakeTags.push({
-        stock: t.stock || "Unknown",
-        pnl: t.pnl || 0,
-        tag: "🔴 NO STOP-LOSS",
-      });
+      const realizedLoss = (t.pnl && t.pnl < 0) ? Math.abs(t.pnl) : 0;
+      const isOverRisk = realizedLoss > 0.01 * capital;
+      if (isOverRisk) {
+        mistakeTags.push({
+          stock: t.stock || "Unknown",
+          pnl: t.pnl || 0,
+          tag: "🔴 NO STOP-LOSS",
+        });
+      } else {
+        mistakeTags.push({
+          stock: t.stock || "Unknown",
+          pnl: t.pnl || 0,
+          tag: "✅ Info: Always apply SL and position size risk",
+        });
+      }
     } else {
       mistakeTags.push({
         stock: t.stock || "Unknown",
@@ -294,7 +304,7 @@ export async function POST(request: NextRequest) {
         losingHoldTimes.push(minutes);
       }
       const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
-      const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+      const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
       const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
       const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
       return {
