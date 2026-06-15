@@ -4,8 +4,22 @@ import { tradeSchema } from "@/lib/validation/schemas";
 import { tradeRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 import { autoCheckInChallenge } from "@/lib/services/challenge-service";
 
-// Mistake Detector per client spec
-// Mistake Detector per client spec
+export function virtualizeTrade(trade: any) {
+  if (!trade) return trade;
+  const originalMistakes: string[] = Array.isArray(trade.mistakes) ? trade.mistakes : [];
+  
+  const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+  
+  const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
+  const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
+  
+  return {
+    ...trade,
+    mistakes,
+    observations,
+  };
+}
+
 function detectMistakes(
   trade: {
     direction: string;
@@ -27,18 +41,23 @@ function detectMistakes(
     todayTradeCount: number;
     todayLosingTradesCount: number;
     todayNetPnl: number;
+    dailyLossLimitPct: number;
   }
 ): string[] {
   const mistakes: string[] = [];
 
-  // 1. Risk per trade breached: Trade risk > 1% of capital
+  // 1. Risk per trade breached: Trade risk > 1% of capital OR Single Trade Loss > 1% of capital
   if (trade.risk_pct > 1) {
     mistakes.push("risk_breached");
   }
+  if (trade.exit_price !== null && trade.exit_price !== undefined && trade.pnl < -0.01 * context.capital) {
+    mistakes.push("single_loss_breached");
+  }
 
-  // 2. Daily loss breached: Realized loss > 3% of capital
+  // 2. Daily loss breached: Realized loss > defined% of capital
   const netDailyPnl = context.todayNetPnl + trade.pnl;
-  if (netDailyPnl < -0.03 * context.capital) {
+  const limitPct = (context.dailyLossLimitPct || 3) / 100;
+  if (netDailyPnl < -limitPct * context.capital) {
     mistakes.push("daily_loss_breached");
   }
 
@@ -47,10 +66,10 @@ function detectMistakes(
     mistakes.push("no_stop_loss");
   }
 
-  // 4. Revenge trading: (losses today >= 2) AND (daily loss > 3% of capital)
+  // 4. Revenge trading: (losses today >= 2) AND (daily loss > defined% of capital)
   const isCurrentLoss = trade.exit_price !== null && trade.pnl < 0;
   const totalLosingTrades = context.todayLosingTradesCount + (isCurrentLoss ? 1 : 0);
-  if (totalLosingTrades >= 2 && netDailyPnl < -0.03 * context.capital) {
+  if (totalLosingTrades >= 2 && netDailyPnl < -limitPct * context.capital) {
     mistakes.push("revenge_trading");
   }
 
@@ -170,6 +189,17 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .eq("date", today);
 
+    const { data: latestAssessment } = await supabase
+      .from("assessments")
+      .select("risk_level")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const riskLevel = latestAssessment?.risk_level || "medium";
+    const dailyLossLimitPct = riskLevel === "low" ? 2 : riskLevel === "high" ? 5 : 3;
+
     const todayTradeCount = todayTrades?.length || 0;
     const todayLosingTradesCount = (todayTrades || []).filter(t => t.exit_price !== null && (t.pnl || 0) < 0).length;
     const todayNetPnl = (todayTrades || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -191,14 +221,15 @@ export async function POST(request: NextRequest) {
         capital,
         todayTradeCount,
         todayLosingTradesCount,
-        todayNetPnl
+        todayNetPnl,
+        dailyLossLimitPct
       }),
     };
 
     // RULE VIOLATION BLOCKING
     const violations: string[] = [];
-    if (dailyLossPct >= 2) {
-      violations.push("Daily loss limit (2%) exceeded - trading blocked for today");
+    if (dailyLossPct >= dailyLossLimitPct) {
+      violations.push(`Daily loss limit (${dailyLossLimitPct}%) exceeded - trading blocked for today`);
     }
     if (todayTradeCount >= 5) {
       violations.push("Maximum daily trades (5) reached - no more trades allowed today");
@@ -208,7 +239,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Block trade if critical violations
-    if (violations.length > 0 && dailyLossPct >= 2) {
+    if (violations.length > 0 && dailyLossPct >= dailyLossLimitPct) {
       return NextResponse.json({ 
         error: "Trade blocked due to rule violations",
         violations,
@@ -259,14 +290,14 @@ export async function POST(request: NextRequest) {
     if (mistakes.includes("daily_loss_breached")) {
       mistakeFeedback.push({
         mistake: "daily_loss_breached",
-        feedback: "⚠️ Daily loss limit breached: Your net daily loss has exceeded 3% of capital.",
+        feedback: `⚠️ Daily loss limit breached: Your net daily loss has exceeded ${dailyLossLimitPct}% of capital.`,
         severity: "critical"
       });
     }
     if (mistakes.includes("revenge_trading")) {
       mistakeFeedback.push({
         mistake: "revenge_trading",
-        feedback: "⚠️ Revenge trading detected: Multiple losses today and daily loss exceeded 3%. Take a break.",
+        feedback: `⚠️ Revenge trading detected: Multiple losses today and daily loss exceeded ${dailyLossLimitPct}%. Take a break.`,
         severity: "critical"
       });
     }
@@ -298,10 +329,17 @@ export async function POST(request: NextRequest) {
         severity: "medium"
       });
     }
+    if (mistakes.includes("single_loss_breached")) {
+      mistakeFeedback.push({
+        mistake: "single_loss_breached",
+        feedback: "⚠️ Single Trade Loss > 1% Capital: You realized a loss exceeding 1% of your total capital on a single trade. Keep your losses small.",
+        severity: "high"
+      });
+    }
 
     const warnings: string[] = [];
     if (todayTradeCount > 3) warnings.push("overtrading");
-    if (dailyLossPct >= 1) warnings.push("daily_loss_limit_warning");
+    if (dailyLossPct >= (dailyLossLimitPct - 1)) warnings.push("daily_loss_limit_warning");
 
     // AUTOMATIC CHALLENGE CHECK-IN
     // One journal entry (trade) = one day of challenge progress
@@ -319,11 +357,13 @@ export async function POST(request: NextRequest) {
       console.error("Challenge auto check-in error (non-blocking):", checkinError);
     }
 
+    const virtualTrade = virtualizeTrade(trade);
+
     return NextResponse.json({ 
-      trade, 
+      trade: virtualTrade, 
       warnings, 
       dailyPnl: todayNetPnl,
-      mistakes: tradeData.mistakes,
+      mistakes: virtualTrade.mistakes,
       mistakeFeedback,
       violations: violations.length > 0 ? violations : undefined,
       // Include challenge progress in response
@@ -367,7 +407,9 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ trades, total: count, page, limit });
+    const virtualizedTrades = (trades || []).map(virtualizeTrade);
+
+    return NextResponse.json({ trades: virtualizedTrades, total: count, page, limit });
   } catch {
     return NextResponse.json({ trades: [], total: 0 });
   }

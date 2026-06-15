@@ -70,6 +70,7 @@ interface DailyReport {
       followed_plan: boolean;
       sl_followed: boolean;
       mistakes: string[];
+      observations?: string[];
       reflection_text?: string | null;
       reflection_feedback?: string | null;
     }>;
@@ -536,6 +537,7 @@ export default function DailyReportPage() {
                   <tbody className="divide-y divide-border/50">
                     {report.feedback.tradeScorecard.map((trade) => {
                       const hasViolations = !trade.followed_plan || !trade.sl_followed || trade.mistakes.length > 0;
+                      const hasCoach = hasViolations || (trade.observations && trade.observations.length > 0);
                       
                       return (
                         <tr key={trade.id} className="hover:bg-muted/10 transition-colors">
@@ -572,11 +574,16 @@ export default function DailyReportPage() {
                             )}
                           </td>
                           <td className="py-3 text-xs">
-                            {trade.mistakes && trade.mistakes.length > 0 ? (
+                            {(trade.mistakes && trade.mistakes.length > 0) || (trade.observations && trade.observations.length > 0) ? (
                               <div className="flex flex-wrap gap-1">
-                                {trade.mistakes.map((m, idx) => (
-                                  <span key={idx} className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0.5 rounded">
+                                {trade.mistakes && trade.mistakes.map((m, idx) => (
+                                  <span key={`mistake-${idx}`} className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0.5 rounded font-semibold">
                                     {m}
+                                  </span>
+                                ))}
+                                {trade.observations && trade.observations.map((obs, idx) => (
+                                  <span key={`obs-${idx}`} className="bg-muted text-foreground text-[10px] px-1.5 py-0.5 rounded border border-border font-semibold">
+                                    {obs}
                                   </span>
                                 ))}
                               </div>
@@ -585,7 +592,7 @@ export default function DailyReportPage() {
                             )}
                           </td>
                           <td className="py-3 text-center no-print">
-                            {hasViolations ? (
+                            {hasCoach ? (
                               trade.reflection_feedback ? (
                                 <button
                                   onClick={() => setActiveReflectionTrade(trade)}

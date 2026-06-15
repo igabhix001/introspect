@@ -58,6 +58,7 @@ interface TradeRow {
   emotion_before: string | null;
   emotion_after: string | null;
   mistakes: string[];
+  observations?: string[];
   notes: string | null;
   created_at: string;
   reflection_text?: string | null;
@@ -758,35 +759,56 @@ export default function JournalPage() {
                     );
                     const isClean = reportMistake?.tag.startsWith("✅");
                     const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
-                    
+                    const tradeObservations = trade.observations || [];
+                    const renderingBadges = [];
+
                     if (reportMistake && !isClean) {
-                      return (
-                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
+                      renderingBadges.push(
+                        <span key="report-mistake" className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
                           {mistakeText?.split(" (")[0] || "Violation"}
                         </span>
                       );
                     } else if (reportMistake && isClean) {
-                      return (
-                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
+                      renderingBadges.push(
+                        <span key="report-clean" className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
                           Clean ✓
                         </span>
                       );
                     } else if (trade.mistakes && trade.mistakes.length > 0) {
-                      return (
+                      trade.mistakes.forEach((m, idx) => {
+                        renderingBadges.push(
+                          <span
+                            key={`mistake-${idx}`}
+                            className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                              mistakeBadges[m] || "bg-muted text-foreground border-border"
+                            }`}
+                          >
+                            {m}
+                          </span>
+                        );
+                      });
+                    }
+
+                    tradeObservations.forEach((obs, idx) => {
+                      renderingBadges.push(
                         <span
-                          className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
-                            mistakeBadges[trade.mistakes[0]] || "bg-muted text-foreground border-border"
-                          }`}
+                          key={`obs-${idx}`}
+                          className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
                         >
-                          {trade.mistakes[0]}
+                          {obs}
                         </span>
                       );
+                    });
+
+                    if (renderingBadges.length === 0) {
+                      return <span className="text-xs text-muted-foreground/40">—</span>;
                     }
-                    return <span className="text-xs text-muted-foreground/40">—</span>;
+
+                    return <div className="flex flex-wrap gap-1">{renderingBadges}</div>;
                   })()}
 
                   {(() => {
-                    const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0);
+                    const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (trade.observations && trade.observations.length > 0);
                     if (!hasMistake) return null;
                     return (
                       <button
@@ -874,25 +896,54 @@ export default function JournalPage() {
                   );
                   const isClean = reportMistake?.tag.startsWith("✅");
                   const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
-                  const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (reportMistake && !isClean);
+                  const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (trade.observations && trade.observations.length > 0) || (reportMistake && !isClean);
+
+                  const tradeObservations = trade.observations || [];
+                  const renderingBadges = [];
+
+                  if (reportMistake && !isClean) {
+                    renderingBadges.push(
+                      <span key="report-mistake" className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
+                        ⚠️ {mistakeText?.split(" (")[0] || "Violation"}
+                      </span>
+                    );
+                  } else if (reportMistake && isClean) {
+                    renderingBadges.push(
+                      <span key="report-clean" className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
+                        ✓ Clean Trade
+                      </span>
+                    );
+                  } else if (trade.mistakes && trade.mistakes.length > 0) {
+                    trade.mistakes.forEach((m, idx) => {
+                      renderingBadges.push(
+                        <span
+                          key={`mistake-${idx}`}
+                          className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                            mistakeBadges[m] || "bg-muted text-foreground border-border"
+                          }`}
+                        >
+                          {m}
+                        </span>
+                      );
+                    });
+                  }
+
+                  tradeObservations.forEach((obs, idx) => {
+                    renderingBadges.push(
+                      <span
+                        key={`obs-${idx}`}
+                        className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
+                      >
+                        {obs}
+                      </span>
+                    );
+                  });
 
                   return (
                     <div className="pt-1 flex items-center justify-between gap-2">
-                      {reportMistake && !isClean ? (
-                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-destructive/10 text-destructive border-destructive/30">
-                          ⚠️ {mistakeText?.split(" (")[0] || "Violation"}
-                        </span>
-                      ) : reportMistake && isClean ? (
-                        <span className="px-2 py-0.5 rounded border text-[10px] font-bold bg-success/10 text-success border-success/30">
-                          ✓ Clean Trade
-                        </span>
-                      ) : trade.mistakes && trade.mistakes.length > 0 ? (
-                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${mistakeBadges[trade.mistakes[0]] || "bg-muted text-foreground border-border"}`}>
-                          {trade.mistakes[0]}
-                        </span>
-                      ) : (
-                        <div />
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {renderingBadges}
+                      </div>
 
                       <div className="flex items-center gap-2">
                         {hasMistake && (

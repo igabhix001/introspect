@@ -61,6 +61,30 @@ function calculateHoldTimeMinutes(entryStr?: string | null, exitStr?: string | n
   return 0;
 }
 
+function virtualizeDailyReport(report: any) {
+  if (!report || !report.feedback) return report;
+  const feedback = { ...report.feedback };
+  if (Array.isArray(feedback.tradeScorecard)) {
+    feedback.tradeScorecard = feedback.tradeScorecard.map((t: any) => {
+      const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
+      const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+      const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
+      const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
+      return {
+        ...t,
+        mistakes,
+        observations: Array.isArray(t.observations)
+          ? Array.from(new Set([...t.observations, ...observations]))
+          : observations
+      };
+    });
+  }
+  return {
+    ...report,
+    feedback
+  };
+}
+
 interface PillarResult {
   penalty: number;
   breached: boolean;
@@ -269,6 +293,10 @@ export async function POST(request: NextRequest) {
       } else if (pnlVal < 0) {
         losingHoldTimes.push(minutes);
       }
+      const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
+      const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+      const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
+      const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
       return {
         id: t.id,
         stock: t.stock || "Unknown",
@@ -279,7 +307,8 @@ export async function POST(request: NextRequest) {
         direction: t.direction || "long",
         followed_plan: t.followed_plan ?? true,
         sl_followed: t.sl_followed ?? true,
-        mistakes: t.mistakes || [],
+        mistakes,
+        observations,
         reflection_text: t.reflection_text || null,
         reflection_feedback: t.reflection_feedback || null,
       };
@@ -416,7 +445,7 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ report: data });
+    return NextResponse.json({ report: virtualizeDailyReport(data) });
   } catch (error) {
     console.error("Daily report error:", error);
     return NextResponse.json({ error: "Failed to generate report" }, { status: 500 });
@@ -445,7 +474,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ reports });
+    const virtualizedReports = (reports || []).map(virtualizeDailyReport);
+    return NextResponse.json({ reports: virtualizedReports });
   } catch {
     return NextResponse.json({ reports: [] });
   }

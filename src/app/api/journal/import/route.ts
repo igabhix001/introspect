@@ -127,7 +127,7 @@ function finalizeReconstructedTrade(trade: {
   totalSellQty: number;
   totalSellVal: number;
   entryTime: Date;
-}, exitTime: Date): ReconstructedTrade {
+}, exitTime: Date, capital: number): ReconstructedTrade {
   const isLong = trade.direction === "long";
   const qty = isLong ? trade.totalBuyQty : trade.totalSellQty;
   const avgEntry = isLong 
@@ -177,6 +177,11 @@ function finalizeReconstructedTrade(trade: {
     mistakes.push("holding_losers_too_long");
   }
 
+  // Single Trade Loss > 1% Capital
+  if (grossPnl < -0.01 * capital) {
+    mistakes.push("single_loss_breached");
+  }
+
   return {
     stock: trade.executions[0].symbol,
     direction: trade.direction,
@@ -198,6 +203,38 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Fetch capital and dailyLossLimitPct early to pass to finalizeReconstructedTrade
+    let capital = 100000;
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("trading_capital")
+        .eq("id", user.id)
+        .single();
+      if (profile?.trading_capital) {
+        capital = Number(profile.trading_capital);
+      }
+    } catch (err) {
+      console.error("Error fetching profile capital for import:", err);
+    }
+
+    let dailyLossLimitPct = 3; // default
+    try {
+      const { data: latestAssessment } = await supabase
+        .from("assessments")
+        .select("risk_level")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestAssessment?.risk_level) {
+        const rl = latestAssessment.risk_level;
+        dailyLossLimitPct = rl === "low" ? 2 : rl === "high" ? 5 : 3;
+      }
+    } catch (err) {
+      console.error("Error fetching latest assessment for import rules:", err);
+    }
 
     // Rate limiting
     const identifier = getRateLimitIdentifier(request, user.id);
@@ -370,7 +407,7 @@ export async function POST(request: NextRequest) {
                 currentTrade!.executions.push(exec);
                 currentTrade!.totalSellQty += execQty;
                 currentTrade!.totalSellVal += execQty * execPrice;
-                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time, capital));
                 currentTrade = null;
               } else {
                 // Reversal: SELL > netQty. Split the trade!
@@ -381,7 +418,7 @@ export async function POST(request: NextRequest) {
                 });
                 currentTrade!.totalSellQty += closeQty;
                 currentTrade!.totalSellVal += closeQty * execPrice;
-                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time, capital));
 
                 // Start new short trade with remainder
                 const remainingQty = execQty - closeQty;
@@ -420,7 +457,7 @@ export async function POST(request: NextRequest) {
                 currentTrade!.executions.push(exec);
                 currentTrade!.totalBuyQty += execQty;
                 currentTrade!.totalBuyVal += execQty * execPrice;
-                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time, capital));
                 currentTrade = null;
               } else {
                 // Reversal: BUY > absNetQty. Split the trade!
@@ -431,7 +468,7 @@ export async function POST(request: NextRequest) {
                 });
                 currentTrade!.totalBuyQty += closeQty;
                 currentTrade!.totalBuyVal += closeQty * execPrice;
-                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time));
+                reconstructedTrades.push(finalizeReconstructedTrade(currentTrade!, exec.time, capital));
 
                 // Start new long trade with remainder
                 const remainingQty = execQty - closeQty;
@@ -530,21 +567,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Context-aware daily checks for overtrading and revenge trading in bulk imports
-    let capital = 100000;
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("capital")
-        .eq("id", user.id)
-        .single();
-      if (profile?.capital) {
-        capital = Number(profile.capital);
-      }
-    } catch (err) {
-      console.error("Error fetching profile capital for import rules:", err);
-    }
-
     for (const d of dates) {
       const existingOnDate = existingTrades.filter(ext => ext.date === d);
       const newOnDate = uniqueTradesToInsert.filter(t => t.date === d);
@@ -562,16 +584,22 @@ export async function POST(request: NextRequest) {
       // Overtrading check: more than 5 trades per day
       const isOvertrading = totalTrades > 5;
 
-      // Revenge trading check: 2 or more losses and daily drawdown exceeding 3% of capital
-      const isRevengeTrading = totalLosingTrades >= 2 && netDailyPnl < -0.03 * capital;
+      // Revenge trading check: 2 or more losses and daily drawdown exceeding defined% of capital
+      const isRevengeTrading = totalLosingTrades >= 2 && netDailyPnl < -(dailyLossLimitPct / 100) * capital;
 
-      if (isOvertrading || isRevengeTrading) {
+      // Daily loss limit check: daily drawdown exceeding defined% of capital
+      const isDailyLossBreached = netDailyPnl < -(dailyLossLimitPct / 100) * capital;
+
+      if (isOvertrading || isRevengeTrading || isDailyLossBreached) {
         for (const t of newOnDate) {
           if (isOvertrading && !t.mistakes.includes("overtrading")) {
             t.mistakes.push("overtrading");
           }
           if (isRevengeTrading && !t.mistakes.includes("revenge_trading")) {
             t.mistakes.push("revenge_trading");
+          }
+          if (isDailyLossBreached && !t.mistakes.includes("daily_loss_breached")) {
+            t.mistakes.push("daily_loss_breached");
           }
         }
       }

@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Loader2,
 } from "lucide-react";
 import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
 
@@ -60,6 +61,8 @@ export default function CalculatorPage() {
   const [customInstrument, setCustomInstrument] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filteredSymbols, setFilteredSymbols] = useState<any[]>([]);
+  const [searchingSymbols, setSearchingSymbols] = useState<boolean>(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const comboboxRef = useRef<HTMLDivElement>(null);
 
@@ -251,26 +254,68 @@ export default function CalculatorPage() {
     }
   };
 
-  // Filtered symbols for autocomplete search modal
-  const filteredSymbols = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    
-    // Filter by tab type first
-    let list = FYERS_SYMBOLS_MASTER;
-    if (activeSearchCategory !== "all") {
-      list = list.filter(item => item.type === activeSearchCategory);
+  // Debounced live fetch for symbol search modal
+  useEffect(() => {
+    if (!symbolSearchOpen) return;
+
+    let active = true;
+    const query = searchQuery.trim();
+
+    const getLocalFallback = () => {
+      let list = FYERS_SYMBOLS_MASTER;
+      if (activeSearchCategory !== "all") {
+        list = list.filter(item => item.type === activeSearchCategory);
+      }
+      if (!query) {
+        return list.slice(0, 15);
+      }
+      const qLower = query.toLowerCase();
+      return list.filter(
+        item =>
+          item.symbol.toLowerCase().includes(qLower) ||
+          item.description.toLowerCase().includes(qLower)
+      );
+    };
+
+    if (!query) {
+      setFilteredSymbols(getLocalFallback());
+      setSearchingSymbols(false);
+      return;
     }
-    
-    if (query === "") {
-      return list.slice(0, 15);
-    }
-    
-    return list.filter(
-      item =>
-        item.symbol.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query)
-    );
-  }, [searchQuery, activeSearchCategory]);
+
+    setSearchingSymbols(true);
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const url = `/api/market/symbols?q=${encodeURIComponent(query)}&category=${activeSearchCategory}`;
+        const res = await fetch(url);
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data && Array.isArray(data.symbols)) {
+            setFilteredSymbols(data.symbols);
+          } else {
+            setFilteredSymbols(getLocalFallback());
+          }
+        } else if (active) {
+          setFilteredSymbols(getLocalFallback());
+        }
+      } catch (err) {
+        console.error("Failed to fetch symbols:", err);
+        if (active) {
+          setFilteredSymbols(getLocalFallback());
+        }
+      } finally {
+        if (active) {
+          setSearchingSymbols(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(delayDebounce);
+    };
+  }, [searchQuery, activeSearchCategory, symbolSearchOpen]);
 
   // Compute dynamic stop loss price
   const computedStopLossPrice = useMemo(() => {
@@ -1086,7 +1131,9 @@ export default function CalculatorPage() {
                     className="w-full pl-9 pr-10 py-3 rounded-xl bg-background border border-border text-sm font-medium focus:outline-none focus:border-success/40 transition-all"
                     autoFocus
                   />
-                  {searchQuery && (
+                  {searchingSymbols ? (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : searchQuery ? (
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
@@ -1094,7 +1141,7 @@ export default function CalculatorPage() {
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -1158,7 +1205,12 @@ export default function CalculatorPage() {
                 )}
 
                 {/* Filtered symbols list */}
-                {filteredSymbols.length > 0 ? (
+                {searchingSymbols && filteredSymbols.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-success" />
+                    <span className="text-xs">Searching live markets...</span>
+                  </div>
+                ) : filteredSymbols.length > 0 ? (
                   filteredSymbols.map((item) => {
                     const isSelected = selectedInstrument === item.symbol;
                     
@@ -1207,7 +1259,7 @@ export default function CalculatorPage() {
                         {/* Badge / Exchange */}
                         <div className="w-24 text-right flex items-center justify-end gap-1.5">
                           <span className="text-[10px] text-muted-foreground capitalize">
-                            {item.type.slice(0, -1)}
+                            {item.type === "indices" ? "Index" : item.type === "stocks" ? "Stock" : item.type === "futures" ? "Future" : item.type === "options" ? "Option" : item.type.slice(0, -1)}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                             item.exchange === "NSE" 
@@ -1223,9 +1275,9 @@ export default function CalculatorPage() {
                     );
                   })
                 ) : (
-                  !searchQuery.trim() && (
+                  !searchingSymbols && (
                     <div className="text-center py-10 text-xs text-muted-foreground">
-                      Type above to search for symbols.
+                      {searchQuery.trim() ? "No symbols found." : "Type above to search for symbols."}
                     </div>
                   )
                 )}

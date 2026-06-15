@@ -28,10 +28,21 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     if (format === "json") {
+      const virtualizedTrades = (trades || []).map(t => {
+        const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
+        const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+        const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
+        const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
+        return {
+          ...t,
+          mistakes,
+          observations,
+        };
+      });
       return NextResponse.json({
         exported_at: new Date().toISOString(),
-        total_trades: trades?.length || 0,
-        trades,
+        total_trades: virtualizedTrades.length,
+        trades: virtualizedTrades,
       });
     }
 

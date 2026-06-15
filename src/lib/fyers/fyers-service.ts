@@ -41,9 +41,9 @@ export function clearFyersTokenCache() {
  */
 export async function getFyersToken(): Promise<string | null> {
   const nowMs = Date.now();
-  const cacheStaleTimeMs = 5 * 60 * 1000; // Cache DB state for 5 minutes
 
   // 1. Return cached token if we recently checked the DB (positive or negative result)
+  const cacheStaleTimeMs = cachedToken ? 5 * 60 * 1000 : 5 * 1000; // 5 minutes for valid token, 5 seconds for negative lookup
   if (hasCheckedToken && nowMs - lastCacheCheck < cacheStaleTimeMs) {
     if (cachedToken) {
       const expiry = new Date(cachedTokenExpiryTime);

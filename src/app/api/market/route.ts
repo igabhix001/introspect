@@ -241,12 +241,20 @@ export async function GET(request: NextRequest) {
         zone_status = "CONFIRMED";
         confirmation_count = 3;
       } else {
-        const last = historyState.zone_history[2];
-        const prev = historyState.zone_history[1];
-        if (last === prev) {
-          confirmation_count = 2;
+        // Breakout acceleration: If transitioning from NO_TRADE to BULLISH/BEARISH with live data, confirm immediately
+        if (historyState.confirmed_zone === "NO_TRADE" && raw_zone !== "NO_TRADE" && dataSource === "fyers_live") {
+          confirmed_zone = raw_zone;
+          zone_status = "CONFIRMED";
+          confirmation_count = 3;
+          historyState.zone_history = [raw_zone, raw_zone, raw_zone];
         } else {
-          confirmation_count = 1;
+          const last = historyState.zone_history[2];
+          const prev = historyState.zone_history[1];
+          if (last === prev) {
+            confirmation_count = 2;
+          } else {
+            confirmation_count = 1;
+          }
         }
       }
     }
@@ -313,26 +321,6 @@ export async function GET(request: NextRequest) {
       volatility_condition * 0.2
     ) * 100;
 
-    // Stability Engine (Section 5.3)
-    historyState.confirmed_zone_history.push(confirmed_zone);
-    if (historyState.confirmed_zone_history.length > 100) {
-      historyState.confirmed_zone_history.shift();
-    }
-    let consecutive_confirmed = 0;
-    for (let i = historyState.confirmed_zone_history.length - 1; i >= 0; i--) {
-      if (historyState.confirmed_zone_history[i] === confirmed_zone) {
-        consecutive_confirmed++;
-      } else {
-        break;
-      }
-    }
-    let stability: "STABLE" | "WATCH" | "UNSTABLE" = "UNSTABLE";
-    if (consecutive_confirmed >= 10) {
-      stability = "STABLE";
-    } else if (consecutive_confirmed >= 5) {
-      stability = "WATCH";
-    }
-
     // Regime Detection (Section 5.4)
     const price_move_abs = Math.abs(niftyPrice - todayOpen);
     let sb = 0;
@@ -355,6 +343,32 @@ export async function GET(request: NextRequest) {
       regime = "VOLATILE";
     } else if (vix < 12 && intraday_range < 0.3 * atrValue) {
       regime = "COMPRESSION";
+    }
+
+    // Stability Engine (Section 5.3)
+    historyState.confirmed_zone_history.push(confirmed_zone);
+    if (historyState.confirmed_zone_history.length > 100) {
+      historyState.confirmed_zone_history.shift();
+    }
+    let consecutive_confirmed = 0;
+    for (let i = historyState.confirmed_zone_history.length - 1; i >= 0; i--) {
+      if (historyState.confirmed_zone_history[i] === confirmed_zone) {
+        consecutive_confirmed++;
+      } else {
+        break;
+      }
+    }
+    let stability: "STABLE" | "WATCH" | "UNSTABLE" = "UNSTABLE";
+    if (
+      regime === "TREND_DAY" ||
+      (regime === "COMPRESSION" && confirmed_zone === "NO_TRADE") ||
+      (historyState.confirmed_zone_history.length < 10 && zone_change_count_10min <= 1)
+    ) {
+      stability = "STABLE";
+    } else if (consecutive_confirmed >= 10) {
+      stability = "STABLE";
+    } else if (consecutive_confirmed >= 5) {
+      stability = "WATCH";
     }
 
     // Sentiment Score (for User Dashboard)
