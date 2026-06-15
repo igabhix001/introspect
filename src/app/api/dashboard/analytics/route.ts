@@ -127,11 +127,14 @@ export async function GET() {
     const weeklyPnl = dayNames.slice(1, 6).map((day) => ({ day, pnl: dayPnl[day] || 0 }));
 
     // Legacy mistake data from trades (for backward compatibility)
+    const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
     const tradeMistakeCounts: Record<string, number> = {};
     allTrades.forEach((t: { mistakes?: string[] }) => {
-      (t.mistakes || []).forEach((m: string) => {
-        tradeMistakeCounts[m] = (tradeMistakeCounts[m] || 0) + 1;
-      });
+      (t.mistakes || [])
+        .filter((m: string) => !observationsList.includes(m))
+        .forEach((m: string) => {
+          tradeMistakeCounts[m] = (tradeMistakeCounts[m] || 0) + 1;
+        });
     });
     const mistakeData = Object.entries(tradeMistakeCounts).map(([name, value]) => ({
       name,
@@ -140,12 +143,19 @@ export async function GET() {
     }));
 
     return NextResponse.json({
-      allTrades: allTrades.map((t: Record<string, any>) => ({
-        ...t,
-        entry_price: Number(t.entry_price),
-        exit_price: t.exit_price ? Number(t.exit_price) : null,
-        pnl: Number(t.pnl || 0),
-      })),
+      allTrades: allTrades.map((t: Record<string, any>) => {
+        const originalMistakes = Array.isArray(t.mistakes) ? t.mistakes : [];
+        const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
+        const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
+        return {
+          ...t,
+          entry_price: Number(t.entry_price),
+          exit_price: t.exit_price ? Number(t.exit_price) : null,
+          pnl: Number(t.pnl || 0),
+          mistakes,
+          observations,
+        };
+      }),
       tradeCount: allTrades.length,
       totalPnl: total,
       winRate: totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0,

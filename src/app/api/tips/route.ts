@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     // Analyze user's weak areas
     const weakAreas: string[] = [];
     if (recentTrades && recentTrades.length > 0) {
-      const noStopLossCount = recentTrades.filter(t => t.mistakes?.includes("no_stop_loss")).length;
+      const noStopLossCount = recentTrades.filter(t => t.mistakes?.includes("no_stop_loss") || t.mistakes?.includes("always_apply_sl")).length;
       const overRiskCount = recentTrades.filter(t => t.mistakes?.includes("over_risk")).length;
       const planNotFollowedCount = recentTrades.filter(t => !t.followed_plan).length;
       const losingTrades = recentTrades.filter(t => t.pnl < 0).length;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, type Variants } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   TrendingUp,
   TrendingDown,
@@ -17,9 +17,16 @@ import {
   ChevronRight,
   Loader2,
   Info,
+  Activity,
+  RefreshCw,
+  X,
+  AlertOctagon,
+  Lightbulb,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { PreMarketRoutineRow } from "@/components/dashboard/pre-market-routine-row";
 
 const DisciplineChart = dynamic(() => import("@/components/dashboard/discipline-chart"), {
   ssr: false,
@@ -47,9 +54,20 @@ const staggerItem: Variants = {
 };
 
 function MarketZoneWidget() {
-  const { data: marketData, isLoading } = useMarketQuery();
+  const { data: marketData, isLoading, refetch } = useMarketQuery();
+  const [isMarketOpen, setIsMarketOpen] = useState(false);
+  const [loadingMarket, setLoadingMarket] = useState(false);
   const zone = marketData?.market_zone || null;
   const marketStatus = marketData?.market_status as "OPEN" | "CLOSED" | undefined;
+
+  const handleRefresh = async () => {
+    setLoadingMarket(true);
+    try {
+      await refetch();
+    } finally {
+      setLoadingMarket(false);
+    }
+  };
 
   const zoneMap: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
     "Positive Market Bias": { label: "Positive Market Bias", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
@@ -59,62 +77,277 @@ function MarketZoneWidget() {
   const z = zone ? zoneMap[zone] || zoneMap["Neutral Market Bias"] : null;
 
   return (
-    <motion.div
-      variants={staggerItem}
-      className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
-    >
-      <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${z?.bg || "bg-muted/30"}`} />
-      <div className="relative">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Nifty 50 Sentiment
-            </p>
-            {/* Market Status Indicator */}
-            {marketStatus && (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
-                marketStatus === "OPEN" 
-                  ? "bg-success/10 text-success" 
-                  : "bg-amber-500/10 text-amber-500"
-              }`}>
-                {marketStatus === "OPEN" ? (
-                  <>
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" />
-                    </span>
-                    LIVE
-                  </>
-                ) : (
-                  "CLOSED"
-                )}
-              </span>
-            )}
-          </div>
-          <Link href="/dashboard/calculator" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-            Details →
-          </Link>
-        </div>
-        {z ? (
-          <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-2xl">{z.emoji}</span>
-              <span className={`text-3xl font-bold font-heading ${z.color}`}>{z.label}</span>
-              {marketData?.zone_status === "WATCH" && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-500 uppercase tracking-wider animate-pulse border border-amber-500/20">
-                  STABILIZING ({marketData?.confirmation_count}/3)
+    <>
+      <motion.div
+        variants={staggerItem}
+        className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-border/85 transition-all p-5 group"
+      >
+        <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${z?.bg || "bg-muted/30"}`} />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Nifty 50 Sentiment
+              </p>
+              {/* Market Status Indicator */}
+              {marketStatus && (
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                  marketStatus === "OPEN" 
+                    ? "bg-success/10 text-success" 
+                    : "bg-amber-500/10 text-amber-500"
+                }`}>
+                  {marketStatus === "OPEN" ? (
+                    <>
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" />
+                      </span>
+                      LIVE
+                    </>
+                  ) : (
+                    "CLOSED"
+                  )}
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Market zone • <span className="text-foreground font-medium">Nifty 50 (India)</span>
-            </p>
-          </>
-        ) : (
-          <span className="text-sm text-muted-foreground">Loading...</span>
+            <button
+              onClick={() => setIsMarketOpen(true)}
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              Details →
+            </button>
+          </div>
+          {z ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-2xl">{z.emoji}</span>
+                <span className={`text-3xl font-bold font-heading ${z.color}`}>{z.label}</span>
+                {marketData?.zone_status === "WATCH" && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-500 uppercase tracking-wider animate-pulse border border-amber-500/20">
+                    STABILIZING ({marketData?.confirmation_count}/3)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Market zone • <span className="text-foreground font-medium">Nifty 50 (India)</span>
+              </p>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">Loading...</span>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Interactive Modal Popup Overlay */}
+      <AnimatePresence>
+        {isMarketOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl overflow-y-auto max-h-[90vh] z-50"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border/40 pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4.5 w-4.5 text-primary" />
+                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground">
+                    Market Intelligence
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={loadingMarket || isLoading}
+                    className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                    title="Refresh Data"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loadingMarket || isLoading ? "animate-spin" : ""}`} />
+                  </button>
+                  <button
+                    onClick={() => setIsMarketOpen(false)}
+                    className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                    title="Close"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {isLoading && !marketData ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+                </div>
+              ) : marketData ? (
+                <div className="space-y-5">
+                  {/* Zone status banner */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
+                    <div className="flex items-center gap-2">
+                      {marketData.failsafe_mode ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-destructive/15 text-destructive animate-pulse uppercase">
+                          FAIL-SAFE ACTIVE
+                        </span>
+                      ) : marketData.zone_status === "WATCH" ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-500 animate-pulse uppercase">
+                          WATCH ({marketData.confirmation_count}/3)
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-success/15 text-success uppercase">
+                          CONFIRMED
+                        </span>
+                      )}
+                      <span className={`px-3 py-1.5 rounded-xl text-xs font-black tracking-wider border uppercase ${
+                        marketData.market_zone === "Positive Market Bias" 
+                          ? "bg-success/20 text-success border-success/30 shadow-[0_0_12px_rgba(34,197,94,0.15)]" 
+                          : marketData.market_zone === "Negative Market Bias" 
+                          ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
+                          : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                      }`}>
+                        {marketData.market_zone}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-border/30 pt-2 text-xs">
+                    <span className="text-muted-foreground">Confidence</span>
+                    <span className={`font-bold uppercase ${
+                      marketData.confidence === "HIGH" ? "text-success" :
+                      marketData.confidence === "MODERATE" ? "text-amber-500" :
+                      "text-muted-foreground"
+                    }`}>
+                      {marketData.confidence || "LOW"}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground leading-relaxed bg-muted/30 p-3.5 rounded-xl border border-border/40">
+                    {marketData.market_zone === "Positive Market Bias" && (
+                      "Current market indicators show positive directional alignment. Market conditions may be supportive of bullish market behavior."
+                    )}
+                    {marketData.market_zone === "Negative Market Bias" && (
+                      "Current market indicators show negative directional alignment. Market conditions may be supportive of bearish market behavior."
+                    )}
+                    {marketData.market_zone === "Neutral Market Bias" && (
+                      "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                    )}
+                  </div>
+
+                  {/* Watch State Progress Bar */}
+                  {marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
+                    <div className="rounded-lg bg-amber-500/[0.03] border border-amber-500/10 p-3 space-y-1.5 animate-pulse">
+                      <div className="flex items-center justify-between text-[10px] text-amber-500 font-semibold">
+                        <span>Stabilizing Bias...</span>
+                        <span>{marketData.confirmation_count} / 3 Confirmations</span>
+                      </div>
+                      <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                          style={{ width: `${(marketData.confirmation_count / 3) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Persistence Timer */}
+                  {marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
+                    <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border/30 px-3 py-1.5 rounded-lg">
+                      <span>Bias Stability:</span>
+                      <span className="text-foreground font-semibold flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-success animate-ping" />
+                        Stable for {marketData.stability_duration}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Momentum score */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-medium">
+                      <span className="text-muted-foreground">Momentum Score</span>
+                      <span className="text-foreground">{marketData.radar_score}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          marketData.radar_score >= 65 ? "bg-success" : marketData.radar_score >= 40 ? "bg-amber-500" : "bg-destructive"
+                        }`}
+                        style={{ width: `${marketData.radar_score}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Snapshot Grid */}
+                  <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">Nifty 50</span>
+                      <span className="font-mono font-bold text-foreground text-sm">₹{marketData.nifty_price?.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">India VIX</span>
+                      <span className="font-mono font-bold text-foreground text-sm">{marketData.vix}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">Put-Call Ratio</span>
+                      <span className="font-mono font-bold text-foreground text-sm">{marketData.pcr}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">Advances/Declines</span>
+                      <span className="font-mono font-bold text-foreground text-sm">{marketData.advances} : {marketData.declines}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">Market Regime</span>
+                      <span className={`font-mono font-bold text-sm ${
+                        marketData.regime === "TREND_DAY" ? "text-success" : marketData.regime === "VOLATILE" ? "text-destructive" : marketData.regime === "COMPRESSION" ? "text-amber-500" : "text-foreground"
+                      }`}>
+                        {marketData.regime?.replace("_", " ")}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold mb-0.5">Zone Stability</span>
+                      <span className={`font-mono font-bold text-sm ${
+                        marketData.stability === "STABLE" ? "text-success" : marketData.stability === "WATCH" ? "text-amber-500" : "text-destructive"
+                      }`}>
+                        {marketData.stability}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Insights list */}
+                  {marketData.reasons && marketData.reasons.length > 0 && (
+                    <div className="space-y-1.5 border-t border-border/40 pt-3.5">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider block font-bold">Insights Summary</span>
+                      <ul className="space-y-1 text-xs text-muted-foreground">
+                        {marketData.reasons.map((reason: string, i: number) => (
+                          <li key={i} className="flex items-start gap-1.5 leading-relaxed">
+                            <span className="text-primary mt-1">•</span>
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Sources & SEBI Disclaimer (Client requirement Sec 3.3.8 / compliance) */}
+                  <div className="border-t border-border/30 pt-3.5 space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-white/80 font-mono">
+                      <span>Source: Third-party data providers</span>
+                      {marketData.market_status && (
+                        <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] text-white/70 leading-normal text-justify">
+                      This assessment is generated using quantitative market indicators and is provided for informational and educational purposes only. It does not constitute investment advice, a recommendation, research report, or a solicitation to buy or sell any security. Users should exercise independent judgment before making trading decisions.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic text-center py-6">No live market data available.</p>
+              )}
+            </motion.div>
+          </div>
         )}
-      </div>
-    </motion.div>
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -190,7 +423,6 @@ function RiskLimitStatusBar({ todayTradeCount, todayPnl, capitalUsed }: { todayT
             Risk Limit Status Controls
           </h3>
         </div>
-        <span className="text-[10px] text-muted-foreground font-mono">Capital: ₹{capitalUsed.toLocaleString("en-IN")}</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -1090,6 +1322,9 @@ function DashboardContent() {
           </motion.div>
         </div>
       </div>
+
+      {/* Pre-Market Routine checklist */}
+      <PreMarketRoutineRow />
 
       {/* Risk Management Disclaimer (Client requirement Sec 3.3.8) */}
       <motion.div

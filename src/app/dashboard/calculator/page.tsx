@@ -29,6 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
+import { PreMarketRoutineRow } from "@/components/dashboard/pre-market-routine-row";
 
 function getCleanSymbolName(symbol: string, customSym?: string): string {
   if (symbol === "Custom") return customSym || "Custom";
@@ -1291,6 +1292,9 @@ export default function CalculatorPage() {
           </div>
         )}
       </AnimatePresence>
+      
+      {/* Pre-Market Routine checklist */}
+      <PreMarketRoutineRow />
     </div>
   );
 }

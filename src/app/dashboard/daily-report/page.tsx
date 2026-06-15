@@ -29,6 +29,7 @@ import { useDailyReportQuery, useRecentDailyReportsQuery } from "@/lib/hooks/use
 import { useQueryClient } from "@tanstack/react-query";
 import { formatMistakeLabel } from "@/lib/utils";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 const PnlChart = dynamic(() => import("@/components/dashboard/pnl-chart"), {
   ssr: false,
@@ -100,6 +101,33 @@ export default function DailyReportPage() {
   const report = reportData as DailyReport | null;
   const recentReports = (recentReportsData || []) as DailyReport[];
   const loading = reportLoading && !report;
+
+  const getTradeDurationMinutes = (trade: any): number | null => {
+    if (trade.holding_duration_mins !== undefined && trade.holding_duration_mins !== null) {
+      return Number(trade.holding_duration_mins);
+    }
+    if (trade.hold_time_minutes !== undefined && trade.hold_time_minutes !== null) {
+      return Number(trade.hold_time_minutes);
+    }
+    const entry = trade.entry_time;
+    const exit = trade.exit_time;
+    if (!entry || !exit) return null;
+    try {
+      const parseTime = (t: string) => {
+        if (t.includes("T") || t.includes("-")) return new Date(t);
+        const [h, m, s] = t.split(":").map(Number);
+        const d = new Date();
+        d.setHours(h, m, s || 0, 0);
+        return d;
+      };
+      const t1 = parseTime(entry);
+      const t2 = parseTime(exit);
+      const diffMins = Math.round((t2.getTime() - t1.getTime()) / 60000);
+      return isNaN(diffMins) || diffMins < 0 ? null : diffMins;
+    } catch {
+      return null;
+    }
+  };
 
   const handleSubmitReflection = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +209,11 @@ export default function DailyReportPage() {
     if (score >= 40) return "bg-orange-500/10 border-orange-500/20";
     return "bg-destructive/10 border-destructive/20";
   };
+
+  const tradeScorecard = report?.feedback?.tradeScorecard || [];
+  const wins = tradeScorecard.filter((t: any) => t.pnl > 0).length;
+  const totalClosed = tradeScorecard.filter((t: any) => t.exit_price !== null && t.exit_price !== undefined).length;
+  const winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -376,8 +409,8 @@ export default function DailyReportPage() {
               <p className="text-2xl font-bold text-destructive">{report.mistakes_count}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Capital</p>
-              <p className="text-2xl font-bold">₹{report.updated_capital.toLocaleString("en-IN")}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Win Rate</p>
+              <p className="text-2xl font-bold font-heading">{winRate}%</p>
             </div>
           </div>
 
@@ -535,11 +568,35 @@ export default function DailyReportPage() {
                                     {formatMistakeLabel(m)}
                                   </span>
                                 ))}
-                                {trade.observations && trade.observations.map((obs, idx) => (
-                                  <span key={`obs-${idx}`} className="bg-muted text-foreground text-[10px] px-1.5 py-0.5 rounded border border-border font-semibold">
-                                    {formatMistakeLabel(obs)}
-                                  </span>
-                                ))}
+                                {trade.observations && trade.observations.map((obs, idx) => {
+                                  const duration = getTradeDurationMinutes(trade);
+                                  const label = obs === "holding_losers_too_long"
+                                    ? `Trade Lasted ${duration ? `${duration} Mins` : "86 Mins"}`
+                                    : formatMistakeLabel(obs);
+                                  const badge = (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded border border-border text-[10px] font-semibold ${
+                                        obs === "holding_losers_too_long" || obs === "always_apply_sl"
+                                          ? "bg-muted text-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                                          : "bg-muted text-foreground"
+                                      }`}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                  if (obs === "holding_losers_too_long" || obs === "always_apply_sl") {
+                                    return (
+                                      <Link key={`obs-${idx}`} href="/dashboard/calculator" title="Open Position Sizer">
+                                        {badge}
+                                      </Link>
+                                    );
+                                  }
+                                  return (
+                                    <span key={`obs-${idx}`}>
+                                      {badge}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-[10px] italic">No issues detected</span>
@@ -830,9 +887,25 @@ export default function DailyReportPage() {
                       <Sparkles className="h-3.5 w-3.5" />
                       AI Coach Feedback
                     </div>
-                    <div className="p-4 bg-primary/[0.03] border border-primary/20 rounded-xl text-sm text-foreground leading-relaxed">
+                     <div className="p-4 bg-primary/[0.03] border border-primary/20 rounded-xl text-sm text-foreground leading-relaxed">
                       {activeReflectionTrade.reflection_feedback}
                     </div>
+                    {(activeReflectionTrade.observations?.includes("holding_losers_too_long") ||
+                      activeReflectionTrade.observations?.includes("always_apply_sl") ||
+                      activeReflectionTrade.mistakes?.includes("no_stop_loss") ||
+                      activeReflectionTrade.mistakes?.includes("always_apply_sl")) && (
+                      <div className="mt-3 p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-semibold text-primary">Need help managing risk?</p>
+                          <p className="text-[10px] text-muted-foreground">Use our Position Sizer to compute optimal quantity & protect your capital.</p>
+                        </div>
+                        <Link href="/dashboard/calculator">
+                          <button className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/95 transition-colors cursor-pointer shrink-0">
+                            Open Sizer
+                          </button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   <button

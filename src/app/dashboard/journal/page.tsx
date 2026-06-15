@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { useTradesQuery, useDailyReportQuery, useChallengesQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatMistakeLabel } from "@/lib/utils";
 
 const emotionColors: Record<string, string> = {
@@ -387,6 +388,37 @@ export default function JournalPage() {
       )
     : 0;
 
+  const mistakeCost = filteredTrades
+    .filter((t) => (t.pnl || 0) < 0 && t.mistakes && t.mistakes.length > 0)
+    .reduce((sum, t) => sum + Math.abs(t.pnl || 0), 0);
+
+  const getTradeDurationMinutes = (trade: any): number | null => {
+    if (trade.holding_duration_mins !== undefined && trade.holding_duration_mins !== null) {
+      return Number(trade.holding_duration_mins);
+    }
+    if (trade.hold_time_minutes !== undefined && trade.hold_time_minutes !== null) {
+      return Number(trade.hold_time_minutes);
+    }
+    const entry = trade.entry_time;
+    const exit = trade.exit_time;
+    if (!entry || !exit) return null;
+    try {
+      const parseTime = (t: string) => {
+        if (t.includes("T") || t.includes("-")) return new Date(t);
+        const [h, m, s] = t.split(":").map(Number);
+        const d = new Date();
+        d.setHours(h, m, s || 0, 0);
+        return d;
+      };
+      const t1 = parseTime(entry);
+      const t2 = parseTime(exit);
+      const diffMins = Math.round((t2.getTime() - t1.getTime()) / 60000);
+      return isNaN(diffMins) || diffMins < 0 ? null : diffMins;
+    } catch {
+      return null;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -429,7 +461,28 @@ export default function JournalPage() {
       )}
 
       {/* Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3.5 space-y-1 relative group">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-destructive uppercase tracking-wider font-bold">
+              Mistake Cost
+            </p>
+            <div className="relative cursor-pointer">
+              <Info className="h-3.5 w-3.5 text-destructive/60 hover:text-destructive transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-900 border border-zinc-800 text-zinc-300 text-[9px] p-2 rounded-lg shadow-xl hidden group-hover:block z-50 pointer-events-none leading-normal normal-case font-normal">
+                This is the total loss incurred on trades where you deviated from your trading plan or rules. Had you followed your rules, this loss could have been avoided.
+              </div>
+            </div>
+          </div>
+          <p className="text-lg font-bold font-heading font-mono leading-none text-destructive">
+            ₹{mistakeCost.toLocaleString("en-IN")}
+          </p>
+          <div className="border-t border-destructive/10 pt-1 mt-1 text-[9px] text-destructive/80 font-mono flex justify-between">
+            <span>Avoidable Loss:</span>
+            <span className="font-semibold">₹{mistakeCost.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-border bg-card p-3.5 space-y-1 relative group">
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -791,14 +844,34 @@ export default function JournalPage() {
                     }
 
                     tradeObservations.forEach((obs, idx) => {
-                      renderingBadges.push(
+                      const duration = getTradeDurationMinutes(trade);
+                      const label = obs === "holding_losers_too_long"
+                        ? `Trade Lasted ${duration ? `${duration} Mins` : "86 Mins"}`
+                        : formatMistakeLabel(obs);
+                      const badge = (
                         <span
-                          key={`obs-${idx}`}
-                          className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
+                          className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                            obs === "holding_losers_too_long" || obs === "always_apply_sl"
+                              ? "bg-muted text-foreground border-border hover:bg-muted/80 cursor-pointer transition-colors"
+                              : "bg-muted text-foreground border-border"
+                          }`}
                         >
-                          {formatMistakeLabel(obs)}
+                          {label}
                         </span>
                       );
+                      if (obs === "holding_losers_too_long" || obs === "always_apply_sl") {
+                        renderingBadges.push(
+                          <Link key={`obs-${idx}`} href="/dashboard/calculator" title="Open Position Sizer">
+                            {badge}
+                          </Link>
+                        );
+                      } else {
+                        renderingBadges.push(
+                          <span key={`obs-${idx}`}>
+                            {badge}
+                          </span>
+                        );
+                      }
                     });
 
                     if (renderingBadges.length === 0) {
@@ -930,14 +1003,34 @@ export default function JournalPage() {
                   }
 
                   tradeObservations.forEach((obs, idx) => {
-                    renderingBadges.push(
+                    const duration = getTradeDurationMinutes(trade);
+                    const label = obs === "holding_losers_too_long"
+                      ? `Trade Lasted ${duration ? `${duration} Mins` : "86 Mins"}`
+                      : formatMistakeLabel(obs);
+                    const badge = (
                       <span
-                        key={`obs-${idx}`}
-                        className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
+                        className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                          obs === "holding_losers_too_long" || obs === "always_apply_sl"
+                            ? "bg-muted text-foreground border-border hover:bg-muted/80 cursor-pointer transition-colors"
+                            : "bg-muted text-foreground border-border"
+                        }`}
                       >
-                        {formatMistakeLabel(obs)}
+                        {label}
                       </span>
                     );
+                    if (obs === "holding_losers_too_long" || obs === "always_apply_sl") {
+                      renderingBadges.push(
+                        <Link key={`obs-${idx}`} href="/dashboard/calculator" title="Open Position Sizer">
+                          {badge}
+                        </Link>
+                      );
+                    } else {
+                      renderingBadges.push(
+                        <span key={`obs-${idx}`}>
+                          {badge}
+                        </span>
+                      );
+                    }
                   });
 
                   return (
@@ -1441,6 +1534,22 @@ export default function JournalPage() {
                     <div className="p-4 bg-primary/[0.03] border border-primary/20 rounded-xl text-sm text-foreground leading-relaxed">
                       {activeReflectionTrade.reflection_feedback}
                     </div>
+                    {(activeReflectionTrade.observations?.includes("holding_losers_too_long") ||
+                      activeReflectionTrade.observations?.includes("always_apply_sl") ||
+                      activeReflectionTrade.mistakes?.includes("no_stop_loss") ||
+                      activeReflectionTrade.mistakes?.includes("always_apply_sl")) && (
+                      <div className="mt-3 p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-semibold text-primary">Need help managing risk?</p>
+                          <p className="text-[10px] text-muted-foreground">Use our Position Sizer to compute optimal quantity & protect your capital.</p>
+                        </div>
+                        <Link href="/dashboard/calculator">
+                          <button className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/95 transition-colors cursor-pointer shrink-0">
+                            Open Sizer
+                          </button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   <button

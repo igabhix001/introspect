@@ -28,6 +28,7 @@ const EquityChart = dynamic(() => import("@/components/dashboard/equity-chart"),
 import { useAnalyticsQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatMistakeLabel } from "@/lib/utils";
+import Link from "next/link";
 
 const stagger = {
   container: { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } },
@@ -228,14 +229,18 @@ export default function AnalyticsPage() {
     };
   });
 
+  const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
+
   // 4. Cognitive Bias / Mistake counts from filtered trades
   const mistakeCounts: Record<string, number> = {};
   filteredTrades.forEach((t: { mistakes?: string[] | null }) => {
     if (t.mistakes) {
-      t.mistakes.forEach((m: string) => {
-        const clean = m.replace(/^🔴\s*/, "").split(" (")[0];
-        mistakeCounts[clean] = (mistakeCounts[clean] || 0) + 1;
-      });
+      t.mistakes
+        .filter((m) => !observationsList.includes(m))
+        .forEach((m: string) => {
+          const clean = m.replace(/^🔴\s*/, "").split(" (")[0];
+          mistakeCounts[clean] = (mistakeCounts[clean] || 0) + 1;
+        });
     }
   });
 
@@ -280,28 +285,106 @@ export default function AnalyticsPage() {
     .reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
 
   const totalMistakesCount = filteredTrades.reduce((sum: number, t: { mistakes?: string[] | null }) => {
-    return sum + (t.mistakes?.length || 0);
+    const actualMistakes = (t.mistakes || []).filter((m) => !observationsList.includes(m));
+    return sum + actualMistakes.length;
   }, 0);
 
   // Derive simple action plan recommendations based on the top biases or default rules
-  const simpleRecommendations: string[] = [];
+  const simpleRecommendations: React.ReactNode[] = [];
   if (biasData.length > 0) {
     biasData.slice(0, 3).forEach((item) => {
       if (item.bias.toLowerCase().includes("stop")) {
-        simpleRecommendations.push("Always enter stop-loss orders in your terminal immediately at trade execution.");
+        simpleRecommendations.push(
+          <span key={item.bias}>
+            Always enter stop-loss orders in your terminal immediately at trade execution. Use the{" "}
+            <Link href="/dashboard/calculator" className="text-success underline hover:text-success/80 font-bold">
+              Position Sizer
+            </Link>{" "}
+            to pre-calculate safety targets.
+          </span>
+        );
       } else if (item.bias.toLowerCase().includes("revenge") || item.bias.toLowerCase().includes("over")) {
-        simpleRecommendations.push("Strictly block new entries once you reach your max daily limit (5 trades or 3% drawdown).");
+        simpleRecommendations.push(
+          <span key={item.bias}>
+            Strictly block new entries once you reach your max daily limit (5 trades or 3% drawdown).
+          </span>
+        );
       } else {
-        simpleRecommendations.push(`Address ${item.bias}: Review your entry setup parameters before placing execution orders.`);
+        simpleRecommendations.push(
+          <span key={item.bias}>
+            Address {item.bias}: Review your entry setup parameters before placing execution orders.
+          </span>
+        );
       }
     });
   }
+
+  // Explicitly check for holding losers too long observation to add dynamic sizer suggestion
+  const holdingLoserTrades = filteredTrades.filter((t: any) => {
+    const obs = Array.isArray(t.observations) ? t.observations : [];
+    const mis = Array.isArray(t.mistakes) ? t.mistakes : [];
+    return obs.includes("holding_losers_too_long") || mis.includes("holding_losers_too_long");
+  });
+  if (holdingLoserTrades.length > 0) {
+    let maxMins = 86;
+    holdingLoserTrades.forEach((t: any) => {
+      const mins = getHoldTimeInMinutes(t.entry_time, t.exit_time);
+      if (mins !== null && mins > maxMins) {
+        maxMins = mins;
+      }
+    });
+    simpleRecommendations.push(
+      <span key="holding_losers">
+        Address holding losers too long: Review your entry setup parameters before placing execution orders. Use quantity as per{" "}
+        <Link href="/dashboard/calculator" className="text-success underline hover:text-success/80 font-bold">
+          position sizer rule
+        </Link>{" "}
+        to control risk. Note: the trade lasted for {maxMins} mins.
+      </span>
+    );
+  }
+
   if (simpleRecommendations.length === 0) {
-    simpleRecommendations.push("Maintain strict capital allocation per trade (limit risk to max 1% of total account balance).");
-    simpleRecommendations.push("Journal pre-trade emotional states to build awareness of boredom or urgency spikes.");
+    simpleRecommendations.push(
+      <span key="default-alloc">
+        Maintain strict capital allocation per trade (limit risk to max 1% of total account balance). Use the{" "}
+        <Link href="/dashboard/calculator" className="text-success underline hover:text-success/80 font-bold">
+          Position Sizer
+        </Link>{" "}
+        to control risk.
+      </span>
+    );
+    simpleRecommendations.push(
+      <span key="default-emotions">
+        Journal pre-trade emotional states to build awareness of boredom or urgency spikes.
+      </span>
+    );
   }
 
   const dateFilterLabel = dateFilter === "today" ? "Today" : dateFilter === "week" ? "7 Days" : dateFilter === "month" ? "30 Days" : "All Time";
+
+  // ──── Behavioral Cost Report Computations ────
+  const overtradingTrades = filteredTrades.filter((t: any) => (t.mistakes || []).includes("overtrading"));
+  const revengeTrades = filteredTrades.filter((t: any) => (t.mistakes || []).includes("revenge_trading"));
+  const fomoTrades = filteredTrades.filter((t: any) => (t.mistakes || []).includes("fomo") || (t.mistakes || []).includes("fomo_entry"));
+  const riskViolationTrades = filteredTrades.filter((t: any) => {
+    const m = t.mistakes || [];
+    return m.includes("risk_breached") || m.includes("single_loss_breached") || m.includes("daily_loss_breached") || m.includes("over_risk");
+  });
+
+  const overtradingCost = overtradingTrades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
+  const revengeCost = revengeTrades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
+  const fomoCost = fomoTrades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
+  const riskViolationCost = riskViolationTrades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
+
+  // Total Behavioral Mistake Cost = sum of losses of unique trades with mistakes
+  const uniqueMistakeTrades = filteredTrades.filter((t: any) => {
+    const m = t.mistakes || [];
+    return m.includes("overtrading") || m.includes("revenge_trading") || m.includes("fomo") || m.includes("fomo_entry") ||
+      m.includes("risk_breached") || m.includes("single_loss_breached") || m.includes("daily_loss_breached") || m.includes("over_risk");
+  });
+  const totalBehavioralCost = uniqueMistakeTrades.reduce((sum: number, t: any) => sum + Math.abs((t.pnl || 0) < 0 ? (t.pnl || 0) : 0), 0);
+  const disciplineAdjustedPnl = totalPnl + totalBehavioralCost;
 
   return (
     <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-6">
@@ -326,32 +409,133 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Simple Numerical Performance Scorecard (Point 19) */}
-      <motion.div variants={stagger.item} className="rounded-2xl border border-border bg-card p-5 space-y-4">
-        <h3 className="font-heading text-sm font-bold">Behavioural & Loss Scorecard</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Today's Total Loss</span>
-            <p className="text-xl font-bold font-mono text-destructive">
-              ₹{Math.abs(dailyLoss).toLocaleString("en-IN")}
-            </p>
-            <span className="text-[9px] text-muted-foreground block mt-1">Sum of negative trades today</span>
+      {/* Behavioral Cost Report Card */}
+      <motion.div variants={stagger.item} className="rounded-2xl border border-border bg-card p-5 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/40 pb-3 gap-2">
+          <div>
+            <h3 className="font-heading text-sm font-bold flex items-center gap-1.5">
+              <Brain className="h-4 w-4 text-destructive" />
+              Behavioral Cost Report ({dateFilterLabel})
+            </h3>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Quantifying the exact cost of discipline mistakes</p>
           </div>
-          
-          <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Weekly Drawdown Total</span>
-            <p className="text-xl font-bold font-mono text-destructive">
-              ₹{Math.abs(weeklyLoss).toLocaleString("en-IN")}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground">Total Mistake Cost:</span>
+            <span className="text-sm font-bold font-mono text-destructive bg-destructive/10 border border-destructive/20 px-2 py-0.5 rounded-lg">
+              ₹{totalBehavioralCost.toLocaleString("en-IN")}
+            </span>
+          </div>
+        </div>
+
+        {/* P&L Comparison Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border border-border/40">
+          <div className="space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Actual P&L</span>
+            <p className={`text-lg font-bold font-mono ${totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
+              {totalPnl >= 0 ? "+" : ""}₹{totalPnl.toLocaleString("en-IN")}
             </p>
-            <span className="text-[9px] text-muted-foreground block mt-1">Sum of negative trades over past 7 days</span>
+            <span className="text-[9px] text-muted-foreground block">Net result with rules deviated</span>
+          </div>
+          <div className="space-y-1 border-t md:border-t-0 md:border-l border-border/40 pt-3 md:pt-0 md:pl-4">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Behavioral Cost</span>
+            <p className="text-lg font-bold font-mono text-destructive">
+              -₹{totalBehavioralCost.toLocaleString("en-IN")}
+            </p>
+            <span className="text-[9px] text-muted-foreground block">Incurred due to undisciplined trades</span>
+          </div>
+          <div className="space-y-1 border-t md:border-t-0 md:border-l border-border/40 pt-3 md:pt-0 md:pl-4">
+            <span className="text-[10px] text-success uppercase tracking-wider font-bold block">Discipline-Adjusted P&L</span>
+            <p className={`text-lg font-bold font-mono ${disciplineAdjustedPnl >= 0 ? "text-success" : "text-destructive"}`}>
+              {disciplineAdjustedPnl >= 0 ? "+" : ""}₹{disciplineAdjustedPnl.toLocaleString("en-IN")}
+            </p>
+            <span className="text-[9px] text-success block font-semibold font-sans">Had you followed your rules, this would be your P&L!</span>
+          </div>
+        </div>
+
+        {/* Categories Breakdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Overtrading */}
+          <div className="p-4 rounded-xl border border-border bg-muted/10 space-y-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-foreground block">Overtrading</span>
+              <span className="text-[10px] text-muted-foreground block">{overtradingTrades.length} trades identified</span>
+            </div>
+            <div className="space-y-1 pt-2 border-t border-border/40">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-muted-foreground">Net impact:</span>
+                <span className={overtradingCost >= 0 ? "text-success" : "text-destructive"}>
+                  {overtradingCost >= 0 ? "+" : ""}₹{overtradingCost.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {overtradingCost < 0 && (
+                <div className="text-[9px] text-success font-semibold">
+                  If avoided: Account would be +₹{Math.abs(overtradingCost).toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Mistakes Logged ({dateFilterLabel})</span>
-            <p className="text-xl font-bold font-mono text-amber-500">
-              {totalMistakesCount}
-            </p>
-            <span className="text-[9px] text-muted-foreground block mt-1">Total rules deviated or system overrides</span>
+          {/* Revenge Trading */}
+          <div className="p-4 rounded-xl border border-border bg-muted/10 space-y-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-foreground block">Revenge Trading</span>
+              <span className="text-[10px] text-muted-foreground block">{revengeTrades.length} instances detected</span>
+            </div>
+            <div className="space-y-1 pt-2 border-t border-border/40">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-muted-foreground">Net impact:</span>
+                <span className={revengeCost >= 0 ? "text-success" : "text-destructive"}>
+                  {revengeCost >= 0 ? "+" : ""}₹{revengeCost.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {revengeCost < 0 && (
+                <div className="text-[9px] text-success font-semibold">
+                  If avoided: Account would be +₹{Math.abs(revengeCost).toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* FOMO Entries */}
+          <div className="p-4 rounded-xl border border-border bg-muted/10 space-y-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-foreground block">FOMO Entries</span>
+              <span className="text-[10px] text-muted-foreground block">{fomoTrades.length} instances detected</span>
+            </div>
+            <div className="space-y-1 pt-2 border-t border-border/40">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-muted-foreground">Net impact:</span>
+                <span className={fomoCost >= 0 ? "text-success" : "text-destructive"}>
+                  {fomoCost >= 0 ? "+" : ""}₹{fomoCost.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {fomoCost < 0 && (
+                <div className="text-[9px] text-success font-semibold">
+                  If avoided: Account would be +₹{Math.abs(fomoCost).toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Risk Violation 1% or daylimit */}
+          <div className="p-4 rounded-xl border border-border bg-muted/10 space-y-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-foreground block">Risk Violations</span>
+              <span className="text-[10px] text-muted-foreground block">{riskViolationTrades.length} instances detected</span>
+            </div>
+            <div className="space-y-1 pt-2 border-t border-border/40">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-muted-foreground">Net impact:</span>
+                <span className={riskViolationCost >= 0 ? "text-success" : "text-destructive"}>
+                  {riskViolationCost >= 0 ? "+" : ""}₹{riskViolationCost.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {riskViolationCost < 0 && (
+                <div className="text-[9px] text-success font-semibold">
+                  If avoided: Account would be +₹{Math.abs(riskViolationCost).toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

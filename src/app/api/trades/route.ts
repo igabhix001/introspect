@@ -20,6 +20,22 @@ export function virtualizeTrade(trade: any) {
   };
 }
 
+function getHoldTimeInMinutes(entryTime: string | null, exitTime: string | null): number | null {
+  if (!entryTime || !exitTime) return null;
+  const entryParts = entryTime.split(":");
+  const exitParts = exitTime.split(":");
+  if (entryParts.length >= 2 && exitParts.length >= 2) {
+    const h1 = parseInt(entryParts[0]);
+    const m1 = parseInt(entryParts[1]);
+    const h2 = parseInt(exitParts[0]);
+    const m2 = parseInt(exitParts[1]);
+    if (isNaN(h1) || isNaN(m1) || isNaN(h2) || isNaN(m2)) return null;
+    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    return diff >= 0 ? diff : null;
+  }
+  return null;
+}
+
 function detectMistakes(
   trade: {
     direction: string;
@@ -61,15 +77,9 @@ function detectMistakes(
     mistakes.push("daily_loss_breached");
   }
 
-  // 3. No stop loss set: stop_set? = No
+  // 3. Stop loss checking (observation only, not a mistake)
   if (trade.stop_loss === null || trade.stop_loss === undefined) {
-    const realizedLoss = (trade.pnl && trade.pnl < 0) ? Math.abs(trade.pnl) : 0;
-    const isOverRisk = realizedLoss > 0.01 * context.capital;
-    if (isOverRisk) {
-      mistakes.push("no_stop_loss");
-    } else {
-      mistakes.push("always_apply_sl");
-    }
+    mistakes.push("always_apply_sl");
   }
 
   // 4. Revenge trading: (losses today >= 2) AND (daily loss > defined% of capital)
@@ -107,6 +117,17 @@ function detectMistakes(
   const isDateInvalid = !trade.date || isNaN(Date.parse(trade.date));
   if (isSymbolEmpty || isDateInvalid) {
     mistakes.push("data_integrity_symbol_date");
+  }
+
+  // 9. Early Profit Booking & Holding Losers Too Long (Observations)
+  const mins = getHoldTimeInMinutes(trade.entry_time || null, trade.exit_time || null);
+  if (mins !== null) {
+    if (trade.pnl > 0 && mins <= 5) {
+      mistakes.push("early_profit_booking");
+    }
+    if (trade.pnl < 0 && mins >= 45) {
+      mistakes.push("holding_losers_too_long");
+    }
   }
 
   // Backward compatibility legacy rules
@@ -265,17 +286,10 @@ export async function POST(request: NextRequest) {
     const mistakeFeedback: { mistake: string; feedback: string; severity: string }[] = [];
     const mistakes = tradeData.mistakes || [];
     
-    if (mistakes.includes("no_stop_loss")) {
-      mistakeFeedback.push({
-        mistake: "no_stop_loss",
-        feedback: "⚠️ Trading without a stop-loss is extremely risky. Always define your exit before entering.",
-        severity: "critical"
-      });
-    }
     if (mistakes.includes("always_apply_sl")) {
       mistakeFeedback.push({
         mistake: "always_apply_sl",
-        feedback: "💡 Note: Always apply a stop loss and position size risk to protect your capital.",
+        feedback: "💡 Note: Always apply a stop loss and position size risk to protect your capital. Use the Position Sizer tool to control risk.",
         severity: "low"
       });
     }

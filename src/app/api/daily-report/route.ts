@@ -142,21 +142,11 @@ function runBehavioralAudit(
         tag: `🔴 SIZE VIOLATION (Risked ₹${Math.round(initialRisk)} vs allowed ₹${Math.round(unitRisk)}, ${overPct}% over)`,
       });
     } else if (!t.stop_loss) {
-      const realizedLoss = (t.pnl && t.pnl < 0) ? Math.abs(t.pnl) : 0;
-      const isOverRisk = realizedLoss > 0.01 * capital;
-      if (isOverRisk) {
-        mistakeTags.push({
-          stock: t.stock || "Unknown",
-          pnl: t.pnl || 0,
-          tag: "🔴 NO STOP-LOSS",
-        });
-      } else {
-        mistakeTags.push({
-          stock: t.stock || "Unknown",
-          pnl: t.pnl || 0,
-          tag: "✅ Info: Always apply SL and position size risk",
-        });
-      }
+      mistakeTags.push({
+        stock: t.stock || "Unknown",
+        pnl: t.pnl || 0,
+        tag: "✅ Info: Always apply SL and position size risk",
+      });
     } else {
       mistakeTags.push({
         stock: t.stock || "Unknown",
