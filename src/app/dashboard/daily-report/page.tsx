@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/lib/auth/auth-context";
 import { useDailyReportQuery, useRecentDailyReportsQuery } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatMistakeLabel } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
 const PnlChart = dynamic(() => import("@/components/dashboard/pnl-chart"), {
@@ -483,7 +484,7 @@ export default function DailyReportPage() {
                       <th className="pb-2">Duration</th>
                       <th className="pb-2 text-right">P&L</th>
                       <th className="pb-2 text-center">Safety Status</th>
-                      <th className="pb-2">Mistakes / Violations</th>
+                      <th className="pb-2">Mistakes / Observations</th>
                       <th className="pb-2 text-center no-print">CBT Coach</th>
                     </tr>
                   </thead>
@@ -531,12 +532,12 @@ export default function DailyReportPage() {
                               <div className="flex flex-wrap gap-1">
                                 {trade.mistakes && trade.mistakes.map((m, idx) => (
                                   <span key={`mistake-${idx}`} className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0.5 rounded font-semibold">
-                                    {m}
+                                    {formatMistakeLabel(m)}
                                   </span>
                                 ))}
                                 {trade.observations && trade.observations.map((obs, idx) => (
                                   <span key={`obs-${idx}`} className="bg-muted text-foreground text-[10px] px-1.5 py-0.5 rounded border border-border font-semibold">
-                                    {obs}
+                                    {formatMistakeLabel(obs)}
                                   </span>
                                 ))}
                               </div>

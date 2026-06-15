@@ -98,6 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeCache({ user, profile, hasActiveSubscription, initialized: !loading });
   }, [user, profile, hasActiveSubscription, loading]);
 
+  const clearAuth = () => {
+    if (!mountedRef.current) return;
+    setUser(null);
+    setProfile(null);
+    setHasActiveSubscription(false);
+    hydrationStartedRef.current = false;
+    hydrationDoneRef.current = true;
+    clearCache();
+  };
+
   /**
    * Fetch profile via server API route (uses admin client to bypass RLS).
    * Falls back to direct Supabase query with user JWT if API fails.
@@ -115,6 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         signal: AbortSignal.timeout(5000), // 5s timeout to prevent hanging
       });
+
+      if (res.status === 401 || res.status === 403) {
+        console.warn("[AuthProvider] Unauthorized profile fetch (expired session). Logging out.");
+        if (mountedRef.current) {
+          clearAuth();
+        }
+        return;
+      }
 
       if (res.ok) {
         const data = await res.json();
@@ -144,7 +162,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Final fallback: minimal profile — user can still use the app but no admin features
-    if (mountedRef.current) {
+    // Only set if we don't already have a profile in state (prevents overwriting admin role on transient errors)
+    if (mountedRef.current && !profileRef.current) {
       setProfile({
         id: userId,
         email: userEmail || "",
@@ -232,16 +251,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const clearAuth = () => {
-      if (!mountedRef.current) return;
-      setUser(null);
-      setProfile(null);
-      setHasActiveSubscription(false);
-      hydrationStartedRef.current = false;
-      hydrationDoneRef.current = true;
-      clearCache();
-    };
-
     let activeSubscription: ReturnType<SupabaseClient["auth"]["onAuthStateChange"]>["data"]["subscription"] | null = null;
 
     const initListener = async () => {
@@ -311,12 +320,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const checkSessionOnFocus = async () => {
+      if (!mountedRef.current || !userRef.current) return;
+      
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        
+        // Fetch current session from Supabase. This automatically attempts a token refresh if expired.
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // If we are online, but session is null or has error, it is a definitive auth failure.
+        if (navigator.onLine && (error || !session)) {
+          console.warn("[AuthProvider] Session validation failed on focus while online. Logging out.");
+          clearAuth();
+          window.location.replace("/auth/login");
+        }
+      } catch (err) {
+        console.error("[AuthProvider] Error checking session on focus:", err);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkSessionOnFocus();
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", checkSessionOnFocus);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+
     initListener();
 
     return () => {
       mountedRef.current = false;
       clearTimeout(safetyTimer);
       activeSubscription?.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", checkSessionOnFocus);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

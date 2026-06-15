@@ -27,6 +27,7 @@ const EquityChart = dynamic(() => import("@/components/dashboard/equity-chart"),
 });
 import { useAnalyticsQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
+import { formatMistakeLabel } from "@/lib/utils";
 
 const stagger = {
   container: { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } },
@@ -489,7 +490,7 @@ export default function AnalyticsPage() {
               biasData.map((item) => (
                 <div key={item.bias} className="space-y-1.5">
                   <div className="flex justify-between text-xs font-medium">
-                    <span className="text-foreground">{item.bias}</span>
+                    <span className="text-foreground">{formatMistakeLabel(item.bias)}</span>
                     <span className="text-muted-foreground">{item.count} occurrences</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">

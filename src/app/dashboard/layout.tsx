@@ -5,6 +5,9 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { QueryProvider } from "@/lib/query-client";
 import { useRealtimeInvalidation } from "@/lib/hooks/use-realtime-invalidation";
+import { useAuth } from "@/lib/auth/auth-context";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 function RealtimeInvalidator() {
   useRealtimeInvalidation();
@@ -18,18 +21,40 @@ export default function DashboardLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    // Trigger welcome email check for trial users on layout mount
-    fetch("/api/user/welcome-email", { method: "POST" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.status === "sent") {
-          console.log("[Welcome Email] Welcome email successfully sent via Resend.");
-        }
-      })
-      .catch((err) => console.error("[Welcome Email] Error invoking welcome email trigger:", err));
-  }, []);
+    if (!loading && !user) {
+      router.replace("/auth/login");
+    }
+  }, [loading, user, router]);
+
+  useEffect(() => {
+    if (user) {
+      // Trigger welcome email check for trial users on layout mount
+      fetch("/api/user/welcome-email", { method: "POST" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.status === "sent") {
+            console.log("[Welcome Email] Welcome email successfully sent via Resend.");
+          }
+        })
+        .catch((err) => console.error("[Welcome Email] Error invoking welcome email trigger:", err));
+    }
+  }, [user]);
+
+  if (loading && !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <QueryProvider>

@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { useTradesQuery, useDailyReportQuery, useChallengesQuery, queryKeys } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { formatMistakeLabel } from "@/lib/utils";
 
 const emotionColors: Record<string, string> = {
   Calm: "bg-success/10 text-success",
@@ -657,7 +658,7 @@ export default function JournalPage() {
           <div className="col-span-2 text-right">Gross P&L</div>
           <div className="col-span-1">Emotion</div>
           <div className="col-span-1 text-center">Rules</div>
-          <div className="col-span-2">Mistake</div>
+          <div className="col-span-2">Mistake / Observation</div>
         </div>
 
         <div className="divide-y divide-border/50">
@@ -783,7 +784,7 @@ export default function JournalPage() {
                               mistakeBadges[m] || "bg-muted text-foreground border-border"
                             }`}
                           >
-                            {m}
+                            {formatMistakeLabel(m)}
                           </span>
                         );
                       });
@@ -795,7 +796,7 @@ export default function JournalPage() {
                           key={`obs-${idx}`}
                           className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
                         >
-                          {obs}
+                          {formatMistakeLabel(obs)}
                         </span>
                       );
                     });
@@ -922,7 +923,7 @@ export default function JournalPage() {
                             mistakeBadges[m] || "bg-muted text-foreground border-border"
                           }`}
                         >
-                          {m}
+                          {formatMistakeLabel(m)}
                         </span>
                       );
                     });
@@ -934,7 +935,7 @@ export default function JournalPage() {
                         key={`obs-${idx}`}
                         className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
                       >
-                        {obs}
+                        {formatMistakeLabel(obs)}
                       </span>
                     );
                   });

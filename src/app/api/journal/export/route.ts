@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { formatMistakeLabel } from "@/lib/utils";
 
 // GET: Export journal/trades as CSV or JSON
 export async function GET(request: NextRequest) {
@@ -55,29 +56,37 @@ export async function GET(request: NextRequest) {
       "Date", "Symbol", "Direction", "Entry Price", "Exit Price", 
       "Quantity", "Stop Loss", "Target", "P&L", "Risk %", 
       "SL Followed", "Followed Plan", "Emotion", "Notes", "Mistakes",
-      "Market Sentiment", "Entry Time", "Exit Time"
+      "Observations", "Market Sentiment", "Entry Time", "Exit Time"
     ];
 
-    const rows = trades.map(t => [
-      t.date,
-      t.stock || "",
-      t.direction || "",
-      t.entry_price || "",
-      t.exit_price || "",
-      t.quantity || "",
-      t.stop_loss || "",
-      t.target_price || "",
-      t.pnl || 0,
-      t.risk_pct || 0,
-      t.sl_followed ? "Yes" : "No",
-      t.followed_plan ? "Yes" : "No",
-      t.emotion_before || "",
-      (t.notes || "").replace(/,/g, ";").replace(/\n/g, " ").replace(/"/g, '""'),
-      (t.mistakes || []).join("; "),
-      t.market_sentiment || "",
-      t.entry_time || "",
-      t.exit_time || "",
-    ]);
+    const rows = trades.map(t => {
+      const originalMistakes: string[] = Array.isArray(t.mistakes) ? t.mistakes : [];
+      const observationsList = ["holding_losers_too_long", "early_profit_booking"];
+      const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m)).map(formatMistakeLabel);
+      const observations = originalMistakes.filter((m: string) => observationsList.includes(m)).map(formatMistakeLabel);
+
+      return [
+        t.date || "",
+        t.stock || "",
+        t.direction || "",
+        t.entry_price || "",
+        t.exit_price || "",
+        t.quantity || "",
+        t.stop_loss || "",
+        t.target_price || "",
+        t.pnl || 0,
+        t.risk_pct || 0,
+        t.sl_followed ? "Yes" : "No",
+        t.followed_plan ? "Yes" : "No",
+        t.emotion_before || "",
+        (t.notes || "").replace(/,/g, ";").replace(/\n/g, " ").replace(/"/g, '""'),
+        mistakes.join("; "),
+        observations.join("; "),
+        t.market_sentiment || "",
+        t.entry_time || "",
+        t.exit_time || "",
+      ];
+    });
 
     const csv = [
       headers.join(","),
