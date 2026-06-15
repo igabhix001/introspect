@@ -16,16 +16,25 @@ import {
   Printer,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  Radar,
-  ResponsiveContainer,
-  Tooltip,
-  LineChart,
-  Line,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+const RiskRadarChart = dynamic(() => import("@/components/dashboard/risk-radar-chart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground animate-pulse">
+      Loading risk visualization...
+    </div>
+  ),
+});
+
+const RiskLineChart = dynamic(() => import("@/components/dashboard/risk-line-chart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground animate-pulse">
+      Loading trend...
+    </div>
+  ),
+});
 import { useAuth } from "@/lib/auth/auth-context";
 import { useAssessmentQuery, useAllAssessmentsQuery } from "@/lib/hooks/use-queries";
 
@@ -260,25 +269,7 @@ export default function RiskReportPage() {
             </Link>
           </div>
           <div className="h-[300px] min-h-[260px] min-w-0">
-            {mounted ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                  <PolarGrid stroke="var(--border)" strokeDasharray="3 3" />
-                  <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 500 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", padding: "8px 12px", color: "var(--foreground)" }}
-                    labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-                    itemStyle={{ color: "var(--success)" }}
-                    formatter={(value) => [`${value}/100`, "Score"]}
-                  />
-                  <Radar dataKey="score" stroke="var(--success)" strokeWidth={2} fill="var(--success)" fillOpacity={0.15} dot={{ r: 4, fill: "var(--success)", strokeWidth: 0 }} />
-                </RadarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                Loading risk visualization...
-              </div>
-            )}
+            <RiskRadarChart data={radarData} />
           </div>
         </motion.div>
 
@@ -319,27 +310,13 @@ export default function RiskReportPage() {
                 </span>
               </div>
               <div className="h-16 w-full min-h-[64px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={allAssessments.map((a: any, i: number) => ({
+                <RiskLineChart
+                  data={allAssessments.map((a: any, i: number) => ({
                     index: i + 1,
                     score: a.discipline_score,
                     date: new Date(a.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                  }))}>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "10px", padding: "4px 8px", color: "var(--foreground)" }}
-                      labelFormatter={(label) => `Assessment #${label}`}
-                      formatter={(value) => [`${value}/100`, "Score"]}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="score" 
-                      stroke="var(--success)" 
-                      strokeWidth={2} 
-                      dot={{ r: 2.5, fill: "var(--success)", strokeWidth: 0 }} 
-                      activeDot={{ r: 4 }} 
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                  }))}
+                />
               </div>
               {/* Show improvement text */}
               <div className="text-[11px] text-muted-foreground flex items-center justify-between border-t border-border/30 pt-2">

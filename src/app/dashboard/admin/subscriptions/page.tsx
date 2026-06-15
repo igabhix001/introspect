@@ -27,30 +27,16 @@ interface Sub {
   profiles?: { full_name: string; email: string } | null;
 }
 
-export default function AdminSubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState<Sub[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "active" | "expired" | "cancelled">("all");
-  const [stats, setStats] = useState({ total: 0, active: 0, monthly: 0, yearly: 0, totalRevenue: 0 });
+import { useAdminSubscriptionsQuery } from "@/lib/hooks/use-queries";
 
-  useEffect(() => {
-    async function fetchSubscriptions() {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/admin/subscriptions?filter=${filter}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSubscriptions(data.subscriptions || []);
-          if (data.stats) setStats(data.stats);
-        }
-      } catch (error) {
-        console.error("Failed to fetch subscriptions:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchSubscriptions();
-  }, [filter]);
+export default function AdminSubscriptionsPage() {
+  const [filter, setFilter] = useState<"all" | "active" | "expired" | "cancelled">("all");
+
+  const { data, isLoading } = useAdminSubscriptionsQuery(filter);
+
+  const subscriptions: Sub[] = data?.subscriptions || [];
+  const stats = data?.stats || { total: 0, active: 0, monthly: 0, yearly: 0, totalRevenue: 0 };
+  const loading = isLoading && !data;
 
   const planBadge: Record<string, string> = {
     monthly: "bg-blue-500/10 text-blue-500",

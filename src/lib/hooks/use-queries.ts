@@ -45,175 +45,18 @@ export const queryKeys = {
 // ─── Dashboard Overview Data ───
 export function useDashboardQuery() {
   const userId = useStableUserId();
-  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.dashboard(userId || ""),
     queryFn: async ({ signal }) => {
       if (!userId) return null;
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const [tradesRes, assessmentRes, reportsRes, challengeRes, todayReportRes, totalClosedRes, winsRes] = await Promise.all([
-        supabase
-          .from("trades")
-          .select("*")
-          .eq("user_id", userId)
-          .gte("created_at", `${today}T00:00:00`)
-          .order("created_at", { ascending: false })
-          .abortSignal(signal),
-        supabase
-          .from("assessments")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .abortSignal(signal)
-          .maybeSingle(),
-        supabase
-          .from("daily_reports")
-          .select("date, discipline_score")
-          .eq("user_id", userId)
-          .order("date", { ascending: false })
-          .limit(35)
-          .abortSignal(signal),
-        supabase
-          .from("challenges")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .abortSignal(signal)
-          .maybeSingle(),
-        supabase
-          .from("daily_reports")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("date", today)
-          .abortSignal(signal)
-          .maybeSingle(),
-        supabase
-          .from("trades")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId)
-          .not("exit_price", "is", null)
-          .abortSignal(signal),
-        supabase
-          .from("trades")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId)
-          .not("exit_price", "is", null)
-          .gt("pnl", 0)
-          .abortSignal(signal),
-      ]);
-
-      const trades = tradesRes.data || [];
-      const assessment = assessmentRes.data;
-      const reports = reportsRes.data || [];
-      const activeChallenge = challengeRes.data;
-      const todayFullReport = todayReportRes.data as {
-        discipline_score?: number;
-        mistakes_count?: number;
-        rules_followed?: number;
-        total_rules?: number;
-        feedback?: {
-          positive?: string[];
-          negative?: string[];
-          suggestions?: string[];
-          mistakeTags?: Array<{ stock: string; pnl: number; tag: string }>;
-        };
-      } | null;
-
-      const todayPnl = trades.reduce((sum: number, t: { pnl?: number }) => sum + (t.pnl || 0), 0);
-
-      // Get today's report if it exists
-      const todayReport = reports.find((r: { date: string }) => r.date === today) as { discipline_score?: number } | undefined;
-      
-      // Discipline score logic:
-      // 1. If today's report exists, use it
-      // 2. If no trades today, show 0 (not 100 - you haven't earned discipline yet)
-      // 3. Otherwise show last known score or 0
-      let disciplineScore = 0;
-      if (todayFullReport?.discipline_score !== undefined) {
-        disciplineScore = todayFullReport.discipline_score;
-      } else if (todayReport?.discipline_score !== undefined) {
-        disciplineScore = todayReport.discipline_score;
-      } else if (trades.length === 0) {
-        disciplineScore = 0;
-      } else {
-        disciplineScore = 0;
-      }
-
-      const disciplineTrend = reports
-        .slice()
-        .reverse()
-        .map((r: { date: string; discipline_score?: number }) => ({
-          day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(r.date).getDay()],
-          score: r.discipline_score || 0,
-        }));
-
-      // Determine if user has journaled today
-      const hasJournaledToday = trades.length > 0;
-      const hasTodayReport = !!todayFullReport || !!todayReport;
-      
-      // Check if user has ever done assessment (has any historical reports or assessment)
-      const hasEverTraded = reports.length > 0 || trades.length > 0;
-      const hasAssessment = !!assessment;
-
-      // Extract mistakes from today's report
-      const todayMistakesCount = todayFullReport?.mistakes_count || 0;
-      const todayMistakeTags = todayFullReport?.feedback?.mistakeTags || [];
-      const todayAreasToImprove = todayFullReport?.feedback?.negative || [];
-      const rulesFollowed = todayFullReport?.rules_followed || 0;
-      const totalRules = todayFullReport?.total_rules || 4;
-
-      const totalClosed = totalClosedRes.count || 0;
-      const wins = winsRes.count || 0;
-      const winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
-
-      return {
-        disciplineScore,
-        hasJournaledToday,
-        hasTodayReport,
-        hasEverTraded,
-        hasAssessment,
-        dailyReports: reports,
-        winRate,
-        totalClosed,
-        todayTrades: trades.length,
-        maxTrades: 5,
-        todayPnl,
-        capitalUsed: assessment?.capital || 100000,
-        rulesFollowed,
-        totalRules,
-        currentStreak: activeChallenge?.current_day || 0,
-        todayMistakesCount,
-        todayMistakeTags,
-        todayAreasToImprove,
-        recentTrades: trades.slice(0, 5).map((t: Record<string, unknown>) => ({
-          id: t.id as string,
-          stock_index: (t.stock || t.stock_index || "Unknown") as string,
-          direction: t.direction as string,
-          entry_price: t.entry_price as number,
-          exit_price: (t.exit_price || 0) as number,
-          pnl: (t.pnl || 0) as number,
-          followed_plan: t.followed_plan as boolean,
-          created_at: t.created_at as string,
-        })),
-        disciplineTrend: disciplineTrend.length > 0
-          ? disciplineTrend
-          : [
-              { day: "Mon", score: 0 },
-              { day: "Tue", score: 0 },
-              { day: "Wed", score: 0 },
-              { day: "Today", score: 0 },
-            ],
-        tradingRules: [],
-      };
+      const res = await fetch(`/api/dashboard/overview?t=${Date.now()}`, { signal });
+      if (!res.ok) throw new Error("Failed to fetch dashboard overview");
+      return res.json();
     },
     enabled: !!userId,
-    staleTime: 30 * 1000, // 30 seconds — fresh enough for dashboard
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 15 * 60 * 1000,
   });
 }
 
@@ -238,7 +81,8 @@ export function useTradesQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 30 * 1000, // 30 seconds — trades don't change that fast
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 15 * 60 * 1000,
   });
 }
 
@@ -328,7 +172,8 @@ export function useChallengesQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    gcTime: 15 * 60 * 1000,
   });
 }
 
@@ -373,7 +218,8 @@ export function useLoyaltyQuery() {
       return data;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -398,7 +244,8 @@ export function useDailyReportsQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -436,7 +283,8 @@ export function useLoyaltyWithTransactionsQuery() {
       };
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -461,7 +309,8 @@ export function useDailyReportQuery(date: string) {
       return data;
     },
     enabled: !!userId && !!date,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -489,163 +338,26 @@ export function useRecentDailyReportsQuery() {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
 // ─── Analytics Data ───
 export function useAnalyticsQuery() {
   const userId = useStableUserId();
-  const supabase = createClient();
 
   return useQuery({
     queryKey: ["analytics", userId || ""] as const,
     queryFn: async ({ signal }) => {
       if (!userId) return null;
-
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      // Fetch trades, weekly reports, and user profile in parallel
-      const [tradesRes, weeklyReportsRes, profileRes] = await Promise.all([
-        supabase
-          .from("trades")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: true })
-          .abortSignal(signal),
-        supabase
-          .from("daily_reports")
-          .select("*")
-          .eq("user_id", userId)
-          .gte("date", sevenDaysAgo.toISOString().split("T")[0])
-          .order("date", { ascending: false })
-          .abortSignal(signal),
-        supabase
-          .from("profiles")
-          .select("trading_capital")
-          .eq("id", userId)
-          .single()
-      ]);
-
-      const allTrades = tradesRes.data || [];
-      const weeklyReports = (weeklyReportsRes.data || []) as Array<{
-        date: string;
-        mistakes_count?: number;
-        feedback?: {
-          negative?: string[];
-          suggestions?: string[];
-          mistakeTags?: Array<{ stock: string; pnl: number; tag: string }>;
-        };
-      }>;
-
-      // Extract weekly mistakes from daily reports
-      const weeklyMistakeCounts: Record<string, number> = {};
-      const weeklyAreasToImprove: string[] = [];
-      const weeklySuggestions: string[] = [];
-
-      weeklyReports.forEach((report) => {
-        // Collect mistake tags
-        if (report.feedback?.mistakeTags) {
-          report.feedback.mistakeTags.forEach((mt) => {
-            if (!mt.tag.startsWith("✅")) {
-              const cleanTag = mt.tag.replace(/^🔴\s*/, "").split(" (")[0];
-              weeklyMistakeCounts[cleanTag] = (weeklyMistakeCounts[cleanTag] || 0) + 1;
-            }
-          });
-        }
-        // Collect areas to improve
-        if (report.feedback?.negative) {
-          report.feedback.negative.forEach((neg) => {
-            const cleanNeg = neg.replace(/^⚠️\s*/, "");
-            if (!weeklyAreasToImprove.includes(cleanNeg)) {
-              weeklyAreasToImprove.push(cleanNeg);
-            }
-          });
-        }
-        // Collect suggestions
-        if (report.feedback?.suggestions) {
-          report.feedback.suggestions.forEach((sug) => {
-            if (!weeklySuggestions.includes(sug)) {
-              weeklySuggestions.push(sug);
-            }
-          });
-        }
-      });
-
-      const mistakeColors: Record<string, string> = {
-        "SIZE VIOLATION": "#EF4444",
-        "NO STOP-LOSS": "#F97316",
-        "REVENGE TRADE": "#DC2626",
-        "FOMO": "#F59E0B",
-        "Overtrading": "#A855F7",
-        "Over-leveraged": "#3B82F6",
-      };
-
-      const weeklyMistakeData = Object.entries(weeklyMistakeCounts).map(([name, value]) => ({
-        name,
-        value,
-        color: mistakeColors[name] || "#6B7280",
-      }));
-
-      if (allTrades.length === 0) {
-        return {
-          allTrades: [],
-          tradeCount: 0,
-          totalPnl: 0,
-          winRate: 0,
-          ruleAdherence: 0,
-          weeklyPnl: [],
-          mistakeData: [],
-          weeklyMistakeData,
-          weeklyAreasToImprove,
-          weeklySuggestions,
-        };
-      }
-
-      const total = allTrades.reduce((sum: number, t: { pnl: number }) => sum + t.pnl, 0);
-      const closedTrades = allTrades.filter((t: { exit_price?: number | null }) => t.exit_price !== null && t.exit_price !== undefined);
-      const totalClosed = closedTrades.length;
-      const wins = closedTrades.filter((t: { pnl: number }) => t.pnl > 0).length;
-      const rulesFollowed = allTrades.filter((t: { followed_plan: boolean }) => t.followed_plan).length;
-
-      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const dayPnl: Record<string, number> = {};
-      allTrades.forEach((t: { created_at: string; pnl: number }) => {
-        const dayName = dayNames[new Date(t.created_at).getDay()];
-        dayPnl[dayName] = (dayPnl[dayName] || 0) + t.pnl;
-      });
-      const weeklyPnl = dayNames.slice(1, 6).map((day) => ({ day, pnl: dayPnl[day] || 0 }));
-
-      // Legacy mistake data from trades (for backward compatibility)
-      const tradeMistakeCounts: Record<string, number> = {};
-      allTrades.forEach((t: { mistakes?: string[] }) => {
-        (t.mistakes || []).forEach((m: string) => {
-          tradeMistakeCounts[m] = (tradeMistakeCounts[m] || 0) + 1;
-        });
-      });
-      const mistakeData = Object.entries(tradeMistakeCounts).map(([name, value]) => ({
-        name,
-        value,
-        color: mistakeColors[name] || "#6B7280",
-      }));
-
-      return {
-        allTrades,
-        tradeCount: allTrades.length,
-        totalPnl: total,
-        winRate: totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0,
-        ruleAdherence: Math.round((rulesFollowed / allTrades.length) * 100),
-        weeklyPnl,
-        mistakeData,
-        weeklyMistakeData,
-        weeklyAreasToImprove,
-        weeklySuggestions,
-        tradingCapital: profileRes.data?.trading_capital || 100000,
-      };
+      const res = await fetch(`/api/dashboard/analytics?t=${Date.now()}`, { signal });
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      return res.json();
     },
     enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes — analytics are aggregate and stable
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -718,48 +430,54 @@ export function useAdminStatsQuery() {
 
   return useQuery({
     queryKey: ["adminStats"] as const,
-    queryFn: async () => {
-      const res = await fetch("/api/admin/stats");
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/admin/stats", { signal });
       if (!res.ok) throw new Error("Failed to fetch admin stats");
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
 }
 
-export function useAdminUsersQuery() {
+export function useAdminUsersQuery(page?: number, limit?: number, search?: string) {
   const { user, isAdmin } = useAuth();
 
   return useQuery({
-    queryKey: ["adminUsers"] as const,
-    queryFn: async () => {
-      const res = await fetch("/api/admin/users");
+    queryKey: ["adminUsers", page, limit, search] as const,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams();
+      if (page) params.append("page", page.toString());
+      if (limit) params.append("limit", limit.toString());
+      if (search) params.append("search", search);
+
+      const res = await fetch(`/api/admin/users?${params}`, { signal });
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
 }
 
-export function useAdminSubscriptionsQuery() {
+export function useAdminSubscriptionsQuery(filter?: string) {
   const { user, isAdmin } = useAuth();
 
   return useQuery({
-    queryKey: ["adminSubscriptions"] as const,
-    queryFn: async () => {
-      const res = await fetch("/api/admin/subscriptions");
+    queryKey: ["adminSubscriptions", filter] as const,
+    queryFn: async ({ signal }) => {
+      const url = filter ? `/api/admin/subscriptions?filter=${filter}` : "/api/admin/subscriptions";
+      const res = await fetch(url, { signal });
       if (!res.ok) throw new Error("Failed to fetch subscriptions");
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
 }
@@ -769,14 +487,64 @@ export function useAdminNotificationsQuery() {
 
   return useQuery({
     queryKey: ["adminNotifications"] as const,
-    queryFn: async () => {
-      const res = await fetch("/api/admin/notifications");
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/admin/notifications", { signal });
       if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json();
     },
     enabled: !!user?.id && isAdmin,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminMessagesQuery(filter?: string) {
+  const { user, isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminMessages", filter] as const,
+    queryFn: async ({ signal }) => {
+      const statusFilter = filter || "all";
+      const res = await fetch(`/api/contact?status=${statusFilter}`, { signal });
+      if (!res.ok) throw new Error("Failed to fetch contact messages");
+      return res.json();
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminSettingsQuery() {
+  const { user, isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminSettings"] as const,
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/admin/settings", { signal });
+      if (!res.ok) throw new Error("Failed to fetch settings");
+      return res.json();
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useAdminFyersStatusQuery() {
+  const { user, isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: ["adminFyersStatus"] as const,
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/admin/fyers", { signal });
+      if (!res.ok) throw new Error("Failed to fetch Fyers status");
+      return res.json();
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 30 * 1000, // Check Fyers token connection status relatively frequently
+    gcTime: 5 * 60 * 1000,
   });
 }

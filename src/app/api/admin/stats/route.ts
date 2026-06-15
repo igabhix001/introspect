@@ -31,58 +31,55 @@ export async function GET() {
     // Use admin client for all queries (bypasses RLS)
     const adminDb = createAdminClient();
 
-    // Total users
-    const { count: totalUsers } = await adminDb
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "user");
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
 
-    // Active subscribers
-    const { count: activeSubscribers } = await adminDb
-      .from("subscriptions")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active");
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
 
-    // MRR calculation
-    const { data: activeSubs } = await adminDb
-      .from("subscriptions")
-      .select("plan, amount_paid")
-      .eq("status", "active");
+    const [totalUsersRes, activeSubsRes, recentSignupsRes, expiredLastMonthRes, recentUsersRes] = await Promise.all([
+      adminDb
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "user"),
+      adminDb
+        .from("subscriptions")
+        .select("plan, amount_paid")
+        .eq("status", "active"),
+      adminDb
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", weekAgo.toISOString())
+        .eq("role", "user"),
+      adminDb
+        .from("subscriptions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "expired")
+        .gte("cancelled_at", monthAgo.toISOString()),
+      adminDb
+        .from("profiles")
+        .select("id, full_name, email, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const totalUsers = totalUsersRes.count || 0;
+    const activeSubs = activeSubsRes.data || [];
+    const activeSubscribers = activeSubs.length;
+    const recentSignups = recentSignupsRes.count || 0;
+    const expiredLastMonth = expiredLastMonthRes.count || 0;
+    const recentUsers = recentUsersRes.data || [];
 
     let mrr = 0;
-    (activeSubs || []).forEach((sub) => {
+    activeSubs.forEach((sub) => {
       if (sub.plan === "monthly") mrr += sub.amount_paid;
       else if (sub.plan === "yearly") mrr += Math.round(sub.amount_paid / 12);
     });
-
-    // Recent signups (last 7 days)
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const { count: recentSignups } = await adminDb
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", weekAgo.toISOString());
-
-    // Churn
-    const monthAgo = new Date();
-    monthAgo.setDate(monthAgo.getDate() - 30);
-    const { count: expiredLastMonth } = await adminDb
-      .from("subscriptions")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "expired")
-      .gte("cancelled_at", monthAgo.toISOString());
 
     const totalActive = (activeSubscribers || 0) + (expiredLastMonth || 0);
     const churnRate = totalActive > 0
       ? Math.round(((expiredLastMonth || 0) / totalActive) * 100 * 10) / 10
       : 0;
-
-    // Recent signups list
-    const { data: recentUsers } = await adminDb
-      .from("profiles")
-      .select("id, full_name, email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
 
     return NextResponse.json({
       totalUsers: totalUsers || 0,

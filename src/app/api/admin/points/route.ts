@@ -22,36 +22,39 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Fetch all loyalty transactions with user profiles
-    const { data: transactions } = await supabase
-      .from("loyalty_points")
-      .select(`
-        *,
-        profiles(full_name, email)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(100);
+    // Fetch transactions and membersCount in parallel
+    const [transactionsRes, membersCountRes] = await Promise.all([
+      supabase
+        .from("loyalty_points")
+        .select(`
+          *,
+          profiles(full_name, email)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+    ]);
 
-    // Get user count
-    const { count: membersCount } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true });
+    const transactions = transactionsRes.data || [];
+    const membersCount = membersCountRes.count || 0;
 
     // Calculate totals
     let issued = 0;
     let redeemed = 0;
     
-    (transactions || []).forEach((tx: { points: number }) => {
+    transactions.forEach((tx: any) => {
       if (tx.points > 0) issued += tx.points;
       else redeemed += Math.abs(tx.points);
     });
 
     return NextResponse.json({
-      transactions: transactions || [],
+      transactions,
       totals: {
         issued,
         redeemed,
-        members: membersCount || 0,
+        members: membersCount,
       },
     });
   } catch (error) {

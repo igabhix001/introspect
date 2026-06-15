@@ -50,41 +50,67 @@ export async function GET(request: NextRequest) {
     const { data: users, count, error } = await query;
     if (error) throw error;
 
-    // Enrich each user with assessment scores and trade counts
-    const enrichedUsers = await Promise.all(
-      (users || []).map(async (user) => {
-        const { data: assessment } = await adminDb
-          .from("assessments")
-          .select("discipline_score")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+    const userIds = (users || []).map((u) => u.id);
 
-        const { count: tradeCount } = await adminDb
+    // Batch fetch assessments and active subscriptions in parallel, and run trade counts concurrently
+    const [assessmentsRes, activeSubsRes, ...tradeCountsRes] = userIds.length > 0 ? await Promise.all([
+      adminDb
+        .from("assessments")
+        .select("user_id, discipline_score, created_at")
+        .in("user_id", userIds)
+        .order("created_at", { ascending: false }),
+      adminDb
+        .from("subscriptions")
+        .select("user_id, plan, status")
+        .in("user_id", userIds)
+        .eq("status", "active")
+        .order("created_at", { ascending: false }),
+      ...userIds.map((uid) =>
+        adminDb
           .from("trades")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", uid)
+      ),
+    ]) : [{ data: [] }, { data: [] }];
 
-        // Get active subscription
-        const { data: activeSub } = await adminDb
-          .from("subscriptions")
-          .select("plan, status")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+    const assessments = (assessmentsRes as any).data || [];
+    const activeSubs = (activeSubsRes as any).data || [];
 
-        return {
-          ...user,
-          discipline_score: assessment?.discipline_score ?? 0,
-          total_trades: tradeCount ?? 0,
-          active_plan: activeSub?.plan ?? "none",
-          subscription_status: activeSub ? "active" : "inactive",
-        };
-      })
-    );
+    // Map user_id to latest assessment discipline_score
+    const latestAssessments = new Map<string, number>();
+    assessments.forEach((a: any) => {
+      if (!latestAssessments.has(a.user_id)) {
+        latestAssessments.set(a.user_id, a.discipline_score);
+      }
+    });
+
+    // Map user_id to active subscription
+    const userSubs = new Map<string, { plan: string; status: string }>();
+    activeSubs.forEach((sub: any) => {
+      if (!userSubs.has(sub.user_id)) {
+        userSubs.set(sub.user_id, { plan: sub.plan, status: sub.status });
+      }
+    });
+
+    // Map user_id to trade count
+    const tradeCountMap = new Map<string, number>();
+    if (userIds.length > 0) {
+      userIds.forEach((uid, index) => {
+        const countRes = tradeCountsRes[index] as { count: number | null };
+        tradeCountMap.set(uid, countRes?.count || 0);
+      });
+    }
+
+    const enrichedUsers = (users || []).map((user) => {
+      const activeSub = userSubs.get(user.id);
+      return {
+        ...user,
+        discipline_score: latestAssessments.get(user.id) ?? 0,
+        total_trades: tradeCountMap.get(user.id) ?? 0,
+        active_plan: activeSub?.plan ?? "none",
+        subscription_status: activeSub ? "active" : "inactive",
+      };
+    });
 
     return NextResponse.json({ users: enrichedUsers, total: count, page, limit });
   } catch (error) {

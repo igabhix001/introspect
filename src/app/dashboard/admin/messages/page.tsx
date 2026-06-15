@@ -40,31 +40,19 @@ const statusIcons: Record<string, React.ReactNode> = {
   archived: <Archive className="h-3 w-3" />,
 };
 
+import { useAdminMessagesQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function AdminMessagesPage() {
-  const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
   const [selectedMessage, setSelectedMessage] = useState<ContactSubmission | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const fetchSubmissions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/contact?status=${filter}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data.submissions || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch submissions:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const { data, isLoading, refetch } = useAdminMessagesQuery(filter);
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [fetchSubmissions]);
+  const submissions: ContactSubmission[] = data?.submissions || [];
+  const loading = isLoading && !data;
 
   const updateStatus = async (id: string, status: string) => {
     setActionLoading(id);
@@ -75,7 +63,7 @@ export default function AdminMessagesPage() {
         body: JSON.stringify({ id, status }),
       });
       if (res.ok) {
-        fetchSubmissions();
+        queryClient.invalidateQueries({ queryKey: ["adminMessages"] });
         if (selectedMessage?.id === id) {
           setSelectedMessage({ ...selectedMessage, status: status as ContactSubmission["status"] });
         }
@@ -103,7 +91,7 @@ export default function AdminMessagesPage() {
           </p>
         </div>
         <button
-          onClick={fetchSubmissions}
+          onClick={() => refetch()}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted text-xs font-medium transition-colors cursor-pointer"
         >

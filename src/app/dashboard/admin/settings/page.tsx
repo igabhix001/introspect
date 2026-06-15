@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { useAdminSettingsQuery, useAdminFyersStatusQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Settings,
   Shield,
@@ -61,43 +63,35 @@ function AdminSettingsContent() {
     }
   }, [searchParams]);
 
-  // Load saved pricing & settings
+  const queryClient = useQueryClient();
+
+  const { data: settingsData } = useAdminSettingsQuery();
+  const { data: fyersData } = useAdminFyersStatusQuery();
+
   useEffect(() => {
-    async function loadSettings() {
-      try {
-        const res = await fetch("/api/admin/settings");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.settings?.pricing_monthly) {
-            setPricing((p) => ({ ...p, monthly: data.settings.pricing_monthly.amount || p.monthly }));
-          }
-          if (data.settings?.pricing_6month) {
-            setPricing((p) => ({ ...p, sixMonth: data.settings.pricing_6month.amount || p.sixMonth }));
-          }
-          if (data.settings?.pricing_yearly) {
-            setPricing((p) => ({ ...p, yearly: data.settings.pricing_yearly.amount || p.yearly }));
-          }
-          if (data.settings?.fyers_default_instrument) {
-            setFyersDefaultInstrument(data.settings.fyers_default_instrument.instrument || "Nifty 50");
-          }
-        }
-      } catch { /* ignore */ }
+    if (settingsData?.settings) {
+      const settings = settingsData.settings;
+      if (settings.pricing_monthly) {
+        setPricing((p) => ({ ...p, monthly: settings.pricing_monthly.amount || p.monthly }));
+      }
+      if (settings.pricing_6month) {
+        setPricing((p) => ({ ...p, sixMonth: settings.pricing_6month.amount || p.sixMonth }));
+      }
+      if (settings.pricing_yearly) {
+        setPricing((p) => ({ ...p, yearly: settings.pricing_yearly.amount || p.yearly }));
+      }
+      if (settings.fyers_default_instrument) {
+        setFyersDefaultInstrument(settings.fyers_default_instrument.instrument || "Nifty 50");
+      }
     }
+  }, [settingsData]);
 
-    async function loadFyersStatus() {
-      try {
-        const res = await fetch("/api/admin/fyers");
-        if (res.ok) {
-          const data = await res.json();
-          setFyersStatus(data);
-          if (data.appId) setFyersAppId(data.appId);
-        }
-      } catch { /* ignore */ }
+  useEffect(() => {
+    if (fyersData) {
+      setFyersStatus(fyersData);
+      if (fyersData.appId) setFyersAppId(fyersData.appId);
     }
-
-    loadSettings();
-    loadFyersStatus();
-  }, []);
+  }, [fyersData]);
 
   const handleSavePricing = async () => {
     setPricingLoading(true);
@@ -117,6 +111,7 @@ function AdminSettingsContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "pricing_yearly", value: { amount: pricing.yearly, amount_paise: pricing.yearly * 100 } }),
       });
+      queryClient.invalidateQueries({ queryKey: ["adminSettings"] });
       setPricingSaved(true);
       setTimeout(() => setPricingSaved(false), 2000);
     } catch { /* ignore */ }
@@ -140,9 +135,7 @@ function AdminSettingsContent() {
       if (res.ok) {
         setFyersMessage({ type: "success", text: "Fyers connected successfully! Token will auto-refresh." });
         setFyersAuthCode("");
-        // Refresh status
-        const statusRes = await fetch("/api/admin/fyers");
-        if (statusRes.ok) setFyersStatus(await statusRes.json());
+        queryClient.invalidateQueries({ queryKey: ["adminFyersStatus"] });
       } else {
         setFyersMessage({ type: "error", text: data.error || "Authentication failed" });
       }
@@ -160,6 +153,7 @@ function AdminSettingsContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "fyers_default_instrument", value: { instrument: fyersDefaultInstrument } }),
       });
+      queryClient.invalidateQueries({ queryKey: ["adminSettings"] });
       setFyersDefaultInstrumentSaved(true);
       setTimeout(() => setFyersDefaultInstrumentSaved(false), 2000);
     } catch { /* ignore */ }

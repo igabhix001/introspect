@@ -48,11 +48,12 @@ const statusColors: Record<string, string> = {
   inactive: "bg-muted text-muted-foreground",
 };
 
+import { useAdminUsersQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [total, setTotal] = useState(0);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -66,30 +67,11 @@ export default function AdminUsersPage() {
   const [subscriptionDuration, setSubscriptionDuration] = useState<number>(30);
   const limit = 15;
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        ...(search && { search }),
-      });
-      const res = await fetch(`/api/admin/users?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users);
-        setTotal(data.total);
-      }
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
+  const { data, isLoading } = useAdminUsersQuery(page, limit, search);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+  const users: AdminUser[] = data?.users || [];
+  const total = data?.total || 0;
+  const loading = isLoading && !data;
 
   const updateUser = async (userId: string, updates: Record<string, unknown>) => {
     setActionLoading(userId);
@@ -100,7 +82,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({ userId, updates }),
       });
       if (res.ok) {
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
         if (selectedUser?.id === userId) {
           setSelectedUser(null);
         }
@@ -130,7 +112,7 @@ export default function AdminUsersPage() {
         setNewAdminEmail("");
         setNewAdminPassword("");
         setNewAdminName("");
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       }
     } catch (error) {
       console.error("Failed to create admin:", error);
@@ -148,7 +130,7 @@ export default function AdminUsersPage() {
       if (res.ok) {
         setDeleteConfirm(null);
         setSelectedUser(null);
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       } else {
         const data = await res.json();
         alert(data.error || "Failed to delete user");
@@ -177,7 +159,7 @@ export default function AdminUsersPage() {
       if (res.ok) {
         setShowSubscriptionModal(null);
         setSelectedUser(null);
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
         alert("Subscription assigned successfully!");
       } else {
         const data = await res.json();

@@ -27,15 +27,16 @@ import {
 import { useAuth } from "@/lib/auth/auth-context";
 import { useDailyReportQuery, useRecentDailyReportsQuery } from "@/lib/hooks/use-queries";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid
-} from "recharts";
+import dynamic from "next/dynamic";
+
+const PnlChart = dynamic(() => import("@/components/dashboard/pnl-chart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  ),
+});
 
 interface DailyReport {
   id: string;
@@ -404,71 +405,23 @@ export default function DailyReportPage() {
               </div>
 
               <div className="h-[200px] min-h-[260px] min-w-0 -ml-2 no-print">
-                {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={[
-                        { tradeIndex: 0, time: "Start", pnl: 0 },
-                        ...(() => {
-                          let runningPnl = 0;
-                          return report.feedback.tradeScorecard.map((t, idx) => {
-                            runningPnl += t.pnl;
-                            return {
-                              tradeIndex: idx + 1,
-                              time: t.exit_time || t.entry_time || `T${idx + 1}`,
-                              pnl: runningPnl,
-                              symbol: t.stock
-                            };
-                          });
-                        })()
-                      ]}
-                    >
-                      <defs>
-                        <linearGradient id="pnlCurveGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                      <XAxis
-                        dataKey="time"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                        tickFormatter={(val) => `₹${val}`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "12px",
-                          fontSize: "12px",
-                        }}
-                        formatter={(val: any, name, props) => {
-                          const symbol = props.payload.symbol ? ` (${props.payload.symbol})` : "";
-                          return [`₹${val.toLocaleString("en-IN")}${symbol}`, "Running P&L"];
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="pnl"
-                        stroke="var(--primary)"
-                        strokeWidth={2.5}
-                        fill="url(#pnlCurveGradient)"
-                        dot={{ r: 4, fill: "var(--card)", stroke: "var(--primary)", strokeWidth: 2 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                )}
+                <PnlChart
+                  data={[
+                    { tradeIndex: 0, time: "Start", pnl: 0 },
+                    ...(() => {
+                      let runningPnl = 0;
+                      return report.feedback.tradeScorecard.map((t, idx) => {
+                        runningPnl += t.pnl;
+                        return {
+                          tradeIndex: idx + 1,
+                          time: t.exit_time || t.entry_time || `T${idx + 1}`,
+                          pnl: runningPnl,
+                          symbol: t.stock
+                        };
+                      });
+                    })()
+                  ]}
+                />
               </div>
 
               {/* Print-only Textual Cumulative P&L Path */}

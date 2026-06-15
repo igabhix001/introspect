@@ -15,20 +15,16 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
-  Legend,
-  AreaChart,
-  Area,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+const EquityChart = dynamic(() => import("@/components/dashboard/equity-chart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  ),
+});
 import { useAnalyticsQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -408,30 +404,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="h-[250px] min-h-[260px] min-w-0 -ml-2">
             {filteredTrades.length > 0 ? (
-              mounted ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={equityCurveData}>
-                    <defs>
-                      <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px", color: "var(--foreground)" }}
-                      formatter={(value: any) => [`₹${value.toLocaleString("en-IN")}`, "Account Balance"]}
-                    />
-                    <Area type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={2} fill="url(#equityGradient)" dot={{ r: 2 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg animate-pulse">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              )
+              <EquityChart data={equityCurveData} />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                 No trades recorded for this period.

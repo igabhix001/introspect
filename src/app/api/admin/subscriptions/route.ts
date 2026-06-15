@@ -36,18 +36,23 @@ export async function GET(request: NextRequest) {
     const { data: subscriptions, error } = await query;
     if (error) throw error;
 
-    // Stats
-    const { count: total } = await adminDb.from("subscriptions").select("*", { count: "exact", head: true });
-    const { count: active } = await adminDb.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active");
-    const { data: allSubs } = await adminDb.from("subscriptions").select("plan, amount_paid").eq("status", "active");
+    // Stats parallelization
+    const [totalRes, allSubsRes] = await Promise.all([
+      adminDb.from("subscriptions").select("*", { count: "exact", head: true }),
+      adminDb.from("subscriptions").select("plan, amount_paid").eq("status", "active")
+    ]);
 
-    const monthly = (allSubs || []).filter((s) => s.plan === "monthly").length;
-    const yearly = (allSubs || []).filter((s) => s.plan === "yearly").length;
-    const totalRevenue = (allSubs || []).reduce((sum, s) => sum + s.amount_paid, 0);
+    const total = totalRes.count || 0;
+    const allSubs = allSubsRes.data || [];
+    const active = allSubs.length;
+
+    const monthly = allSubs.filter((s) => s.plan === "monthly").length;
+    const yearly = allSubs.filter((s) => s.plan === "yearly").length;
+    const totalRevenue = allSubs.reduce((sum, s) => sum + s.amount_paid, 0);
 
     return NextResponse.json({
       subscriptions: subscriptions || [],
-      stats: { total: total || 0, active: active || 0, monthly, yearly, totalRevenue },
+      stats: { total, active, monthly, yearly, totalRevenue },
     });
   } catch (error) {
     console.error("Admin subscriptions error:", error);

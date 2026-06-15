@@ -47,32 +47,20 @@ const templates = [
   { title: "Security Alert", message: "We've detected unusual activity on your account. Please review your recent sessions.", type: "alert" },
 ];
 
+import { useAdminNotificationsQuery } from "@/lib/hooks/use-queries";
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function AdminNotificationsPage() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [sending, setSending] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", message: "", type: "info", target: "all", targetUserId: "" });
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  const { data, isLoading } = useAdminNotificationsQuery();
 
-  async function fetchNotifications() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/notifications");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const notifications: NotificationItem[] = data?.notifications || [];
+  const loading = isLoading && !data;
 
   async function sendNotification() {
     setSending(true);
@@ -85,7 +73,7 @@ export default function AdminNotificationsPage() {
       if (res.ok) {
         setSuccess(true);
         setForm({ title: "", message: "", type: "info", target: "all", targetUserId: "" });
-        fetchNotifications();
+        queryClient.invalidateQueries({ queryKey: ["adminNotifications"] });
         setTimeout(() => {
           setSuccess(false);
           setShowForm(false);
