@@ -192,14 +192,35 @@ export async function GET(request: NextRequest) {
       return "Neutral Market Bias";
     };
 
+    const zoneName = mapZoneToBias(market_zone);
+    const trackingKey = "market:sentiment:tracking";
+    let stability_duration = "00:00";
+
+    const trackingState = cache.get<{ current_zone: string; start_time: number }>(trackingKey);
+    const now = Date.now();
+    if (trackingState && trackingState.data.current_zone === zoneName) {
+      const start = trackingState.data.start_time;
+      const diffSecs = Math.floor((now - start) / 1000);
+      const hours = Math.floor(diffSecs / 3600);
+      const mins = Math.floor((diffSecs % 3600) / 60);
+      const secs = diffSecs % 60;
+      if (hours > 0) {
+        stability_duration = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      } else {
+        stability_duration = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      }
+    } else {
+      cache.set(trackingKey, { current_zone: zoneName, start_time: now }, 86400, 86400);
+    }
+
     const responseData = {
       nifty_price: Math.round(niftyPrice * 100) / 100,
       vix: Math.round(vix * 100) / 100,
       pcr: Math.round(pcr * 100) / 100,
       advances,
       declines,
-      market_zone: mapZoneToBias(market_zone),
-      raw_zone: mapZoneToBias(market_zone),
+      market_zone: zoneName,
+      raw_zone: zoneName,
       radar_score: Math.max(0, Math.min(100, Math.round(radar_score * 10) / 10)),
       confidence,
       stability,
@@ -212,7 +233,7 @@ export async function GET(request: NextRequest) {
       failsafe_mode: false,
       zone_status: "CONFIRMED" as const,
       confirmation_count: 3,
-      stability_duration: "00:00",
+      stability_duration,
     };
 
     // Cache user response for 1 second
