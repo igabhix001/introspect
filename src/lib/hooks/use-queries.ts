@@ -192,8 +192,8 @@ export function useMarketQuery() {
       return res.json();
     },
     enabled: !!user?.id,
-    staleTime: 5 * 1000,
-    refetchInterval: 5 * 1000,
+    staleTime: 1000,
+    refetchInterval: 1000,
     retry: 1,
   });
 }

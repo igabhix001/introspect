@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
 import { PreMarketRoutineRow } from "@/components/dashboard/pre-market-routine-row";
+import { useMarketQuery } from "@/lib/hooks/use-queries";
 
 function getCleanSymbolName(symbol: string, customSym?: string): string {
   if (symbol === "Custom") return customSym || "Custom";
@@ -81,23 +82,12 @@ export default function CalculatorPage() {
   const [fetchingTimeframe, setFetchingTimeframe] = useState(false);
   const [timeframeData, setTimeframeData] = useState<{ close: number; low: number; high: number } | null>(null);
 
-  // Live Market Sentiment State
-  const [marketData, setMarketData] = useState<any>(null);
-  const [loadingMarket, setLoadingMarket] = useState(false);
+  // Live Market Sentiment State using React Query for 1-second auto-refresh
+  const { data: marketData, isLoading: queryLoading, refetch: refetchMarketQuery } = useMarketQuery();
+  const loadingMarket = queryLoading;
 
   const fetchMarketSentiment = async () => {
-    setLoadingMarket(true);
-    try {
-      const res = await fetch("/api/market");
-      const data = await res.json();
-      if (data && !data.error) {
-        setMarketData(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch market data:", err);
-    } finally {
-      setLoadingMarket(false);
-    }
+    await refetchMarketQuery();
   };
 
   const fetchTimeframePrices = async (tf: string, symbol: string) => {
@@ -173,7 +163,6 @@ export default function CalculatorPage() {
       }
     }
     loadDefaults();
-    fetchMarketSentiment();
   }, []);
 
   const handleSlMethodChange = (method: "manual" | "atr" | "timeframe") => {
