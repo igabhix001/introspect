@@ -20,6 +20,8 @@ import {
   Upload,
   Download,
   Info,
+  MessageSquareX,
+  ThumbsUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -68,6 +70,7 @@ interface TradeRow {
   market_sentiment?: string | null;
   entry_time?: string | null;
   exit_time?: string | null;
+  reversals?: { mistake_key: string; reversal_comment: string }[];
 }
 
 export default function JournalPage() {
@@ -114,6 +117,65 @@ export default function JournalPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mistake reversal modal state
+  const [reversalModal, setReversalModal] = useState<{
+    open: boolean;
+    tradeId: string;
+    mistakeKey: string;
+    mistakeLabel: string;
+    comment: string;
+    submitting: boolean;
+    error: string;
+  }>({
+    open: false,
+    tradeId: "",
+    mistakeKey: "",
+    mistakeLabel: "",
+    comment: "",
+    submitting: false,
+    error: "",
+  });
+
+  const handleOpenReversalModal = (tradeId: string, mistakeKey: string) => {
+    setReversalModal({
+      open: true,
+      tradeId,
+      mistakeKey,
+      mistakeLabel: formatMistakeLabel(mistakeKey),
+      comment: "",
+      submitting: false,
+      error: "",
+    });
+  };
+
+  const handleSubmitReversal = async () => {
+    if (reversalModal.comment.trim().length < 5) {
+      setReversalModal((p) => ({ ...p, error: "Please provide a comment of at least 5 characters explaining why this is not a mistake." }));
+      return;
+    }
+    setReversalModal((p) => ({ ...p, submitting: true, error: "" }));
+    try {
+      const res = await fetch(`/api/trades/${reversalModal.tradeId}/reverse-mistake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mistake_key: reversalModal.mistakeKey,
+          reversal_comment: reversalModal.comment.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReversalModal((p) => ({ ...p, submitting: false, error: data.error || "Failed to submit. Please try again." }));
+        return;
+      }
+      // Success — close modal and refresh trades
+      setReversalModal({ open: false, tradeId: "", mistakeKey: "", mistakeLabel: "", comment: "", submitting: false, error: "" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades(user?.id || "") });
+    } catch {
+      setReversalModal((p) => ({ ...p, submitting: false, error: "Network error. Please try again." }));
+    }
+  };
 
   const getHoldingDuration = (entry: string | null, exit: string | null) => {
     if (!entry || !exit) return null;
@@ -830,16 +892,37 @@ export default function JournalPage() {
                       );
                     } else if (trade.mistakes && trade.mistakes.length > 0) {
                       trade.mistakes.forEach((m, idx) => {
-                        renderingBadges.push(
-                          <span
-                            key={`mistake-${idx}`}
-                            className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
-                              mistakeBadges[m] || "bg-muted text-foreground border-border"
-                            }`}
-                          >
-                            {formatMistakeLabel(m)}
-                          </span>
-                        );
+                        const isReversed = (trade.reversals || []).some((r) => r.mistake_key === m);
+                        if (isReversed) {
+                          renderingBadges.push(
+                            <span
+                              key={`mistake-${idx}`}
+                              title={(trade.reversals || []).find(r => r.mistake_key === m)?.reversal_comment}
+                              className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted/40 text-muted-foreground border-border line-through opacity-60 cursor-help"
+                            >
+                              {formatMistakeLabel(m)} — Disputed
+                            </span>
+                          );
+                        } else {
+                          renderingBadges.push(
+                            <span key={`mistake-${idx}`} className="inline-flex items-center gap-1 group/badge">
+                              <span
+                                className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                                  mistakeBadges[m] || "bg-destructive/10 text-destructive border-destructive/20"
+                                }`}
+                              >
+                                {formatMistakeLabel(m)}
+                              </span>
+                              <button
+                                title="Not a Mistake — dispute this detection"
+                                onClick={() => handleOpenReversalModal(trade.id, m)}
+                                className="opacity-0 group-hover/badge:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                              >
+                                <MessageSquareX className="h-3 w-3" />
+                              </button>
+                            </span>
+                          );
+                        }
                       });
                     }
 
@@ -1608,6 +1691,112 @@ export default function JournalPage() {
                   </button>
                 </form>
               )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mistake Reversal Modal ── */}
+      <AnimatePresence>
+        {reversalModal.open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              onClick={() => !reversalModal.submitting && setReversalModal((p) => ({ ...p, open: false }))}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div className="pointer-events-auto w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/10">
+                      <MessageSquareX className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground">Dispute Detection</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Flagged as: <span className="font-semibold text-destructive">{reversalModal.mistakeLabel}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => !reversalModal.submitting && setReversalModal((p) => ({ ...p, open: false }))}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Info note */}
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                  <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    If this detection is incorrect, explain why. Your feedback helps improve the system.
+                    The flag will remain visible but marked as <span className="font-semibold text-foreground">Disputed</span>.
+                  </p>
+                </div>
+
+                {/* Comment input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Why is this not a mistake? <span className="text-destructive">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    disabled={reversalModal.submitting}
+                    value={reversalModal.comment}
+                    onChange={(e) => setReversalModal((p) => ({ ...p, comment: e.target.value, error: "" }))}
+                    placeholder="e.g., The trade was within my planned risk limit and I followed my setup rules. The system incorrectly flagged it because..."
+                    className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm resize-none focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all leading-relaxed disabled:opacity-60"
+                  />
+                  <div className="flex items-center justify-between">
+                    {reversalModal.error ? (
+                      <p className="text-xs text-destructive">{reversalModal.error}</p>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-xs text-muted-foreground/60 ml-auto">{reversalModal.comment.length}/500</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    onClick={() => !reversalModal.submitting && setReversalModal((p) => ({ ...p, open: false }))}
+                    disabled={reversalModal.submitting}
+                    className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitReversal}
+                    disabled={reversalModal.submitting || reversalModal.comment.trim().length < 5}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-500/90 text-white text-sm font-semibold shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {reversalModal.submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <ThumbsUp className="h-4 w-4" />
+                        Submit Dispute
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </>
         )}

@@ -220,6 +220,7 @@ export async function POST(request: NextRequest) {
     }
 
     let dailyLossLimitPct = 3; // default
+    let plannedTradesPerDay = 5; // default
     try {
       const { data: latestAssessment } = await supabase
         .from("assessments")
@@ -231,6 +232,15 @@ export async function POST(request: NextRequest) {
       if (latestAssessment?.risk_level) {
         const rl = latestAssessment.risk_level;
         dailyLossLimitPct = rl === "low" ? 2 : rl === "high" ? 5 : 3;
+      }
+      // Fetch planned trades per day from profile
+      const { data: profileSettings } = await supabase
+        .from("profiles")
+        .select("planned_trades_per_day")
+        .eq("id", user.id)
+        .single();
+      if ((profileSettings as any)?.planned_trades_per_day) {
+        plannedTradesPerDay = Number((profileSettings as any).planned_trades_per_day);
       }
     } catch (err) {
       console.error("Error fetching latest assessment for import rules:", err);
@@ -577,29 +587,60 @@ export async function POST(request: NextRequest) {
       const newPnl = newOnDate.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
       const netDailyPnl = existingPnl + newPnl;
 
-      const existingLosing = existingOnDate.filter(ext => Number(ext.pnl || 0) < 0).length;
-      const newLosing = newOnDate.filter(t => Number(t.pnl || 0) < 0).length;
-      const totalLosingTrades = existingLosing + newLosing;
+      // Overtrading: total trades on that day > user's planned daily limit (not hardcoded 5)
+      const isOvertrading = totalTrades > plannedTradesPerDay;
 
-      // Overtrading check: more than 5 trades per day
-      const isOvertrading = totalTrades > 5;
-
-      // Revenge trading check: 2 or more losses and daily drawdown exceeding defined% of capital
-      const isRevengeTrading = totalLosingTrades >= 2 && netDailyPnl < -(dailyLossLimitPct / 100) * capital;
-
-      // Daily loss limit check: daily drawdown exceeding defined% of capital
+      // Daily loss limit check
       const isDailyLossBreached = netDailyPnl < -(dailyLossLimitPct / 100) * capital;
 
-      if (isOvertrading || isRevengeTrading || isDailyLossBreached) {
-        for (const t of newOnDate) {
-          if (isOvertrading && !t.mistakes.includes("overtrading")) {
-            t.mistakes.push("overtrading");
-          }
-          if (isRevengeTrading && !t.mistakes.includes("revenge_trading")) {
-            t.mistakes.push("revenge_trading");
-          }
-          if (isDailyLossBreached && !t.mistakes.includes("daily_loss_breached")) {
-            t.mistakes.push("daily_loss_breached");
+      // Revenge Trading - REVISED RULE (time-based + risk escalation, avoids false positives).
+      // For bulk imports we can't always determine exact timing, so we use a conservative heuristic:
+      // Flag revenge trading only if ALL are true:
+      //   a) There are >= 2 losing trades on this date with loss >= 1R each
+      //   b) A trade's entry_time is within 30 min of a prior losing trade's exit_time
+      //   c) That trade has a higher risk_pct than the prior losing trade (escalated risk)
+      const oneR = capital * 0.01; // 1% of capital as proxy for 1R when we lack stop-loss data
+      const allLossesOnDate = [
+        ...existingOnDate.filter(t => Number(t.pnl || 0) < 0),
+        ...newOnDate.filter(t => Number(t.pnl || 0) < 0),
+      ];
+
+      // Helper: parse HH:MM or HH:MM:SS to minutes-since-midnight
+      const toMins = (t: string | null | undefined): number | null => {
+        if (!t) return null;
+        const p = t.split(":");
+        return p.length >= 2 ? parseInt(p[0]) * 60 + parseInt(p[1]) : null;
+      };
+
+      // For each new trade, check if it was a revenge trade
+      for (const t of newOnDate) {
+        if (isOvertrading && !t.mistakes.includes("overtrading")) {
+          t.mistakes.push("overtrading");
+        }
+        if (isDailyLossBreached && !t.mistakes.includes("daily_loss_breached")) {
+          t.mistakes.push("daily_loss_breached");
+        }
+
+        // Revenge trading per-trade check
+        const tradeEntryMins = toMins(t.entry_time);
+        if (tradeEntryMins !== null && allLossesOnDate.length >= 1) {
+          for (const loser of allLossesOnDate) {
+            if (loser === t) continue; // skip self
+            const prevLoss = Math.abs(Number(loser.pnl || 0));
+            if (prevLoss < oneR) continue; // previous loss must be >= 1R
+            const loserExitMins = toMins((loser as any).exit_time);
+            if (loserExitMins === null) continue;
+            const gap = tradeEntryMins - loserExitMins;
+            if (gap >= 0 && gap <= 30) {
+              // Check risk escalation
+              const prevRiskPct = Number((loser as any).risk_pct || 0);
+              const tradeRiskPct = Number(t.risk_pct || 0);
+              if (tradeRiskPct > Math.max(prevRiskPct * 1.1, 0.5)) {
+                if (!t.mistakes.includes("revenge_trading")) {
+                  t.mistakes.push("revenge_trading");
+                }
+              }
+            }
           }
         }
       }

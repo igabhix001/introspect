@@ -58,6 +58,9 @@ function detectMistakes(
     todayLosingTradesCount: number;
     todayNetPnl: number;
     dailyLossLimitPct: number;
+    plannedTradesPerDay: number;
+    plannedRiskAmount: number;
+    lastLosingTrade: { pnl: number; exit_time?: string | null; risk_pct?: number } | null;
   }
 ): string[] {
   const mistakes: string[] = [];
@@ -82,16 +85,44 @@ function detectMistakes(
     mistakes.push("always_apply_sl");
   }
 
-  // 4. Revenge trading: (losses today >= 2) AND (daily loss > defined% of capital)
-  const isCurrentLoss = trade.exit_price !== null && trade.pnl < 0;
-  const totalLosingTrades = context.todayLosingTradesCount + (isCurrentLoss ? 1 : 0);
-  if (totalLosingTrades >= 2 && netDailyPnl < -limitPct * context.capital) {
-    mistakes.push("revenge_trading");
+  // 4. Revenge Trading - REVISED RULE (tighter, avoids false positives).
+  //    Detected ONLY when ALL 3 conditions are met:
+  //    a) Previous trade loss >= 1R (the user's planned risk amount)
+  //    b) New trade entered within 30 minutes of previous losing trade's exit
+  //    c) Risk on new trade is escalated above previous planned risk level
+  if (context.lastLosingTrade && trade.entry_time) {
+    const prevLoss = Math.abs(Number(context.lastLosingTrade.pnl || 0));
+    const oneR = context.plannedRiskAmount > 0 ? context.plannedRiskAmount : context.capital * 0.01;
+    const isPrevLossGtOneR = prevLoss >= oneR;
+
+    if (isPrevLossGtOneR && context.lastLosingTrade.exit_time) {
+      // Check time gap: new entry within 30 minutes of last losing trade's exit
+      const toMins = (t: string) => {
+        const p = t.split(":");
+        return p.length >= 2 ? parseInt(p[0]) * 60 + parseInt(p[1]) : null;
+      };
+      const entryMins = toMins(trade.entry_time);
+      const exitMins = toMins(context.lastLosingTrade.exit_time);
+
+      if (entryMins !== null && exitMins !== null) {
+        const gap = entryMins - exitMins;
+        const isWithin30Min = gap >= 0 && gap <= 30;
+
+        if (isWithin30Min) {
+          // c) Risk escalated: new trade risk > 110% of previous trade's risk (or > 1%)
+          const prevRiskPct = Number(context.lastLosingTrade.risk_pct || 0);
+          const riskEscalated = trade.risk_pct > Math.max(prevRiskPct * 1.1, 1.0);
+          if (riskEscalated) {
+            mistakes.push("revenge_trading");
+          }
+        }
+      }
+    }
   }
 
-  // 5. Overtrading: Trades > planned_trades_per_day (5)
+  // 5. Overtrading: Total trades today > user's planned trades per day (from profile)
   const totalTradesCount = context.todayTradeCount + 1;
-  if (totalTradesCount > 5) {
+  if (totalTradesCount > context.plannedTradesPerDay) {
     mistakes.push("overtrading");
   }
 
@@ -227,10 +258,30 @@ export async function POST(request: NextRequest) {
     const riskLevel = latestAssessment?.risk_level || "medium";
     const dailyLossLimitPct = riskLevel === "low" ? 2 : riskLevel === "high" ? 5 : 3;
 
+    // Fetch planned trades per day from profile (fallback to 5)
+    const { data: profileSettings } = await supabase
+      .from("profiles")
+      .select("planned_trades_per_day")
+      .eq("id", user.id)
+      .single();
+    const plannedTradesPerDay: number = (profileSettings as any)?.planned_trades_per_day || 5;
+
     const todayTradeCount = todayTrades?.length || 0;
-    const todayLosingTradesCount = (todayTrades || []).filter(t => t.exit_price !== null && (t.pnl || 0) < 0).length;
+    const completedTodayTrades = (todayTrades || []).filter(t => t.exit_price !== null);
+    const todayLosingTradesCount = completedTodayTrades.filter(t => (t.pnl || 0) < 0).length;
     const todayNetPnl = (todayTrades || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
     const dailyLossPct = Math.abs(Math.min(todayNetPnl, 0)) / capital * 100;
+
+    // Find the most recent losing trade today for revenge trading detection
+    const losingTrades = completedTodayTrades
+      .filter(t => (t.pnl || 0) < 0)
+      .sort((a: any, b: any) => (b.entry_time || "").localeCompare(a.entry_time || ""));
+    const lastLosingTrade = losingTrades.length > 0 ? losingTrades[0] : null;
+
+    // Planned risk amount = risk per trade based on stop loss distance
+    const plannedRiskAmount = validatedData.stop_loss
+      ? Math.abs(validatedData.entry_price - validatedData.stop_loss) * validatedData.quantity
+      : capital * 0.01;
 
     const tradeData = {
       ...validatedData,
@@ -249,7 +300,10 @@ export async function POST(request: NextRequest) {
         todayTradeCount,
         todayLosingTradesCount,
         todayNetPnl,
-        dailyLossLimitPct
+        dailyLossLimitPct,
+        plannedTradesPerDay,
+        plannedRiskAmount,
+        lastLosingTrade,
       }),
     };
 
@@ -258,8 +312,8 @@ export async function POST(request: NextRequest) {
     if (dailyLossPct >= dailyLossLimitPct) {
       violations.push(`Daily loss limit (${dailyLossLimitPct}%) exceeded - trading blocked for today`);
     }
-    if (todayTradeCount >= 5) {
-      violations.push("Maximum daily trades (5) reached - no more trades allowed today");
+    if (todayTradeCount >= plannedTradesPerDay) {
+      violations.push(`Maximum daily trades (${plannedTradesPerDay}) reached - no more trades allowed today`);
     }
     if (riskPct > 2) {
       violations.push("Risk per trade exceeds 2% - reduce position size");
@@ -324,14 +378,16 @@ export async function POST(request: NextRequest) {
     if (mistakes.includes("revenge_trading")) {
       mistakeFeedback.push({
         mistake: "revenge_trading",
-        feedback: `⚠️ Revenge trading detected: Multiple losses today and daily loss exceeded ${dailyLossLimitPct}%. Take a break.`,
+        feedback: `⚠️ Revenge trading detected: You entered a new trade with increased risk within 30 minutes of a losing trade ≥1R. Take a break and review your plan.`,
+
         severity: "critical"
       });
     }
     if (mistakes.includes("overtrading")) {
       mistakeFeedback.push({
         mistake: "overtrading",
-        feedback: "⚠️ Overtrading detected: You exceeded your planned trades limit of 5 trades per day.",
+        feedback: `⚠️ Overtrading detected: You exceeded your planned daily trade limit of ${plannedTradesPerDay} trades.`,
+
         severity: "high"
       });
     }
@@ -365,7 +421,7 @@ export async function POST(request: NextRequest) {
     }
 
     const warnings: string[] = [];
-    if (todayTradeCount > 3) warnings.push("overtrading");
+    if (todayTradeCount > Math.floor(plannedTradesPerDay * 0.6)) warnings.push("overtrading");
     if (dailyLossPct >= (dailyLossLimitPct - 1)) warnings.push("daily_loss_limit_warning");
 
     // AUTOMATIC CHALLENGE CHECK-IN
@@ -434,7 +490,31 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const virtualizedTrades = (trades || []).map(virtualizeTrade);
+    // Fetch reversal records for these trades to show "Reversed by User" states
+    const tradeIds = (trades || []).map((t: any) => t.id);
+    let reversalsMap: Record<string, { mistake_key: string; reversal_comment: string }[]> = {};
+    if (tradeIds.length > 0) {
+      try {
+        const { data: reversals } = await supabase
+          .from("trade_mistake_reversals")
+          .select("trade_id, mistake_key, reversal_comment")
+          .in("trade_id", tradeIds)
+          .eq("user_id", user.id);
+        if (reversals) {
+          for (const r of reversals) {
+            if (!reversalsMap[r.trade_id]) reversalsMap[r.trade_id] = [];
+            reversalsMap[r.trade_id].push({ mistake_key: r.mistake_key, reversal_comment: r.reversal_comment });
+          }
+        }
+      } catch {
+        // Non-critical: table may not exist yet if migration hasn't been run
+      }
+    }
+
+    const virtualizedTrades = (trades || []).map((t: any) => ({
+      ...virtualizeTrade(t),
+      reversals: reversalsMap[t.id] || [],
+    }));
 
     return NextResponse.json({ trades: virtualizedTrades, total: count, page, limit });
   } catch {
