@@ -21,10 +21,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid redemption option. Choose 1 or 3 months." }, { status: 400 });
     }
 
-    // Get current points balance
+    // Get current points balance dynamically from allowed transactions
+    const { data: allTransactions, error: txError } = await supabase
+      .from("loyalty_points")
+      .select("points, action")
+      .eq("user_id", user.id);
+
+    const allowedActions = ["referral", "referral_reward", "redemption"];
+    let currentBalance = 0;
+    if (!txError && allTransactions) {
+      allTransactions.forEach(tx => {
+        if (allowedActions.includes(tx.action)) {
+          currentBalance += tx.points || 0;
+        }
+      });
+    }
+
+    // Get profile subscription info
     const { data: profile } = await supabase
       .from("profiles")
-      .select("current_points_balance, subscription_end_date")
+      .select("subscription_end_date")
       .eq("id", user.id)
       .single();
 
@@ -32,11 +48,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    if ((profile.current_points_balance || 0) < pointsRequired) {
+    if (currentBalance < pointsRequired) {
       return NextResponse.json({ 
         error: "Insufficient points",
         required: pointsRequired,
-        available: profile.current_points_balance || 0,
+        available: currentBalance,
       }, { status: 400 });
     }
 

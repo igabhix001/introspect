@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 1500); // 1.5s timeout for safety
 
-      const res = await fetch(yahooUrl, { signal: controller.signal });
+      const res = await fetch(yahooUrl, { 
+        cache: "no-store",
+        signal: controller.signal 
+      });
       clearTimeout(id);
 
       if (res.ok) {

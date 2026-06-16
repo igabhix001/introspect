@@ -831,17 +831,17 @@ export default function CalculatorPage() {
             )}
 
             {slMethod === "timeframe" && (
-              <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
+              <div className="p-4 rounded-xl border border-success/40 bg-success/[0.03] shadow-[0_0_15px_rgba(34,197,94,0.06)] space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex-1 w-full">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block">
+                    <label className="text-[10px] font-bold text-success uppercase mb-1 block tracking-wider">
                       Candle Resolution Timeframe
                     </label>
                     <div className="flex gap-2 w-full">
                       <select
                         value={selectedTimeframe}
                         onChange={(e) => handleTimeframeChange(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-xs focus:outline-none cursor-pointer font-semibold"
+                        className="flex-1 px-3 py-2 rounded-lg bg-background border border-success/30 text-xs focus:outline-none focus:border-success/50 cursor-pointer font-semibold transition-all"
                       >
                         <option value="5m">5 Minute</option>
                         <option value="15m">15 Minute</option>
@@ -853,7 +853,7 @@ export default function CalculatorPage() {
                       <button
                         onClick={() => fetchTimeframePrices(selectedTimeframe, selectedInstrument)}
                         disabled={fetchingTimeframe}
-                        className="px-3 rounded-lg border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                        className="px-3 rounded-lg border border-success/30 bg-background hover:bg-success/10 flex items-center justify-center transition-all cursor-pointer text-success hover:text-success-foreground"
                       >
                         <RefreshCw className={`h-3.5 w-3.5 ${fetchingTimeframe ? "animate-spin" : ""}`} />
                       </button>
@@ -863,11 +863,11 @@ export default function CalculatorPage() {
 
                 {fetchingTimeframe ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <RefreshCw className="h-3 w-3 animate-spin text-success" />
                     <span>Fetching {getCleanSymbolName(selectedInstrument, customInstrument)} levels...</span>
                   </div>
                 ) : timeframeData ? (
-                  <div className="text-[11px] text-muted-foreground font-mono bg-background/40 p-2.5 rounded-lg border border-border/30 space-y-1">
+                  <div className="text-[11px] text-muted-foreground font-mono bg-background/60 p-2.5 rounded-lg border border-success/20 space-y-1">
                     <div className="flex justify-between">
                       <span>{getCleanSymbolName(selectedInstrument, customInstrument)} Close (Entry):</span>
                       <span className="font-semibold text-foreground">₹{timeframeData.close}</span>
@@ -881,9 +881,9 @@ export default function CalculatorPage() {
                         ₹{tradeDirection === "long" ? timeframeData.low : timeframeData.high}
                       </span>
                     </div>
-                    <div className="flex justify-between border-t border-border/30 pt-1 mt-1 font-semibold text-foreground">
-                      <span>Stop Loss Gap:</span>
-                      <span>₹{(Math.round(Math.abs(timeframeData.close - (tradeDirection === "long" ? timeframeData.low : timeframeData.high)) * 100) / 100).toFixed(2)} pts</span>
+                    <div className="flex justify-between border-t border-success/20 pt-1.5 mt-1.5 font-bold text-foreground">
+                      <span className="text-success uppercase tracking-wider text-[10px]">Stop Loss Gap:</span>
+                      <span className="text-success">₹{(Math.round(Math.abs(timeframeData.close - (tradeDirection === "long" ? timeframeData.low : timeframeData.high)) * 100) / 100).toFixed(2)} pts</span>
                     </div>
                   </div>
                 ) : (

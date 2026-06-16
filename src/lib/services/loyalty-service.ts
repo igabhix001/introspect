@@ -68,11 +68,33 @@ export async function awardPoints(params: AwardPointsParams): Promise<AwardPoint
       };
     }
 
-    const previousBalance = profile.current_points_balance || 0;
+    // Query all existing transactions for this user to calculate the correct previous balance and lifetime points
+    const { data: allTransactions, error: txError } = await adminDb
+      .from("loyalty_points")
+      .select("points, action")
+      .eq("user_id", userId);
+
+    const allowedActions = ["referral", "referral_reward", "redemption"];
+    
+    let currentFilteredPoints = 0;
+    let currentFilteredLifetime = 0;
+
+    if (!txError && allTransactions) {
+      allTransactions.forEach(tx => {
+        if (allowedActions.includes(tx.action)) {
+          currentFilteredPoints += tx.points || 0;
+          if ((tx.points || 0) > 0) {
+            currentFilteredLifetime += tx.points || 0;
+          }
+        }
+      });
+    }
+
+    const previousBalance = currentFilteredPoints;
     const newBalance = previousBalance + points;
     const newLifetime = points > 0 
-      ? (profile.total_lifetime_points || 0) + points 
-      : (profile.total_lifetime_points || 0);
+      ? currentFilteredLifetime + points 
+      : currentFilteredLifetime;
 
     // Calculate new tier based on lifetime points
     const newTier = calculateTier(newLifetime);
@@ -216,13 +238,20 @@ export function getPointsForAction(action: keyof typeof POINTS_CONFIG): number {
 export async function canRedeemFreeMonth(userId: string): Promise<{ canRedeem: boolean; currentBalance: number }> {
   const adminDb = createAdminClient();
   
-  const { data: profile } = await adminDb
-    .from("profiles")
-    .select("current_points_balance")
-    .eq("id", userId)
-    .single();
+  const { data: allTransactions, error: txError } = await adminDb
+    .from("loyalty_points")
+    .select("points, action")
+    .eq("user_id", userId);
 
-  const currentBalance = profile?.current_points_balance || 0;
+  const allowedActions = ["referral", "referral_reward", "redemption"];
+  let currentBalance = 0;
+  if (!txError && allTransactions) {
+    allTransactions.forEach(tx => {
+      if (allowedActions.includes(tx.action)) {
+        currentBalance += tx.points || 0;
+      }
+    });
+  }
   
   return {
     canRedeem: currentBalance >= 150,

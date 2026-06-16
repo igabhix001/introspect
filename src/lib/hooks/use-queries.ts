@@ -271,15 +271,41 @@ export function useLoyaltyWithTransactionsQuery() {
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(20)
-          .abortSignal(signal),
+          .abortSignal(signal), // Retrieve all to dynamically filter and calculate totals
       ]);
 
+      const rawTransactions = ledgerRes.data || [];
+      const allowedActions = ["referral", "referral_reward", "redemption"];
+      const filteredTransactions = rawTransactions.filter((tx) =>
+        allowedActions.includes(tx.action)
+      );
+
+      // Dynamically sum only referral and redemption points
+      let dynamicPoints = 0;
+      let dynamicLifetimePoints = 0;
+
+      filteredTransactions.forEach((tx) => {
+        const pts = tx.points || 0;
+        dynamicPoints += pts;
+        if (pts > 0) {
+          dynamicLifetimePoints += pts;
+        }
+      });
+
+      // Ensure points balance never falls below 0
+      dynamicPoints = Math.max(0, dynamicPoints);
+
+      // Recalculate tier
+      let dynamicTier = "Bronze";
+      if (dynamicLifetimePoints >= 900) dynamicTier = "Platinum";
+      else if (dynamicLifetimePoints >= 600) dynamicTier = "Gold";
+      else if (dynamicLifetimePoints >= 300) dynamicTier = "Silver";
+
       return {
-        points: profileRes.data?.current_points_balance || 0,
-        lifetimePoints: profileRes.data?.total_lifetime_points || 0,
-        tier: profileRes.data?.current_tier || "Bronze",
-        transactions: ledgerRes.data || [],
+        points: dynamicPoints,
+        lifetimePoints: dynamicLifetimePoints,
+        tier: dynamicTier,
+        transactions: filteredTransactions.slice(0, 20), // Display only top 20 allowed transactions
       };
     },
     enabled: !!userId,

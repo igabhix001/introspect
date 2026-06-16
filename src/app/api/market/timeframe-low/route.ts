@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFyersToken } from "@/lib/fyers/fyers-service";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 const TIMEFRAME_MAPPING: Record<string, string> = {
   "5m": "5",
   "15m": "15",
@@ -94,6 +96,7 @@ export async function GET(request: NextRequest) {
         const res = await fetch(
           `https://api-t1.fyers.in/data/history?symbol=${fyersSymbol}&resolution=${fyersResolution}&date_format=0&range_from=${rangeFrom}&range_to=${now}&cont_flag=1`,
           {
+            cache: "no-store",
             headers: {
               Authorization: `${process.env.FYERS_APP_ID}:${token}`,
               "Content-Type": "application/json",

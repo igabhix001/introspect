@@ -289,6 +289,7 @@ export async function fetchNiftyPrice(token: string): Promise<{
     const res = await fetch(
       `${FYERS_API_BASE}/quotes?symbols=NSE:NIFTY50-INDEX`,
       {
+        cache: "no-store",
         headers: {
           Authorization: `${process.env.FYERS_APP_ID}:${token}`,
           "Content-Type": "application/json",
@@ -320,6 +321,7 @@ export async function fetchVIX(token: string): Promise<number | null> {
     const res = await fetch(
       `${FYERS_API_BASE}/quotes?symbols=NSE:INDIAVIX-INDEX`,
       {
+        cache: "no-store",
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
     );
@@ -346,6 +348,7 @@ export async function fetchMarketBreadth(token: string): Promise<{
     const res = await fetch(
       `${FYERS_API_BASE}/options-chain-v3?symbol=NSE:NIFTY50-INDEX&strikecount=20`,
       {
+        cache: "no-store",
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
     );
@@ -381,6 +384,7 @@ export async function fetchMarketBreadth(token: string): Promise<{
     const breadthRes = await fetch(
       `${FYERS_API_BASE}/quotes?symbols=${encodeURIComponent(breadthSymbols.join(","))}`,
       {
+        cache: "no-store",
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
     );
@@ -429,6 +433,7 @@ export async function fetchATR(token: string): Promise<number | null> {
     const res = await fetch(
       `${FYERS_API_BASE}/history?symbol=NSE:NIFTY50-INDEX&resolution=5&date_format=0&range_from=${dayAgo}&range_to=${now}&cont_flag=1`,
       {
+        cache: "no-store",
         headers: { Authorization: `${process.env.FYERS_APP_ID}:${token}` },
       }
     );

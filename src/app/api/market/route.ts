@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
-import { cache, getCacheHeaders } from "@/lib/cache";
+import { cache } from "@/lib/cache";
 import {
   getFyersToken,
   fetchNiftyPrice,
@@ -9,6 +9,8 @@ import {
   fetchMarketBreadth,
   fetchATR,
 } from "@/lib/fyers/fyers-service";
+
+export const dynamic = "force-dynamic";
 
 // ATR-Adaptive Sentiment Engine Config
 const CONFIG = {
@@ -20,30 +22,8 @@ const CONFIG = {
 };
 
 // Cache TTL settings
-const CACHE_TTL_SECONDS = 5; // Fresh data for 5 seconds
-const CACHE_STALE_SECONDS = 30; // Stale-while-revalidate for 30 seconds
-
-interface Snapshot {
-  timestamp: number;
-  nifty_price: number;
-  vix: number;
-  pcr: number;
-  advances: number;
-  declines: number;
-  raw_zone: "BULLISH" | "BEARISH" | "NO_TRADE";
-}
-
-interface SentimentHistoryState {
-  snapshots: Snapshot[];
-  last_valid: Snapshot | null;
-  confirmed_zone: "BULLISH" | "BEARISH" | "NO_TRADE";
-  zone_history: ("BULLISH" | "BEARISH" | "NO_TRADE")[];
-  zone_stable_start: number | null;
-  zone_changes: number[];
-  confirmed_zone_history: ("BULLISH" | "BEARISH" | "NO_TRADE")[];
-}
-
-const HISTORY_CACHE_KEY = "market:sentiment:history_state";
+const CACHE_TTL_SECONDS = 1; // 1 second cache for instant updates
+const CACHE_STALE_SECONDS = 2;
 
 // GET: Fetch live market data with real Fyers or fallback
 export async function GET(request: NextRequest) {
@@ -58,32 +38,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check Cache first for cached response to avoid Auth network latency on cache hit
+    // Check Cache first
     const responseCacheKey = "market:sentiment:live";
     const cachedResponse = cache.get<Record<string, unknown>>(responseCacheKey);
     if (cachedResponse && !cachedResponse.isStale) {
       return NextResponse.json(cachedResponse.data, {
-        headers: getCacheHeaders({ maxAge: CACHE_TTL_SECONDS, staleWhileRevalidate: CACHE_STALE_SECONDS, private: true }),
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
       });
     }
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // Initialize/Retrieve History State
-    let historyState = cache.get<SentimentHistoryState>(HISTORY_CACHE_KEY)?.data;
-    if (!historyState) {
-      historyState = {
-        snapshots: [],
-        last_valid: null,
-        confirmed_zone: "NO_TRADE",
-        zone_history: [],
-        zone_stable_start: null,
-        zone_changes: [],
-        confirmed_zone_history: [],
-      };
-    }
 
     let niftyPrice = 0;
     let prevClose = 0;
@@ -112,79 +80,31 @@ export async function GET(request: NextRequest) {
           niftyPrice = niftyData.current;
           prevClose = niftyData.prevClose;
           todayOpen = niftyData.open;
-          vix = vixData ?? (historyState.last_valid?.vix ?? 14);
+          vix = vixData ?? 14;
           pcr = breadthData?.pcr ?? 1.0;
           advances = breadthData?.advances ?? 25;
           declines = breadthData?.declines ?? 25;
           atrValue = atrData ?? 120;
           dataSource = "fyers_live";
-
-          // Validate Section 2.1
-          isDataValid = niftyPrice > 0 && (advances + declines) === 50 && pcr >= 0.2 && pcr <= 3.0 && vix > 0;
+          isDataValid = niftyPrice > 0 && vix > 0;
         }
       } catch (err) {
         console.error("Fyers fetch error:", err);
       }
     }
 
-    // Fallback strategy Section 2.2
+    // Fallback strategy to simulated data
     if (!isDataValid) {
-      const nowMs = Date.now();
-      // Check if last valid is fresh enough (<30s)
-      if (historyState.last_valid && (nowMs - historyState.last_valid.timestamp < 30000)) {
-        niftyPrice = historyState.last_valid.nifty_price;
-        vix = historyState.last_valid.vix;
-        pcr = historyState.last_valid.pcr;
-        advances = historyState.last_valid.advances;
-        declines = historyState.last_valid.declines;
-        // Use default reference open/close/atr
-        prevClose = 22350;
-        todayOpen = 22360;
-        atrValue = 120;
-        dataSource = "fyers_live";
-        isDataValid = true;
-      } else {
-        // Generate simulated data (always valid)
-        const sim = generateSimulatedData(historyState.last_valid);
-        niftyPrice = sim.niftyPrice;
-        prevClose = sim.prevClose;
-        todayOpen = sim.todayOpen;
-        vix = sim.vix;
-        pcr = sim.pcr;
-        advances = sim.advances;
-        declines = sim.declines;
-        atrValue = sim.atrValue;
-        dataSource = "simulated";
-        isDataValid = true;
-      }
-    }
-
-    const now = Date.now();
-
-    // Fail-Safe Mode Section 9
-    if (!isDataValid) {
-      const failSafeData = {
-        nifty_price: 0,
-        vix: 0,
-        pcr: 0,
-        advances: 0,
-        declines: 0,
-        market_zone: "NO_TRADE" as const,
-        radar_score: 0,
-        confidence: "LOW" as const,
-        stability: "UNSTABLE" as const,
-        momentum: "STEADY" as const,
-        regime: "BALANCED" as const,
-        reasons: ["Market data temporarily unavailable"],
-        data_source: dataSource,
-        market_status: "CLOSED",
-        timestamp: new Date().toISOString(),
-        failsafe_mode: true,
-        zone_status: "WATCH" as const,
-        confirmation_count: 0,
-        stability_duration: "00:00",
-      };
-      return NextResponse.json(failSafeData);
+      const sim = generateSimulatedData();
+      niftyPrice = sim.niftyPrice;
+      prevClose = sim.prevClose;
+      todayOpen = sim.todayOpen;
+      vix = sim.vix;
+      pcr = sim.pcr;
+      advances = sim.advances;
+      declines = sim.declines;
+      atrValue = sim.atrValue;
+      dataSource = "simulated";
     }
 
     // ATR-Adaptive Zone Classification
@@ -197,194 +117,55 @@ export async function GET(request: NextRequest) {
     const bullish_threshold = ref_buy * (1 + buffer_percent);
     const bearish_threshold = ref_sell * (1 - buffer_percent);
 
-    let raw_zone: "BULLISH" | "BEARISH" | "NO_TRADE" = "NO_TRADE";
+    let market_zone: "BULLISH" | "BEARISH" | "NO_TRADE" = "NO_TRADE";
     if (niftyPrice >= bullish_threshold) {
-      raw_zone = "BULLISH";
+      market_zone = "BULLISH";
     } else if (niftyPrice <= bearish_threshold) {
-      raw_zone = "BEARISH";
+      market_zone = "BEARISH";
     }
 
-    // Update snapshot history
-    const currentSnapshot: Snapshot = {
-      timestamp: now,
-      nifty_price: niftyPrice,
-      vix,
-      pcr,
-      advances,
-      declines,
-      raw_zone,
-    };
-    historyState.snapshots.push(currentSnapshot);
-    historyState.snapshots = historyState.snapshots.filter(s => now - s.timestamp <= 600000); // 10 min retention
-    historyState.last_valid = currentSnapshot;
-
-    // Zone Stabilizer (Anti-Flip Confirmation cycles - Section 3)
-    historyState.zone_history.push(raw_zone);
-    if (historyState.zone_history.length > 3) {
-      historyState.zone_history.shift();
-    }
-
-    let confirmed_zone = historyState.confirmed_zone;
-    let zone_status: "CONFIRMED" | "WATCH" = "WATCH";
-    let confirmation_count = historyState.zone_history.length;
-
-    // Cold-start/empty-cache initialization: immediately confirm the first zone
-    if (historyState.zone_history.length === 1) {
-      confirmed_zone = raw_zone;
-      zone_status = "CONFIRMED";
-      confirmation_count = 3;
-      historyState.zone_history = [raw_zone, raw_zone, raw_zone];
-    } else if (historyState.zone_history.length === 3) {
-      const allSame = historyState.zone_history.every(z => z === raw_zone);
-      if (allSame) {
-        confirmed_zone = raw_zone;
-        zone_status = "CONFIRMED";
-        confirmation_count = 3;
-      } else {
-        // Breakout acceleration: If transitioning from NO_TRADE to BULLISH/BEARISH with live data, confirm immediately
-        if (historyState.confirmed_zone === "NO_TRADE" && raw_zone !== "NO_TRADE" && dataSource === "fyers_live") {
-          confirmed_zone = raw_zone;
-          zone_status = "CONFIRMED";
-          confirmation_count = 3;
-          historyState.zone_history = [raw_zone, raw_zone, raw_zone];
-        } else {
-          const last = historyState.zone_history[2];
-          const prev = historyState.zone_history[1];
-          if (last === prev) {
-            confirmation_count = 2;
-          } else {
-            confirmation_count = 1;
-          }
-        }
-      }
-    }
-
-    if (confirmed_zone !== historyState.confirmed_zone) {
-      historyState.confirmed_zone = confirmed_zone;
-      historyState.zone_stable_start = now;
-      historyState.zone_changes.push(now);
-    }
-    if (!historyState.zone_stable_start) {
-      historyState.zone_stable_start = now;
-    }
-
-    // Formatted stability timer duration (Section 10.1)
-    const stableDurationMs = now - historyState.zone_stable_start;
-    const stableMinutes = Math.floor(stableDurationMs / 60000);
-    const stableSeconds = Math.floor((stableDurationMs % 60000) / 1000);
-    const stability_duration = `${stableMinutes.toString().padStart(2, '0')}:${stableSeconds.toString().padStart(2, '0')}`;
-
-    historyState.zone_changes = historyState.zone_changes.filter(t => now - t <= 600000);
-    const zone_change_count_10min = historyState.zone_changes.length;
-
-    // Volatility Shock Protection (Section 4)
-    const twoMinutesAgo = now - 120000;
-    const vixSnapshots2min = historyState.snapshots.filter(s => s.timestamp >= twoMinutesAgo);
-    let shock_detected = false;
-    if (dataSource !== "simulated" && vixSnapshots2min.length >= 2) {
-      const oldestVix = vixSnapshots2min[0].vix;
-      if (oldestVix > 0) {
-        const vix_change = (vix - oldestVix) / oldestVix;
-        if (vix_change > 0.10) {
-          shock_detected = true;
-          confirmed_zone = "NO_TRADE"; // Force NO_TRADE zone on volatility shock
-        }
-      }
-    }
-
-    // Momentum Engine (Section 5.1)
-    let momentum: "RISING" | "WEAKENING" | "STEADY" = "STEADY";
-    const cycles = 3;
-    if (historyState.snapshots.length > cycles) {
-      const pastSnapshot = historyState.snapshots[historyState.snapshots.length - 1 - cycles];
-      const price_momentum = niftyPrice - pastSnapshot.nifty_price;
-      const breadth_momentum = advances - pastSnapshot.advances;
-      if (price_momentum > 0 && breadth_momentum > 0) {
-        momentum = "RISING";
-      } else if (price_momentum < 0 && breadth_momentum < 0) {
-        momentum = "WEAKENING";
-      }
-    }
-
-    // Market Radar Score (Section 5.2)
-    let price_strength = (niftyPrice - bearish_threshold) / (bullish_threshold - bearish_threshold);
-    price_strength = Math.max(0, Math.min(1, price_strength));
-    const breadth_strength = advances / 50;
-    const pcr_normalized = Math.max(0.5, Math.min(2.0, pcr));
-    const pcr_strength = (pcr_normalized - 0.5) / 1.5;
-    const volatility_condition = Math.max(0, Math.min(1, 1 - (vix - 10) / 30));
-
-    const radar_score = (
-      price_strength * 0.3 +
-      breadth_strength * 0.3 +
-      pcr_strength * 0.2 +
-      volatility_condition * 0.2
-    ) * 100;
-
-    // Regime Detection (Section 5.4)
-    const price_move_abs = Math.abs(niftyPrice - todayOpen);
+    // Sentiment Score
     let sb = 0;
     if (advances >= 35) sb = 1;
     else if ((50 - advances) >= 35) sb = -1;
+
     let sd = 0;
     if (pcr >= CONFIG.PCR_BULLISH_THRESHOLD) sd = 1;
     else if (pcr <= CONFIG.PCR_BEARISH_THRESHOLD) sd = -1;
+
     const sentiment_score = sb + sd;
 
-    const prices = historyState.snapshots.map(s => s.nifty_price);
-    const maxPrice = Math.max(...prices, niftyPrice);
-    const minPrice = Math.min(...prices, niftyPrice);
-    const intraday_range = maxPrice - minPrice;
-
-    let regime: "TREND_DAY" | "VOLATILE" | "COMPRESSION" | "BALANCED" = "BALANCED";
-    if (price_move_abs > 0.7 * atrValue && Math.abs(sentiment_score) >= 1) {
-      regime = "TREND_DAY";
-    } else if (vix > 25 && zone_change_count_10min > 3) {
-      regime = "VOLATILE";
-    } else if (vix < 12 && intraday_range < 0.3 * atrValue) {
-      regime = "COMPRESSION";
-    }
-
-    // Stability Engine (Section 5.3)
-    historyState.confirmed_zone_history.push(confirmed_zone);
-    if (historyState.confirmed_zone_history.length > 100) {
-      historyState.confirmed_zone_history.shift();
-    }
-    let consecutive_confirmed = 0;
-    for (let i = historyState.confirmed_zone_history.length - 1; i >= 0; i--) {
-      if (historyState.confirmed_zone_history[i] === confirmed_zone) {
-        consecutive_confirmed++;
-      } else {
-        break;
-      }
-    }
-    let stability: "STABLE" | "WATCH" | "UNSTABLE" = "UNSTABLE";
-    if (
-      regime === "TREND_DAY" ||
-      (regime === "COMPRESSION" && confirmed_zone === "NO_TRADE") ||
-      (historyState.confirmed_zone_history.length < 10 && zone_change_count_10min <= 1)
-    ) {
-      stability = "STABLE";
-    } else if (consecutive_confirmed >= 10) {
-      stability = "STABLE";
-    } else if (consecutive_confirmed >= 5) {
-      stability = "WATCH";
-    }
-
-    // Sentiment Score (for User Dashboard)
+    // Confidence
     const confidence = Math.abs(sentiment_score) >= 2 ? "HIGH" : Math.abs(sentiment_score) === 1 ? "MODERATE" : "LOW";
+
+    // Momentum
+    const momentum = market_zone === "BULLISH" ? "RISING" : market_zone === "BEARISH" ? "WEAKENING" : "STEADY";
+
+    // Stability
+    const stability = vix > 20 ? "UNSTABLE" : vix > 15 ? "WATCH" : "STABLE";
+
+    // Radar Score
+    const priceScore = Math.min(100, Math.max(0, ((niftyPrice - ref_buy) / ref_buy) * 10000 + 50));
+    const breadthScore = (advances / 50) * 100;
+    const pcrScore = Math.min(100, Math.max(0, (pcr - 0.5) * 100));
+    const vixScore = Math.max(0, 100 - (vix - 10) * 3);
+    const radar_score = Math.round(priceScore * 0.3 + breadthScore * 0.3 + pcrScore * 0.2 + vixScore * 0.2);
+
+    // Regime Detection
+    let regime: "TREND_DAY" | "VOLATILE" | "COMPRESSION" | "BALANCED" = "BALANCED";
+    if (vix > 25) regime = "VOLATILE";
+    else if (vix < 12) regime = "COMPRESSION";
+    else if (momentum === "RISING" && advances >= 35 && radar_score > 65) regime = "TREND_DAY";
 
     // Reasons - simplified user-facing messages
     const reasons: string[] = [];
-    if (shock_detected) {
-      reasons.push("High volatility shock detected - market unpredictable");
-    } else if (confirmed_zone === "BULLISH") {
-      reasons.push("Price trading above ATR-adaptive thresholds");
+    if (market_zone === "BULLISH") {
+      reasons.push("Price trading above short-term resistance levels");
       if (advances >= 35) reasons.push("Market breadth currently bullish");
       if (pcr >= 1.2) reasons.push("Derivatives sentiment supporting upside");
       if (momentum === "RISING") reasons.push("Momentum rising across intraday timeframes");
-    } else if (confirmed_zone === "BEARISH") {
-      reasons.push("Price trading below ATR-adaptive thresholds");
+    } else if (market_zone === "BEARISH") {
+      reasons.push("Price trading below short-term support levels");
       if (declines >= 35) reasons.push("Market breadth currently bearish");
       if (pcr <= 0.7) reasons.push("Derivatives sentiment supporting downside");
       if (momentum === "WEAKENING") reasons.push("Momentum weakening across intraday timeframes");
@@ -405,9 +186,6 @@ export async function GET(request: NextRequest) {
     const isBeforeClose = hours < 15 || (hours === 15 && minutes <= 30);
     const market_status = (isOpenDay && isAfterOpen && isBeforeClose) ? "OPEN" : "CLOSED";
 
-    // Save Updated History State back to cache (24 hours TTL)
-    cache.set(HISTORY_CACHE_KEY, historyState, 86400);
-
     const mapZoneToBias = (zone: "BULLISH" | "BEARISH" | "NO_TRADE") => {
       if (zone === "BULLISH") return "Positive Market Bias";
       if (zone === "BEARISH") return "Negative Market Bias";
@@ -420,8 +198,8 @@ export async function GET(request: NextRequest) {
       pcr: Math.round(pcr * 100) / 100,
       advances,
       declines,
-      market_zone: mapZoneToBias(confirmed_zone),
-      raw_zone: mapZoneToBias(raw_zone),
+      market_zone: mapZoneToBias(market_zone),
+      raw_zone: mapZoneToBias(market_zone),
       radar_score: Math.max(0, Math.min(100, Math.round(radar_score * 10) / 10)),
       confidence,
       stability,
@@ -432,16 +210,18 @@ export async function GET(request: NextRequest) {
       market_status,
       timestamp: new Date().toISOString(),
       failsafe_mode: false,
-      zone_status,
-      confirmation_count,
-      stability_duration,
+      zone_status: "CONFIRMED" as const,
+      confirmation_count: 3,
+      stability_duration: "00:00",
     };
 
-    // Cache user response
+    // Cache user response for 1 second
     cache.set(responseCacheKey, responseData, CACHE_TTL_SECONDS, CACHE_STALE_SECONDS);
 
     return NextResponse.json(responseData, {
-      headers: getCacheHeaders({ maxAge: CACHE_TTL_SECONDS, staleWhileRevalidate: CACHE_STALE_SECONDS, private: true }),
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      },
     });
   } catch (error) {
     console.error("Market data error:", error);
@@ -450,40 +230,14 @@ export async function GET(request: NextRequest) {
 }
 
 // Simulated data fallback
-function generateSimulatedData(lastValid: Snapshot | null) {
+function generateSimulatedData() {
   const prevClose = 22350;
-  const todayOpen = 22400;
-  const atrValue = 120;
-  
-  let niftyPrice = 22450;
-  let vix = 14;
-  let pcr = 1.0;
-  let advances = 25;
-  
-  if (lastValid && lastValid.nifty_price > 0) {
-    // Smooth random walk for price
-    const change = (Math.random() * 10 - 4.5); // slight upward bias
-    niftyPrice = lastValid.nifty_price + change;
-    
-    // Smooth random walk for VIX
-    const vixChange = (Math.random() * 0.4 - 0.2);
-    vix = Math.max(10, Math.min(25, lastValid.vix + vixChange));
-    
-    // Smooth random walk for PCR
-    const pcrChange = (Math.random() * 0.04 - 0.02);
-    pcr = Math.max(0.6, Math.min(1.8, lastValid.pcr + pcrChange));
-    
-    // Smooth random walk for advances
-    const advChange = Math.floor(Math.random() * 3 - 1);
-    advances = Math.max(15, Math.min(35, lastValid.advances + advChange));
-  } else {
-    // Initial generation
-    niftyPrice = todayOpen + (Math.random() * 40 - 20);
-    vix = 13 + Math.random() * 2;
-    pcr = 0.9 + Math.random() * 0.2;
-    advances = 23 + Math.floor(Math.random() * 5);
-  }
-  
+  const todayOpen = prevClose + Math.floor(Math.random() * 100 - 50);
+  const niftyPrice = todayOpen + Math.floor(Math.random() * 300 - 100);
+  const atrValue = 100 + Math.random() * 80;
+  const vix = 11 + Math.random() * 16;
+  const pcr = 0.6 + Math.random() * 0.8;
+  const advances = 15 + Math.floor(Math.random() * 30);
   const declines = 50 - advances;
   return { niftyPrice, prevClose, todayOpen, vix, pcr, advances, declines, atrValue };
 }
