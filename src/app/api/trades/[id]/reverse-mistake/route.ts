@@ -11,7 +11,7 @@ interface ReverseRequestBody {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Rate limit
   const identifier = getRateLimitIdentifier(request);
@@ -25,7 +25,7 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const tradeId = params.id;
+    const { id: tradeId } = await params;
     if (!tradeId) {
       return NextResponse.json({ error: "Trade ID is required" }, { status: 400 });
     }
