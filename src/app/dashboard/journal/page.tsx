@@ -848,7 +848,7 @@ export default function JournalPage() {
                     trade.pnl >= 0 ? "text-success" : "text-destructive"
                   }`}
                 >
-                  {trade.pnl >= 0 ? "+" : ""}₹
+                  {trade.pnl >= 0 ? "+" : "−"}₹
                   {Math.abs(trade.pnl).toLocaleString("en-IN")}
                 </div>
                 <div className="col-span-1">
@@ -927,22 +927,17 @@ export default function JournalPage() {
                     }
 
                     tradeObservations.forEach((obs, idx) => {
-                      const duration = getTradeDurationMinutes(trade);
-                      const label = obs === "holding_losers_too_long"
-                        ? `Trade Lasted ${duration ? `${duration} Mins` : "86 Mins"}`
-                        : formatMistakeLabel(obs);
+                      // Skip these per client request — do not display at all (not even as observation)
+                      if (obs === "holding_losers_too_long" || obs === "early_profit_booking") return;
+
                       const badge = (
                         <span
-                          className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
-                            obs === "holding_losers_too_long" || obs === "always_apply_sl"
-                              ? "bg-muted text-foreground border-border hover:bg-muted/80 cursor-pointer transition-colors"
-                              : "bg-muted text-foreground border-border"
-                          }`}
+                          className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
                         >
-                          {label}
+                          {formatMistakeLabel(obs)}
                         </span>
                       );
-                      if (obs === "holding_losers_too_long" || obs === "always_apply_sl") {
+                      if (obs === "always_apply_sl") {
                         renderingBadges.push(
                           <Link key={`obs-${idx}`} href="/dashboard/calculator" title="Open Position Sizer">
                             {badge}
@@ -965,7 +960,8 @@ export default function JournalPage() {
                   })()}
 
                   {(() => {
-                    const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (trade.observations && trade.observations.length > 0);
+                    const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) ||
+                      (trade.observations && trade.observations.some((obs: string) => obs !== "holding_losers_too_long" && obs !== "early_profit_booking"));
                     if (!hasMistake) return null;
                     return (
                       <button
@@ -1017,7 +1013,7 @@ export default function JournalPage() {
                       trade.pnl >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >
-                    {trade.pnl >= 0 ? "+" : ""}₹
+                    {trade.pnl >= 0 ? "+" : "−"}₹
                     {Math.abs(trade.pnl).toLocaleString("en-IN")}
                   </span>
                 </div>
@@ -1053,7 +1049,8 @@ export default function JournalPage() {
                   );
                   const isClean = reportMistake?.tag.startsWith("✅");
                   const mistakeText = reportMistake?.tag.replace(/^🔴\s*/, "").replace(/^✅\s*/, "");
-                  const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (trade.observations && trade.observations.length > 0) || (reportMistake && !isClean);
+                  const hasMistake = !trade.followed_plan || (trade.mistakes && trade.mistakes.length > 0) || (reportMistake && !isClean) ||
+                    (trade.observations && trade.observations.some((obs: string) => obs !== "holding_losers_too_long" && obs !== "early_profit_booking"));
 
                   const tradeObservations = trade.observations || [];
                   const renderingBadges = [];
@@ -1086,22 +1083,17 @@ export default function JournalPage() {
                   }
 
                   tradeObservations.forEach((obs, idx) => {
-                    const duration = getTradeDurationMinutes(trade);
-                    const label = obs === "holding_losers_too_long"
-                      ? `Trade Lasted ${duration ? `${duration} Mins` : "86 Mins"}`
-                      : formatMistakeLabel(obs);
+                    // Skip these per client request — do not display at all (not even as observation)
+                    if (obs === "holding_losers_too_long" || obs === "early_profit_booking") return;
+
                     const badge = (
                       <span
-                        className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
-                          obs === "holding_losers_too_long" || obs === "always_apply_sl"
-                            ? "bg-muted text-foreground border-border hover:bg-muted/80 cursor-pointer transition-colors"
-                            : "bg-muted text-foreground border-border"
-                        }`}
+                        className="px-2 py-0.5 rounded border text-[10px] font-bold bg-muted text-foreground border-border"
                       >
-                        {label}
+                        {formatMistakeLabel(obs)}
                       </span>
                     );
-                    if (obs === "holding_losers_too_long" || obs === "always_apply_sl") {
+                    if (obs === "always_apply_sl") {
                       renderingBadges.push(
                         <Link key={`obs-${idx}`} href="/dashboard/calculator" title="Open Position Sizer">
                           {badge}

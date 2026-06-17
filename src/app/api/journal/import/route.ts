@@ -167,15 +167,8 @@ function finalizeReconstructedTrade(trade: {
     mistakes.push("averaging_down");
   }
 
-  // Early Profit Booking: winning trade duration is < 5 mins (significantly short)
-  if (grossPnl > 0 && holdingDurationMinutes <= 5) {
-    mistakes.push("early_profit_booking");
-  }
-
-  // Holding Losers Too Long: losing trade duration is > 45 mins
-  if (grossPnl < 0 && holdingDurationMinutes >= 45) {
-    mistakes.push("holding_losers_too_long");
-  }
+  // Note: Early Profit Booking & Holding Losers Too Long are NOT flagged per client request.
+  //       These are natural trading situations and should not appear as mistakes or observations.
 
   // Single Trade Loss > 1% Capital
   if (grossPnl < -0.01 * capital) {

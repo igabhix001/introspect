@@ -8,6 +8,10 @@ export function virtualizeTrade(trade: any) {
   if (!trade) return trade;
   const originalMistakes: string[] = Array.isArray(trade.mistakes) ? trade.mistakes : [];
   
+  // These are NOT mistakes — they will be removed from mistake[] and put into observations[]
+  // Observations are rendered differently (neutral/muted style) or hidden entirely.
+  // We keep "holding_losers_too_long" and "early_profit_booking" here for backward-compat:
+  // any trades that were imported before the rule change won't show red badges.
   const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
   
   const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
@@ -19,6 +23,7 @@ export function virtualizeTrade(trade: any) {
     observations,
   };
 }
+
 
 function getHoldTimeInMinutes(entryTime: string | null, exitTime: string | null): number | null {
   if (!entryTime || !exitTime) return null;
@@ -150,16 +155,8 @@ function detectMistakes(
     mistakes.push("data_integrity_symbol_date");
   }
 
-  // 9. Early Profit Booking & Holding Losers Too Long (Observations)
-  const mins = getHoldTimeInMinutes(trade.entry_time || null, trade.exit_time || null);
-  if (mins !== null) {
-    if (trade.pnl > 0 && mins <= 5) {
-      mistakes.push("early_profit_booking");
-    }
-    if (trade.pnl < 0 && mins >= 45) {
-      mistakes.push("holding_losers_too_long");
-    }
-  }
+  // 9. Early Profit Booking & Holding Losers Too Long: removed from mistake detection per client.
+  //    These are natural trading situations and are NOT flagged.
 
   // Backward compatibility legacy rules
   if (trade.risk_pct > 1) {
