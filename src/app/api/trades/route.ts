@@ -8,11 +8,18 @@ export function virtualizeTrade(trade: any) {
   if (!trade) return trade;
   const originalMistakes: string[] = Array.isArray(trade.mistakes) ? trade.mistakes : [];
   
-  // These are NOT mistakes — they will be removed from mistake[] and put into observations[]
-  // Observations are rendered differently (neutral/muted style) or hidden entirely.
-  // We keep "holding_losers_too_long" and "early_profit_booking" here for backward-compat:
-  // any trades that were imported before the rule change won't show red badges.
-  const observationsList = ["holding_losers_too_long", "early_profit_booking", "always_apply_sl"];
+  // These keys are suppressed from the red mistake[] badges:
+  // - holding_losers_too_long, early_profit_booking: removed per client request
+  // - always_apply_sl: shown as neutral observation with link
+  // - data_integrity_buy_sell: was a false-positive that flagged ALL losing long trades
+  //   (entry > exit for a long is a LOSS, not a data error). Removed from detection,
+  //   but kept here to suppress it for any old DB records that still have it.
+  const observationsList = [
+    "holding_losers_too_long",
+    "early_profit_booking",
+    "always_apply_sl",
+    "data_integrity_buy_sell",
+  ];
   
   const mistakes = originalMistakes.filter((m: string) => !observationsList.includes(m));
   const observations = originalMistakes.filter((m: string) => observationsList.includes(m));
@@ -141,12 +148,9 @@ function detectMistakes(
     mistakes.push("missing_fields");
   }
 
-  // 7. Buy price > sell price (long): entry > exit for long direction
-  if (trade.direction === "long" && trade.exit_price !== null && trade.exit_price !== undefined) {
-    if (trade.entry_price > trade.exit_price) {
-      mistakes.push("data_integrity_buy_sell");
-    }
-  }
+  // NOTE: We intentionally do NOT flag entry_price > exit_price for long trades.
+  //       A long trade with entry > exit is simply a LOSS, not a data integrity error.
+  //       Removing this rule prevents false-positive mistake badges on all losing longs.
 
   // 8. Missing/wrong symbol or date: symbol empty OR date invalid
   const isSymbolEmpty = !trade.stock || trade.stock.trim() === "";

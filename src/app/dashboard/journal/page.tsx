@@ -562,7 +562,7 @@ export default function JournalPage() {
               totalPnl >= 0 ? "text-success" : "text-destructive"
             }`}
           >
-            {totalPnl >= 0 ? "+" : ""}₹{Math.abs(totalPnl).toLocaleString("en-IN")}
+            {totalPnl >= 0 ? "+" : "−"}₹{Math.abs(totalPnl).toLocaleString("en-IN")}
           </p>
           {(() => {
             const estimatedCharges = totalPnl > 0 ? totalPnl * 0.05 : 0;
@@ -576,7 +576,7 @@ export default function JournalPage() {
                 <div className="flex justify-between font-semibold text-foreground/80">
                   <span>Proj. Net P&L:</span>
                   <span className={projectedNetPnl >= 0 ? "text-success/90" : "text-destructive/90"}>
-                    {projectedNetPnl >= 0 ? "+" : ""}₹{Math.round(projectedNetPnl).toLocaleString("en-IN")}
+                    {projectedNetPnl >= 0 ? "+" : "−"}₹{Math.round(Math.abs(projectedNetPnl)).toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>
@@ -927,8 +927,14 @@ export default function JournalPage() {
                     }
 
                     tradeObservations.forEach((obs, idx) => {
-                      // Skip these per client request — do not display at all (not even as observation)
-                      if (obs === "holding_losers_too_long" || obs === "early_profit_booking") return;
+                      // Skip these — do not display at all (not even as observation)
+                      // holding_losers_too_long, early_profit_booking: removed per client request
+                      // data_integrity_buy_sell: was a false-positive on all losing long trades
+                      if (
+                        obs === "holding_losers_too_long" ||
+                        obs === "early_profit_booking" ||
+                        obs === "data_integrity_buy_sell"
+                      ) return;
 
                       const badge = (
                         <span
@@ -1083,8 +1089,14 @@ export default function JournalPage() {
                   }
 
                   tradeObservations.forEach((obs, idx) => {
-                    // Skip these per client request — do not display at all (not even as observation)
-                    if (obs === "holding_losers_too_long" || obs === "early_profit_booking") return;
+                    // Skip these — do not display at all (not even as observation)
+                    // holding_losers_too_long, early_profit_booking: removed per client request
+                    // data_integrity_buy_sell: was a false-positive on all losing long trades
+                    if (
+                      obs === "holding_losers_too_long" ||
+                      obs === "early_profit_booking" ||
+                      obs === "data_integrity_buy_sell"
+                    ) return;
 
                     const badge = (
                       <span
@@ -1585,7 +1597,7 @@ export default function JournalPage() {
                   Trade details:
                 </span>
                 <span className="font-mono text-muted-foreground">
-                  {activeReflectionTrade.stock} • {activeReflectionTrade.direction === "long" ? "LONG" : "SHORT"} • P&L: ₹{activeReflectionTrade.pnl.toLocaleString("en-IN")}
+                  {activeReflectionTrade.stock} • {activeReflectionTrade.direction === "long" ? "LONG" : "SHORT"} • P&L: {activeReflectionTrade.pnl >= 0 ? "+" : "−"}₹{Math.abs(activeReflectionTrade.pnl).toLocaleString("en-IN")}
                 </span>
               </div>
 
