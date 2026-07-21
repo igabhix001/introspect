@@ -13,6 +13,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { blogPosts } from "../posts";
+import { AdBanner } from "@/components/ads/google-adsense";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -321,6 +322,8 @@ export default async function BlogPostPage({ params }: PageProps) {
           </a>
         </div>
 
+        {/* AdSense Banner for Article Page */}
+        <AdBanner slot="article-bottom-ad" format="auto" className="mt-8" />
       </div>
     </article>
   );

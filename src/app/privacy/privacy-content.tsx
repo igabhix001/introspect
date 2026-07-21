@@ -58,12 +58,13 @@ const sections = [
   },
   {
     icon: Globe,
-    title: "Cookies & Tracking",
+    title: "Cookies, Advertising & Third-Party Vendors",
     content: [
-      "Essential cookies: login sessions, preferences (dark mode)",
-      "Analytics: anonymous usage patterns to improve the product",
-      "No third-party advertising cookies or trackers",
-      "You can disable non-essential cookies in your browser settings",
+      "Essential cookies: required for authentication, security, and user preferences.",
+      "Google AdSense & Advertising: We use third-party advertising companies like Google AdSense to serve ads when you visit our public tools and pages.",
+      "Google's use of advertising cookies enables it and its partners to serve ads to users based on their visit to our site and/or other sites on the Internet.",
+      "Users may opt out of personalized advertising by visiting Google Ad Settings (www.google.com/settings/ads) or www.aboutads.info.",
+      "Logged-in Pro subscribers enjoy a 100% ad-free experience with zero third-party ad tracking.",
     ],
   },
   {

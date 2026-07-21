@@ -31,6 +31,7 @@ import {
 import { FYERS_SYMBOLS_MASTER, getLotSize } from "@/lib/fyers/symbols";
 import { PreMarketRoutineRow } from "@/components/dashboard/pre-market-routine-row";
 import { useMarketQuery } from "@/lib/hooks/use-queries";
+import { AdBanner } from "@/components/ads/google-adsense";
 
 function getCleanSymbolName(symbol: string, customSym?: string): string {
   if (symbol === "Custom") return customSym || "Custom";
@@ -1284,6 +1285,9 @@ export default function CalculatorPage() {
       
       {/* Pre-Market Routine checklist */}
       <PreMarketRoutineRow />
+
+      {/* Google AdSense Banner for Free Users */}
+      <AdBanner slot="calculator-footer-ad" format="auto" className="mt-8" />
     </div>
   );
 }

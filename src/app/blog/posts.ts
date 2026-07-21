@@ -398,5 +398,149 @@ export const blogPosts: BlogPost[] = [
         answer: "Yes, apps like INTROSPECT™ are designed specifically to log and score discipline and psychological patterns."
       }
     ]
+  },
+  {
+    slug: "fo-trading-loss-prevention-sebi-study",
+    title: "Why 90% of F&O Traders Lose Money: SEBI Study Breakdown & Prevention Guide",
+    excerpt: "SEBI's landmark study revealed 9 out of 10 retail traders lose an average of ₹1.1 Lakh in F&O. Learn the 5 structural mistakes driving these losses and how to protect your capital.",
+    category: "Risk-First Fridays",
+    date: "2026-07-20",
+    readTime: "7 min read",
+    author: {
+      name: "Venkat Narayanan",
+      role: "Founder & Lead Risk Strategist",
+      linkedin: "https://www.linkedin.com/in/venkat-narayanan-intradaymindview/"
+    },
+    tldr: "TL;DR: According to official SEBI data, over 89% of retail futures and options traders incur net losses due to excessive leverage, poor position sizing, and lack of stop-loss discipline. Traders who implement a hard 1% per-trade risk rule and daily loss limits reverse this trend and protect their principal capital.",
+    introduction: "The Securities and Exchange Board of India (SEBI) published a sobering study showing that 89% of individual traders in the equity Futures & Options (F&O) segment incurred net losses, accumulating over ₹1.81 Lakh Crore in collective retail losses. The root cause is rarely market direction — it is unmanaged position sizing and emotional trading.",
+    whatIs: {
+      heading: "What Is the SEBI F&O Study Warning?",
+      text: "The SEBI F&O Study Warning is an official regulatory report highlighting that 90% of retail derivatives traders lose money due to high transaction costs, over-leverage, and lack of pre-defined risk parameters."
+    },
+    whyItMatters: {
+      heading: "Why Capital Protection Must Come Before Profits",
+      text: "In options trading, market leverage amplifies losses far faster than gains. A single 50% loss requires a 100% gain just to break even. Without strict daily loss caps, minor drawdowns compound into catastrophic blowups."
+    },
+    howItWorks: {
+      heading: "The 3 Pillars of Survival in F&O Trading",
+      text: "To stay in the profitable 11%, traders must enforce three non-negotiable guardrails: 1) Risk capping per trade (max 1% of total capital), 2) Daily trade quantity limits (max 3-5 trades), and 3) Mandatory stop-loss orders placed directly in the terminal before trade execution."
+    },
+    practicalSteps: {
+      heading: "4 Steps to Protect Your F&O Account",
+      steps: [
+        "Calculate position size using a Position Sizer before entering any Bank Nifty or Nifty option trade.",
+        "Set a hard Daily Loss Limit of 2-3% of total capital and stop trading immediately if hit.",
+        "Log pre-trade emotion and stop-loss placement in your trading journal.",
+        "Conduct a weekly audit of your behavioral mistakes to identify revenge trading or over-leveraging patterns."
+      ]
+    },
+    commonMistakes: {
+      heading: "Top 4 Mistakes Retail F&O Traders Make",
+      mistakes: [
+        "Averaging down on losing option buying positions.",
+        "Trading hero zero options on expiry days with high position sizes.",
+        "Overtrading to recover earlier losses within 30 minutes of a loss.",
+        "Ignoring brokerage and STT impact on high-frequency trades."
+      ]
+    },
+    conclusion: {
+      heading: "Summary: Turning the Odds in Your Favor",
+      text: "Trading intraday options without strict risk discipline is gambling. Capping your per-trade risk at 1% and honoring daily stop limits transforms your trading from an emotional gamble into a systematic probability business."
+    },
+    quote: "Risk management is not about avoiding loss; it is about managing loss so you survive long enough to win.",
+    faqs: [
+      {
+        question: "What percentage of retail traders lose money in F&O?",
+        answer: "SEBI reports show that 89% of individual retail traders lose money in F&O trading."
+      },
+      {
+        question: "What is the 1% risk rule in options trading?",
+        answer: "The 1% risk rule dictates that you never risk more than 1% of your total account capital on a single trade."
+      },
+      {
+        question: "How do transaction costs affect retail trading losses?",
+        answer: "Brokerage, STT, and exchange fees add an additional 15-25% overhead to retail trading losses."
+      },
+      {
+        question: "Why is averaging down in options dangerous?",
+        answer: "Option decay accelerates time loss; averaging down in options rapidly wipes out account equity."
+      },
+      {
+        question: "How does INTROSPECT™ help F&O traders?",
+        answer: "INTROSPECT™ provides automated position sizers, risk limits, and mistake detection to keep traders disciplined."
+      }
+    ]
+  },
+  {
+    slug: "one-percent-risk-rule-bank-nifty",
+    title: "The 1% Risk Rule: Master Intraday Position Sizing on Nifty & Bank Nifty",
+    excerpt: "Discover how top institutional traders size their positions on Bank Nifty options using the 1% risk rule to protect capital and survive market volatility.",
+    category: "Discipline Mondays",
+    date: "2026-07-21",
+    readTime: "6 min read",
+    author: {
+      name: "Venkat Narayanan",
+      role: "Founder & Lead Risk Strategist",
+      linkedin: "https://www.linkedin.com/in/venkat-narayanan-intradaymindview/"
+    },
+    tldr: "TL;DR: The 1% risk rule states that a trader should never risk more than 1% of their total trading capital on any single trade setup. By adjusting lot size based on stop-loss distance rather than fixed lot counts, traders survive drawdowns effortlessly.",
+    introduction: "Bank Nifty is notorious for swift 200-point moves that trigger sudden emotional panic. Traders who trade fixed lot sizes (e.g., always 10 lots) experience volatile equity swings. Position sizing by fixed risk neutralizes volatility.",
+    whatIs: {
+      heading: "What Is Position Sizing?",
+      text: "Position sizing is the quantitative method of calculating exact share or lot quantity based on account capital, entry price, and stop-loss distance."
+    },
+    whyItMatters: {
+      heading: "Why Fixed Lot Sizing Destroys Discipline",
+      text: "Trading 5 lots when your stop-loss is 50 points creates double the monetary risk of trading 5 lots when your stop-loss is 25 points. Standardizing lot counts leads to inconsistent risk exposure."
+    },
+    howItWorks: {
+      heading: "How to Calculate 1% Position Size for Bank Nifty",
+      text: "Formula: Max Quantity = (Capital × 0.01) / (Entry Price − Stop Loss Price). If account capital is ₹1,00,000, max risk per trade is ₹1,000. If SL distance is ₹20, max quantity is 50 shares (2 lots)."
+    },
+    practicalSteps: {
+      heading: "Step-by-Step Position Sizing Execution",
+      steps: [
+        "Identify your technical entry price and stop-loss level on the chart.",
+        "Calculate your point risk (Entry Price minus Stop-Loss Price).",
+        "Use the INTROSPECT™ Position Sizer to compute exact allowed lots.",
+        "Place stop-loss order in broker terminal immediately upon execution."
+      ]
+    },
+    commonMistakes: {
+      heading: "Common Position Sizing Traps",
+      mistakes: [
+        "Increasing lot size after a losing trade to recover money quickly.",
+        "Setting arbitrary round-number stop losses instead of technical levels.",
+        "Ignoring index volatility and lot size changes."
+      ]
+    },
+    conclusion: {
+      heading: "Summary: Discipline Through Math",
+      text: "Mathematical position sizing removes fear from trading. When you know your max risk is strictly 1%, market noise stops affecting your decision-making."
+    },
+    quote: "Size your position for your worst-case scenario, not your best-case dream.",
+    faqs: [
+      {
+        question: "What is the 1% risk rule?",
+        answer: "It limits maximum potential loss on any single trade to 1% of total account balance."
+      },
+      {
+        question: "How do I size Bank Nifty option lots?",
+        answer: "Divide your 1% risk capital by the stop-loss distance in points to find total quantity, then round down to index lot size."
+      },
+      {
+        question: "Does the 1% rule apply to option buyers?",
+        answer: "Yes, option buyers should size position quantity based on premium stop loss distance to cap total risk."
+      },
+      {
+        question: "What happens if my stop loss gaps down?",
+        answer: "Sizing positions conservatively at 1% ensures even slippage or gap downs won't threaten total account survival."
+      },
+      {
+        question: "Is position sizing available free on INTROSPECT™?",
+        answer: "Yes, the Position Sizer and ATR calculator are 100% free for all traders."
+      }
+    ]
   }
 ];
+

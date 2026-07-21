@@ -8,6 +8,7 @@ import { AuthErrorBoundary } from "@/components/providers/error-boundary";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics, Hotjar } from "@/components/analytics";
+import { GoogleAdSenseScript } from "@/components/ads/google-adsense";
 import { StructuredData } from "@/components/seo/structured-data";
 import "./globals.css";
 
@@ -130,6 +131,7 @@ export default function RootLayout({
             </AuthProvider>
           </AuthErrorBoundary>
           <GoogleAnalytics />
+          <GoogleAdSenseScript />
           <Hotjar />
           {process.env.NODE_ENV === "production" && process.env.VERCEL && (
             <>

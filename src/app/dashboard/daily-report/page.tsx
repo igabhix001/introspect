@@ -30,6 +30,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatMistakeLabel } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { UpgradeModal } from "@/components/paywall/upgrade-modal";
+import { createClient } from "@/lib/supabase/client";
 
 const PnlChart = dynamic(() => import("@/components/dashboard/pnl-chart"), {
   ssr: false,
@@ -86,9 +88,26 @@ export default function DailyReportPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [generating, setGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isProUser, setIsProUser] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState("Historical Daily Reports");
 
   useEffect(() => {
     setMounted(true);
+    const checkSub = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { checkUserSubscription } = await import("@/lib/paywall");
+          const sub = await checkUserSubscription(supabase, user.id);
+          setIsProUser(sub.isPro);
+        }
+      } catch (err) {
+        console.error("Subscription check error:", err);
+      }
+    };
+    checkSub();
   }, []);
 
   const { data: reportData, isLoading: reportLoading } = useDailyReportQuery(selectedDate);
@@ -239,9 +258,17 @@ export default function DailyReportPage() {
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                const todayStr = new Date().toISOString().split("T")[0];
+                if (!isProUser && e.target.value !== todayStr) {
+                  setUpgradeFeature("Historical Daily Reports");
+                  setShowUpgradeModal(true);
+                  return;
+                }
+                setSelectedDate(e.target.value);
+              }}
               max={new Date().toISOString().split("T")[0]}
-              className="bg-transparent text-sm font-medium outline-none"
+              className="bg-transparent text-sm font-medium outline-none cursor-pointer"
             />
           </div>
           <button
@@ -968,6 +995,12 @@ export default function DailyReportPage() {
           </>
         )}
       </AnimatePresence>
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName={upgradeFeature}
+      />
     </div>
   );
 }

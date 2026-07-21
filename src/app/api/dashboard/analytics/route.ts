@@ -166,6 +166,7 @@ export async function GET() {
       weeklyAreasToImprove,
       weeklySuggestions,
       tradingCapital: profileRes.data?.trading_capital || 100000,
+      isPro: (await (await import("@/lib/paywall")).checkUserSubscription(supabase, userId)).isPro,
     });
   } catch (error) {
     console.error("[Dashboard Analytics API] Error:", error);

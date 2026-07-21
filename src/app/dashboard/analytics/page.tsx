@@ -29,6 +29,7 @@ import { useAnalyticsQuery } from "@/lib/hooks/use-queries";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatMistakeLabel } from "@/lib/utils";
 import Link from "next/link";
+import { LockedFeatureCard } from "@/components/paywall/locked-feature-card";
 
 const stagger = {
   container: { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } },
@@ -385,6 +386,33 @@ export default function AnalyticsPage() {
   });
   const totalBehavioralCost = uniqueMistakeTrades.reduce((sum: number, t: any) => sum + Math.abs((t.pnl || 0) < 0 ? (t.pnl || 0) : 0), 0);
   const disciplineAdjustedPnl = totalPnl + totalBehavioralCost;
+
+  if (!data?.isPro) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold font-heading">Advanced Performance Analytics</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Quantitative behavioral feedback and bias radar</p>
+          </div>
+        </div>
+
+        <LockedFeatureCard
+          title="Advanced Trading Analytics is a Pro Feature"
+          description="Upgrade to INTROSPECT™ Pro to access cumulative equity curves, drawdown metrics, behavioral cost reports, and bias radar analysis."
+          featureName="Analytics"
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="h-24 rounded-2xl bg-card border border-border p-4" />
+            <div className="h-24 rounded-2xl bg-card border border-border p-4" />
+            <div className="h-24 rounded-2xl bg-card border border-border p-4" />
+            <div className="h-24 rounded-2xl bg-card border border-border p-4" />
+          </div>
+          <div className="h-64 rounded-2xl bg-card border border-border p-6" />
+        </LockedFeatureCard>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-6">

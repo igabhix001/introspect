@@ -249,6 +249,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check Free tier 50-trade journal limit
+    const { checkUserSubscription, FREE_JOURNAL_LIMIT } = await import("@/lib/paywall");
+    const subStatus = await checkUserSubscription(supabase, user.id);
+    if (!subStatus.isPro) {
+      const { count: existingCount } = await supabase
+        .from("trades")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      
+      if (existingCount && existingCount >= FREE_JOURNAL_LIMIT) {
+        return NextResponse.json(
+          { error: `Free journal limit reached (${FREE_JOURNAL_LIMIT} trades). Upgrade to Pro for unlimited journaling.` },
+          { status: 403 }
+        );
+      }
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
     if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
