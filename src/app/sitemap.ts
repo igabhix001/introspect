@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/how-to-use",
     "/privacy",
     "/terms",
+    "/disclaimer",
     "/auth/login",
     "/auth/signup",
   ];
@@ -32,6 +33,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "nifty-breadth-sentiment",
     "30-day-discipline-challenge",
     "trading-journal-psychology",
+    "fo-trading-loss-prevention-sebi-study",
+    "one-percent-risk-rule-bank-nifty",
   ];
 
   const blogRoutes = blogPostSlugs.map((slug) => ({

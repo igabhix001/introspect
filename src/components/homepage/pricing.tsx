@@ -35,26 +35,44 @@ export default function PricingSection() {
       });
   }, []);
 
-  const getPriceDisplay = (planId: "monthly" | "6-month" | "yearly") => {
+  const getPriceDisplay = (planId: "free" | "monthly" | "6-month" | "yearly") => {
+    if (planId === "free") return "₹0";
     const amount = prices[planId]?.amount ?? 0;
     return `₹${amount.toLocaleString("en-IN")}`;
   };
 
   const pricingPlans: PlanItem[] = [
     {
+      id: "free" as any,
+      name: "INTROSPECT STARTER (Free)",
+      period: "/forever",
+      description: "Essential tools to build discipline. 100% Free.",
+      features: [
+        "ATR Position Sizer & Calculator",
+        "Live Market Sentiment Engine",
+        "Diagnostic Assessment & Basic Score",
+        "Today's EOD Daily Summary Report",
+        "Trade Journal (Up to 50 entries)",
+        "30/60/90 Day Discipline Challenges",
+      ],
+      cta: "Get Started Free",
+      badge: "FREE FOREVER",
+      href: "/auth/signup",
+    },
+    {
       id: "monthly",
       name: "INTROSPECT PRO (Monthly)",
       period: "/month",
-      description: "5 Trading Days Free Trial included. Cancel anytime.",
+      description: "Full AI features & ad-free experience. Cancel anytime.",
       features: [
-        "Interactive Discipline Dashboard",
-        "Real-time Behavioural Risk Engine",
-        "ATR Position Size Calculator",
-        "Market Sentiment Analyzer",
-        "Emotional Mistake Logger & Journal",
-        "Discipline Scoring & Habits Tracker",
+        "Full AI Risk Report & Archetype Matrix",
+        "Interactive AI Coach & Guidance",
+        "Unlimited Trade Journal Storage",
+        "Advanced Analytics & Equity Curve",
+        "Past Historical Daily Reports",
+        "100% Ad-Free Clean Experience",
       ],
-      cta: "Start 5-Day Free Trial",
+      cta: "Start Monthly Pro",
       badge: null,
       href: "/auth/signup?plan=monthly",
     },
@@ -108,7 +126,7 @@ export default function PricingSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {pricingPlans.map((plan) => {
             const isPopular = plan.badge === "POPULAR";
             const isBestValue = plan.badge === "BEST VALUE";

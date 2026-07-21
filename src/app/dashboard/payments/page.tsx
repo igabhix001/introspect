@@ -33,16 +33,16 @@ const plans = [
     priceUSD: 6,
     period: "/month",
     features: [
-      "5 Trading Days Free Trial",
-      "Diagnostic Assessment & Risk Profile",
+      "Forever Free Plan Included",
+      "Full AI Risk Report & Deep Analysis",
+      "Unlimited Trade Journal Storage",
+      "100% Ad-Free Experience",
       "Personalized Trading Rules",
       "Position Sizing Calculator",
-      "Trade Journal + Mistake Detector",
+      "Interactive AI Coach & Recommendations",
       "Daily Progress Tracker",
       "Self-Challenges (30/60/90 days)",
       "Market Sentiment Engine",
-      "End-of-Day Report",
-      "Referral Rewards System",
     ],
     badge: null,
   },
@@ -488,7 +488,7 @@ export default function PaymentsPage() {
       <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <p>
-          5 trading days free trial available for new monthly subscriptions. Points expire after 24 months. Maximum
+          Non-AI features and basic assessment scores are 100% free forever. Upgrading unlocks unlimited journal entries, AI Risk Reports, and an Ad-Free experience. Points expire after 24 months. Maximum
           1 free month redemption per renewal cycle. Referral rewards
           activate only after the referred user completes payment.
         </p>

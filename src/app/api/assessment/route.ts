@@ -309,25 +309,6 @@ export async function POST(request: NextRequest) {
 
     const hasActiveSubscription = !!subscription || isAdmin;
 
-    // If not subscribed, check if user has already taken one free assessment
-    if (!hasActiveSubscription) {
-      const { count } = await supabase
-        .from("assessments")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      if (count && count >= 1) {
-        return NextResponse.json(
-          { 
-            error: "Free assessment limit reached", 
-            message: "You have already used your one free assessment. Subscribe to take unlimited assessments and unlock your full risk report.",
-            requiresSubscription: true 
-          },
-          { status: 403 }
-        );
-      }
-    }
-
     const body = await request.json();
     
     // Validate input

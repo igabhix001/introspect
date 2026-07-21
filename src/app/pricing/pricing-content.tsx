@@ -27,20 +27,19 @@ import { createClient } from "@/lib/supabase/client";
 import { trackSubscribeClick, trackPaymentInitiated, trackPurchase } from "@/lib/analytics";
 
 const allFeatures = [
-  { name: "Full Risk Assessment & Scoring", monthly: true, sixMonth: true, yearly: true },
-  { name: "Personalized Trading Rules", monthly: true, sixMonth: true, yearly: true },
-  { name: "Position Sizing Calculator", monthly: true, sixMonth: true, yearly: true },
-  { name: "Trade Journal + Mistake Detector", monthly: true, sixMonth: true, yearly: true },
-  { name: "Daily Progress Tracker", monthly: true, sixMonth: true, yearly: true },
-  { name: "Self-Challenges (30/60/90 days)", monthly: true, sixMonth: true, yearly: true },
-  { name: "End-of-Day Reports & Coaching", monthly: true, sixMonth: true, yearly: true },
-  { name: "Market Sentiment (Nifty/BankNifty)", monthly: true, sixMonth: true, yearly: true },
-  { name: "Pro Tips & Alerts", monthly: true, sixMonth: true, yearly: true },
-  { name: "Referral Rewards System", monthly: true, sixMonth: true, yearly: true },
-  { name: "Challenge History & Analytics", monthly: false, sixMonth: true, yearly: true },
-  { name: "Journal Export (PDF/CSV)", monthly: false, sixMonth: true, yearly: true },
-  { name: "Priority Support", monthly: false, sixMonth: true, yearly: true },
-  { name: "All Future Feature Updates", monthly: false, sixMonth: false, yearly: true },
+  { name: "Position Sizing & ATR Calculator", free: true, monthly: true, sixMonth: true, yearly: true },
+  { name: "Live Market Sentiment Engine", free: true, monthly: true, sixMonth: true, yearly: true },
+  { name: "30 / 60 / 90 Day Self-Challenges", free: true, monthly: true, sixMonth: true, yearly: true },
+  { name: "Community Reward Points & Badges", free: true, monthly: true, sixMonth: true, yearly: true },
+  { name: "Diagnostic Assessment", free: "Basic Score", monthly: "Full Report", sixMonth: "Full Report", yearly: "Full Report" },
+  { name: "Trade Journal Capacity", free: "50 Trades Cap", monthly: "Unlimited", sixMonth: "Unlimited", yearly: "Unlimited" },
+  { name: "End-of-Day Daily Summary Reports", free: "Today Only", monthly: "Full History", sixMonth: "Full History", yearly: "Full History" },
+  { name: "Interactive AI CBT Coach", free: false, monthly: true, sixMonth: true, yearly: true },
+  { name: "AI Risk Archetype Matrix & Radar", free: false, monthly: true, sixMonth: true, yearly: true },
+  { name: "Behavioral Analytics & Equity Curve", free: false, monthly: true, sixMonth: true, yearly: true },
+  { name: "Journal Export to Excel & PDF", free: false, monthly: false, sixMonth: true, yearly: true },
+  { name: "Ad-Free Clean Experience", free: "Ad-Supported", monthly: "100% Ad-Free", sixMonth: "100% Ad-Free", yearly: "100% Ad-Free" },
+  { name: "Priority Support & Updates", free: false, monthly: false, sixMonth: true, yearly: true },
 ];
 
 declare global {
@@ -70,8 +69,8 @@ export function PricingContent() {
 
   const pricingFAQs = [
     {
-      q: "Is there a free trial?",
-      a: "Yes, all plans include a 5 trading days free trial. No credit card required. Cancel anytime.",
+      q: "Is there a free tier?",
+      a: "Yes! Core utility tools (Position Sizer, Sentiment Engine, Basic Assessment Score, Today's Daily Report, and 50 journal entries) are 100% Free Forever. Upgrade to Pro for AI features, full risk reports, unlimited journaling, and an ad-free experience.",
     },
     {
       q: "Do I need to connect my broker?",
@@ -285,7 +284,65 @@ export function PricingContent() {
         </motion.div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-20">
+          {/* Forever Free Plan */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+          >
+            <div className="relative h-full p-6 rounded-2xl bg-card/40 border border-border/50 glass-card hover:border-border transition-all duration-300 flex flex-col justify-between">
+              <div>
+                <Badge variant="outline" className="border-success/30 text-success bg-success/5 font-semibold mb-3">
+                  100% Free Forever
+                </Badge>
+                <h3 className="font-heading text-xl font-bold mb-1">Starter Free</h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Essential tools to build discipline. No credit card required.
+                </p>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-sm font-semibold text-muted-foreground">₹</span>
+                  <span className="font-heading text-4xl font-extrabold text-foreground">0</span>
+                  <span className="text-xs text-muted-foreground">/forever</span>
+                </div>
+
+                <ul className="space-y-2.5 mb-6 text-xs text-muted-foreground">
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>Position Sizer & ATR Calculator</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>Live Market Sentiment Engine</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>Basic Assessment Score</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>Today's EOD Daily Report</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>Trade Journal (Up to 50 entries)</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-foreground font-medium">
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                    <span>30/60/90 Day Challenges</span>
+                  </li>
+                </ul>
+              </div>
+
+              <Link
+                href="/auth/signup"
+                className="flex items-center justify-center w-full font-semibold py-3.5 rounded-xl border border-border hover:bg-muted text-foreground cursor-pointer text-xs transition-colors"
+              >
+                Get Started Free
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </motion.div>
           {/* Monthly */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -425,46 +482,56 @@ export function PricingContent() {
           </h2>
 
           <div className="rounded-2xl border border-border/50 overflow-hidden">
-            <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-muted/30 border-b border-border/50">
-              <span className="text-sm font-semibold">Feature</span>
-              <span className="text-sm font-semibold text-center">Monthly</span>
-              <span className="text-sm font-semibold text-center">6-Month</span>
-              <span className="text-sm font-semibold text-center">Yearly</span>
+            <div className="grid grid-cols-5 gap-2 px-4 py-4 bg-muted/30 border-b border-border/50 text-xs sm:text-sm font-semibold">
+              <span>Feature</span>
+              <span className="text-center text-muted-foreground">Free</span>
+              <span className="text-center">Monthly</span>
+              <span className="text-center">6-Month</span>
+              <span className="text-center">Yearly</span>
             </div>
 
             {allFeatures.map((feature, i) => (
               <div
                 key={feature.name}
-                className={`grid grid-cols-4 gap-4 px-6 py-3.5 items-center ${
+                className={`grid grid-cols-5 gap-2 px-4 py-3.5 items-center text-xs sm:text-sm ${
                   i % 2 === 0 ? "bg-transparent" : "bg-muted/10"
                 } ${i < allFeatures.length - 1 ? "border-b border-border/30" : ""}`}
               >
-                <span className="text-sm">{feature.name}</span>
-                <div className="flex justify-center">
+                <span className="font-medium text-foreground">{feature.name}</span>
+                <div className="flex justify-center text-center">
+                  {feature.free === true ? (
+                    <Check className="h-4 w-4 text-success" />
+                  ) : feature.free ? (
+                    <span className="text-xs font-medium text-amber-500">{feature.free}</span>
+                  ) : (
+                    <span className="text-muted-foreground/40">—</span>
+                  )}
+                </div>
+                <div className="flex justify-center text-center">
                   {feature.monthly === true ? (
                     <Check className="h-4 w-4 text-success" />
                   ) : feature.monthly ? (
-                    <span className="text-sm font-medium">{feature.monthly}</span>
+                    <span className="text-xs font-medium text-foreground">{feature.monthly}</span>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground/40">—</span>
                   )}
                 </div>
-                <div className="flex justify-center">
+                <div className="flex justify-center text-center">
                   {feature.sixMonth === true ? (
                     <Check className="h-4 w-4 text-success" />
                   ) : feature.sixMonth ? (
-                    <span className="text-sm font-medium text-success">{feature.sixMonth}</span>
+                    <span className="text-xs font-medium text-success">{feature.sixMonth}</span>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground/40">—</span>
                   )}
                 </div>
-                <div className="flex justify-center">
+                <div className="flex justify-center text-center">
                   {feature.yearly === true ? (
                     <Check className="h-4 w-4 text-success" />
                   ) : feature.yearly ? (
-                    <span className="text-sm font-medium text-success">{feature.yearly}</span>
+                    <span className="text-xs font-medium text-success">{feature.yearly}</span>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground/40">—</span>
                   )}
                 </div>
               </div>
