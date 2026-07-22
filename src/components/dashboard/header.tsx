@@ -30,6 +30,7 @@ import {
   FileText,
   Home,
   Shield,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -103,7 +104,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const { profile, signOut, isAdmin } = useAuth();
+  const { profile, signOut, isAdmin, hasActiveSubscription } = useAuth();
   const queryClient = useQueryClient();
   const prefetchAdminStats = () => {
     if (!isAdmin) return;
@@ -389,22 +390,30 @@ export function DashboardHeader({
                       item.href !== "/dashboard/admin" &&
                       pathname.startsWith(item.href));
                   const Icon = item.icon;
+
+                  const isPro = hasActiveSubscription === true;
+                  const gatedLinks = ["/dashboard/risk-report", "/dashboard/analytics", "/dashboard/daily-report"];
+                  const isGated = !isPro && gatedLinks.includes(item.href);
+
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={onMobileMenuToggle}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                         isActive
                           ? isOnAdminPage ? "bg-amber-500/10 text-amber-500" : "bg-success/10 text-success"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       }`}
                     >
-                      <Icon
-                        className="h-[18px] w-[18px]"
-                        strokeWidth={isActive ? 2.2 : 1.8}
-                      />
-                      {item.label}
+                      <div className="flex items-center gap-3">
+                        <Icon
+                          className={`h-[18px] w-[18px] ${isGated ? "text-muted-foreground/60" : ""}`}
+                          strokeWidth={isActive ? 2.2 : 1.8}
+                        />
+                        <span>{item.label}</span>
+                      </div>
+                      {isGated && <Lock className="h-3.5 w-3.5 text-muted-foreground/80 shrink-0" />}
                     </Link>
                   );
                 })}

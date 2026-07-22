@@ -23,6 +23,7 @@ import {
   AlertOctagon,
   Lightbulb,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -591,6 +592,7 @@ function DashboardContent() {
   const dailyReports = data?.dailyReports || [];
   // Show welcome banner only for truly new users who have never traded or done assessment
   const hasNoAssessment = !hasEverTraded && !hasAssessment;
+  const isPro = hasActiveSubscription === true;
 
   // Helper to format date for Consistency Heatmap tooltips
   const formatDate = (date: Date) => {
@@ -822,7 +824,7 @@ function DashboardContent() {
       {/* Consistency Heatmap Card */}
       <motion.div
         variants={staggerItem}
-        className="rounded-2xl border border-border bg-card p-5 space-y-4"
+        className="relative rounded-2xl border border-border bg-card p-5 space-y-4 overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <div className="flex items-center gap-2">
@@ -834,62 +836,80 @@ function DashboardContent() {
           <span className="text-[10px] text-muted-foreground">Hover blocks for daily score detail</span>
         </div>
 
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none snap-x justify-start md:justify-between">
-            {last30Days.map((day) => {
-              let colorClass = "bg-muted/30 border border-border hover:border-border/70";
-              let glowColor = "";
-              if (day.score !== null) {
-                if (day.score >= 75) {
-                  colorClass = "bg-success border border-success/30";
-                  glowColor = "shadow-[0_0_8px_rgba(34,197,94,0.35)]";
-                } else if (day.score >= 55) {
-                  colorClass = "bg-amber-500 border border-amber-500/30";
-                  glowColor = "shadow-[0_0_8px_rgba(245,158,11,0.35)]";
-                } else {
-                  colorClass = "bg-destructive border border-destructive/30";
-                  glowColor = "shadow-[0_0_8px_rgba(239,68,68,0.35)]";
+        <div className="relative">
+          <div className={`flex flex-col space-y-4 ${!isPro ? "blur-[6px] pointer-events-none select-none opacity-40" : ""}`}>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none snap-x justify-start md:justify-between">
+              {last30Days.map((day) => {
+                let colorClass = "bg-muted/30 border border-border hover:border-border/70";
+                let glowColor = "";
+                if (day.score !== null) {
+                  if (day.score >= 75) {
+                    colorClass = "bg-success border border-success/30";
+                    glowColor = "shadow-[0_0_8px_rgba(34,197,94,0.35)]";
+                  } else if (day.score >= 55) {
+                    colorClass = "bg-amber-500 border border-amber-500/30";
+                    glowColor = "shadow-[0_0_8px_rgba(245,158,11,0.35)]";
+                  } else {
+                    colorClass = "bg-destructive border border-destructive/30";
+                    glowColor = "shadow-[0_0_8px_rgba(239,68,68,0.35)]";
+                  }
                 }
-              }
-              return (
-                <div key={day.dateStr} className="relative group snap-center shrink-0" title={`${formatDate(day.date)}: ${day.score !== null ? `Score: ${day.score}/100` : "No trades logged"}`}>
-                  <div className={`w-8 h-8 rounded-lg transition-all duration-200 cursor-pointer ${colorClass} ${glowColor} hover:scale-105`} />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none bg-zinc-900 text-zinc-100 text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl border border-zinc-800 whitespace-nowrap z-30 font-sans">
-                    <p className="font-semibold text-zinc-100">{formatDate(day.date)}</p>
-                    <p className="text-zinc-400 mt-0.5">
-                      {day.score !== null ? (
-                        <>
-                          Score: <span className="font-mono font-bold text-zinc-100">{day.score}</span>/100
-                        </>
-                      ) : (
-                        "No trades logged"
-                      )}
-                    </p>
+                return (
+                  <div key={day.dateStr} className="relative group snap-center shrink-0" title={`${formatDate(day.date)}: ${day.score !== null ? `Score: ${day.score}/100` : "No trades logged"}`}>
+                    <div className={`w-8 h-8 rounded-lg transition-all duration-200 cursor-pointer ${colorClass} ${glowColor} hover:scale-105`} />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none bg-zinc-900 text-zinc-100 text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl border border-zinc-800 whitespace-nowrap z-30 font-sans">
+                      <p className="font-semibold text-zinc-100">{formatDate(day.date)}</p>
+                      <p className="text-zinc-400 mt-0.5">
+                        {day.score !== null ? (
+                          <>
+                            Score: <span className="font-mono font-bold text-zinc-100">{day.score}</span>/100
+                          </>
+                        ) : (
+                          "No trades logged"
+                        )}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 flex-wrap text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-muted/40 border border-border" />
+                No Trades
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-destructive border border-destructive/30 shadow-[0_0_6px_rgba(239,68,68,0.2)]" />
+                Uncontrolled (&lt;55)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-amber-500 border border-amber-500/30 shadow-[0_0_6px_rgba(245,158,11,0.2)]" />
+                Moderate (55-74)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-success border border-success/30 shadow-[0_0_6px_rgba(34,197,94,0.2)]" />
+                Disciplined (75+)
+              </span>
+            </div>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 flex-wrap text-[10px] text-muted-foreground pt-1 border-t border-border/50">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-muted/40 border border-border" />
-              No Trades
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-destructive border border-destructive/30 shadow-[0_0_6px_rgba(239,68,68,0.2)]" />
-              Uncontrolled (&lt;55)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-amber-500 border border-amber-500/30 shadow-[0_0_6px_rgba(245,158,11,0.2)]" />
-              Moderate (55-74)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-success border border-success/30 shadow-[0_0_6px_rgba(34,197,94,0.2)]" />
-              Disciplined (75+)
-            </span>
-          </div>
+          {!isPro && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+              <div className="w-9 h-9 rounded-xl bg-success/15 border border-success/30 flex items-center justify-center mb-2 animate-bounce-slow">
+                <Lock className="h-4.5 w-4.5 text-success" />
+              </div>
+              <p className="text-sm font-heading font-bold text-foreground">Discipline Consistency Heatmap</p>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2.5">Unlock 30-day streak consistency analytics</p>
+              <Link
+                href="/dashboard/payments"
+                className="px-3 py-1.5 rounded-lg bg-success text-success-foreground font-bold text-xs hover:bg-success/90 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -898,7 +918,7 @@ function DashboardContent() {
         {/* Discipline Chart */}
         <motion.div
           variants={staggerItem}
-          className="lg:col-span-2 rounded-2xl border border-border bg-card p-5"
+          className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 relative overflow-hidden"
         >
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -909,17 +929,36 @@ function DashboardContent() {
                 Your weekly score progression
               </p>
             </div>
-            <Link
-              href="/dashboard/analytics"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            >
-              View all
-              <ChevronRight className="h-3 w-3" />
-            </Link>
+            {isPro && (
+              <Link
+                href="/dashboard/analytics"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                View all
+                <ChevronRight className="h-3 w-3" />
+              </Link>
+            )}
           </div>
 
-          <div className="h-[260px] min-h-[260px] min-w-0 -ml-2">
-            <DisciplineChart data={disciplineData} />
+          <div className="relative">
+            <div className={`h-[260px] min-h-[260px] min-w-0 -ml-2 ${!isPro ? "blur-[6px] pointer-events-none select-none opacity-30" : ""}`}>
+              <DisciplineChart data={disciplineData} />
+            </div>
+            {!isPro && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                <div className="w-9 h-9 rounded-xl bg-success/15 border border-success/30 flex items-center justify-center mb-2 animate-bounce-slow">
+                  <Lock className="h-4.5 w-4.5 text-success" />
+                </div>
+                <p className="text-sm font-heading font-bold text-foreground">Discipline Trend Chart</p>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-2.5">Unlock weekly performance trajectory & insights</p>
+                <Link
+                  href="/dashboard/payments"
+                  className="px-3 py-1.5 rounded-lg bg-success text-success-foreground font-bold text-xs hover:bg-success/90 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  Upgrade to Pro
+                </Link>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -1224,7 +1263,7 @@ function DashboardContent() {
           {/* Cognitive Trigger Map */}
           <motion.div
             variants={staggerItem}
-            className="rounded-2xl border border-border bg-card p-5 space-y-4"
+            className="relative rounded-2xl border border-border bg-card p-5 space-y-4 overflow-hidden"
           >
             <div>
               <h3 className="font-heading text-sm font-semibold">
@@ -1235,85 +1274,103 @@ function DashboardContent() {
               </p>
             </div>
 
-            <div className="space-y-3.5">
-              {/* Urgency */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium flex items-center gap-1.5 text-foreground">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                    Urgency (FOMO)
-                  </span>
-                  <span className="font-mono font-semibold text-muted-foreground">
-                    {triggers.urgency}%
-                  </span>
+            <div className="relative">
+              <div className={`space-y-3.5 ${!isPro ? "blur-[6px] pointer-events-none select-none opacity-30" : ""}`}>
+                {/* Urgency */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium flex items-center gap-1.5 text-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                      Urgency (FOMO)
+                    </span>
+                    <span className="font-mono font-semibold text-muted-foreground">
+                      {triggers.urgency}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all duration-500"
+                      style={{ width: `${triggers.urgency}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all duration-500"
-                    style={{ width: `${triggers.urgency}%` }}
-                  />
+
+                {/* Frustration */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium flex items-center gap-1.5 text-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                      Frustration (Revenge)
+                    </span>
+                    <span className="font-mono font-semibold text-muted-foreground">
+                      {triggers.frustration}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-red-500 to-rose-600 transition-all duration-500"
+                      style={{ width: `${triggers.frustration}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Overconfidence */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium flex items-center gap-1.5 text-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                      Overconfidence
+                    </span>
+                    <span className="font-mono font-semibold text-muted-foreground">
+                      {triggers.overconfidence}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                      style={{ width: `${triggers.overconfidence}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Boredom */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium flex items-center gap-1.5 text-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+                      Boredom (Overtrading)
+                    </span>
+                    <span className="font-mono font-semibold text-muted-foreground">
+                      {triggers.boredom}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                      style={{ width: `${triggers.boredom}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Frustration */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium flex items-center gap-1.5 text-foreground">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                    Frustration (Revenge)
-                  </span>
-                  <span className="font-mono font-semibold text-muted-foreground">
-                    {triggers.frustration}%
-                  </span>
+              {!isPro && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                  <div className="w-9 h-9 rounded-xl bg-success/15 border border-success/30 flex items-center justify-center mb-2 animate-bounce-slow">
+                    <Lock className="h-4.5 w-4.5 text-success" />
+                  </div>
+                  <p className="text-sm font-heading font-bold text-foreground">Cognitive Trigger Map</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-2.5">Unlock real-time monitoring of trading bias risks</p>
+                  <Link
+                    href="/dashboard/payments"
+                    className="px-3 py-1.5 rounded-lg bg-success text-success-foreground font-bold text-xs hover:bg-success/90 transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    Upgrade to Pro
+                  </Link>
                 </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-red-500 to-rose-600 transition-all duration-500"
-                    style={{ width: `${triggers.frustration}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Overconfidence */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium flex items-center gap-1.5 text-foreground">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                    Overconfidence
-                  </span>
-                  <span className="font-mono font-semibold text-muted-foreground">
-                    {triggers.overconfidence}%
-                  </span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
-                    style={{ width: `${triggers.overconfidence}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Boredom */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium flex items-center gap-1.5 text-foreground">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
-                    Boredom (Overtrading)
-                  </span>
-                  <span className="font-mono font-semibold text-muted-foreground">
-                    {triggers.boredom}%
-                  </span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
-                    style={{ width: `${triggers.boredom}%` }}
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="pt-2.5 border-t border-border flex items-start gap-2">
+            <div className={`pt-2.5 border-t border-border flex items-start gap-2 ${!isPro ? "opacity-30" : ""}`}>
               <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-[10px] text-muted-foreground leading-relaxed">
                 Triggers are calculated dynamically from your logged mistakes, trade count, and P&L activity today.

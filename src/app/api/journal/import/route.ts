@@ -249,18 +249,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check Free tier 50-trade journal limit
+    // Check Free tier 50-trade monthly journal limit (resets every month)
     const { checkUserSubscription, FREE_JOURNAL_LIMIT } = await import("@/lib/paywall");
     const subStatus = await checkUserSubscription(supabase, user.id);
     if (!subStatus.isPro) {
-      const { count: existingCount } = await supabase
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const startOfMonthIso = startOfMonth.toISOString();
+
+      const { count: monthlyCount } = await supabase
         .from("trades")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .gte("created_at", startOfMonthIso);
       
-      if (existingCount && existingCount >= FREE_JOURNAL_LIMIT) {
+      if (monthlyCount && monthlyCount >= FREE_JOURNAL_LIMIT) {
         return NextResponse.json(
-          { error: `Free journal limit reached (${FREE_JOURNAL_LIMIT} trades). Upgrade to Pro for unlimited journaling.` },
+          { error: `Free monthly journal limit reached (${FREE_JOURNAL_LIMIT} trades this month). Upgrade to Pro for unlimited journaling.` },
           { status: 403 }
         );
       }

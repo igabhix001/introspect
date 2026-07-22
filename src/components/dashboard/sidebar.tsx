@@ -27,6 +27,7 @@ import {
   Gift,
   FileText,
   MessageSquare,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -157,7 +158,7 @@ export function DashboardSidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isAdmin, hasActiveSubscription, signOut } = useAuth();
   const queryClient = useQueryClient();
   const prefetchAdminStats = () => {
     if (!isAdmin) return;
@@ -263,11 +264,15 @@ export function DashboardSidebar({
           const active = isActive || isExactActive;
           const Icon = item.icon;
 
+          const isPro = hasActiveSubscription === true;
+          const gatedLinks = ["/dashboard/risk-report", "/dashboard/analytics", "/dashboard/daily-report"];
+          const isGated = !isPro && gatedLinks.includes(item.href);
+
           return (
             <Link
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? (isGated ? `${item.label} (Premium)` : item.label) : undefined}
               className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 active
                   ? isOnAdminPage
@@ -287,14 +292,21 @@ export function DashboardSidebar({
                 />
               )}
 
-              <Icon
-                className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-[18px] w-[18px]"} transition-colors ${
-                  active
-                    ? isOnAdminPage ? "text-amber-500" : "text-success"
-                    : "text-muted-foreground group-hover:text-foreground"
-                }`}
-                strokeWidth={active ? 2.2 : 1.8}
-              />
+              <div className="relative">
+                <Icon
+                  className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-[18px] w-[18px]"} transition-colors ${
+                    active
+                      ? isOnAdminPage ? "text-amber-500" : "text-success"
+                      : isGated ? "text-muted-foreground/60" : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+                  strokeWidth={active ? 2.2 : 1.8}
+                />
+                {isGated && collapsed && (
+                  <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-muted border border-border flex items-center justify-center">
+                    <Lock className="h-2 w-2 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
 
               <AnimatePresence mode="wait">
                 {!collapsed && (
@@ -303,9 +315,12 @@ export function DashboardSidebar({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="flex flex-col overflow-hidden whitespace-nowrap"
+                    className="flex-1 flex flex-col overflow-hidden whitespace-nowrap"
                   >
-                    <span>{item.label}</span>
+                    <div className="flex items-center justify-between gap-1">
+                      <span>{item.label}</span>
+                      {isGated && <Lock className="h-3 w-3 text-muted-foreground/75 shrink-0" />}
+                    </div>
                     {!active && (
                       <span className="text-[11px] text-muted-foreground/60 font-normal">
                         {item.description}

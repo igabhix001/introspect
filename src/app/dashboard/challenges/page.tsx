@@ -40,7 +40,7 @@ interface ChallengeRow {
 const challengeTemplates = [
   {
     type: "30",
-    tier: "Tier 1: Discipline",
+    tier: "30-Day Discipline Challenge",
     title: "30-Day Builder",
     duration: "30 DAYS",
     focus: "Basic Rules",
@@ -50,33 +50,7 @@ const challengeTemplates = [
     difficultyLabel: "Beginner",
     activeCount: "234 active",
     color: "amber",
-  },
-  {
-    type: "60",
-    tier: "Tier 2: Consistency",
-    title: "60-Day Master",
-    duration: "60 DAYS",
-    focus: "Pattern Building",
-    badge: "Silver Badge",
-    badgeIcon: "⚪",
-    difficulty: "★★★☆☆",
-    difficultyLabel: "Medium",
-    activeCount: "156 active",
-    color: "zinc",
-  },
-  {
-    type: "90",
-    tier: "Tier 3: Elite",
-    title: "90-Day Elite",
-    duration: "90 DAYS",
-    focus: "Mastery",
-    badge: "Gold Badge",
-    badgeIcon: "🟡",
-    extraBadge: "💎 Platinum Path",
-    difficulty: "★★★★★",
-    difficultyLabel: "Hard",
-    activeCount: "89 active",
-    color: "yellow",
+    extraBadge: undefined as string | undefined,
   },
 ];
 
@@ -96,7 +70,6 @@ export default function ChallengesPage() {
   ];
   
   const [starting, setStarting] = useState<string | null>(null);
-  const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const supabase = createClient();
   
@@ -373,56 +346,7 @@ export default function ChallengesPage() {
         </div>
       </motion.div>
 
-      {/* 3. Detailed Benefits Breakdown */}
-      <motion.div variants={stagger.item} className="bg-card border border-border rounded-xl font-medium overflow-hidden">
-        <button 
-          onClick={() => setBenefitsOpen(!benefitsOpen)} 
-          className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-        >
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Trophy className="h-4 w-4" /> Compare All Benefits
-          </div>
-          {benefitsOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-        </button>
-        
-        <AnimatePresence>
-          {benefitsOpen && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="px-4 pb-6 overflow-hidden border-t border-border"
-            >
-              <div className="overflow-x-auto mt-4">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 rounded-tl-lg">Benefit</th>
-                      <th className="px-4 py-3">30-Day</th>
-                      <th className="px-4 py-3">60-Day</th>
-                      <th className="px-4 py-3 rounded-tr-lg">90-Day</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-border">
-                      <td className="px-4 py-3 font-semibold">Badge Level</td>
-                      <td className="px-4 py-3 text-muted-foreground">🟫 Bronze</td>
-                      <td className="px-4 py-3 text-muted-foreground">⚪ Silver</td>
-                      <td className="px-4 py-3 text-amber-500 font-medium">🟡 Gold/Platinum</td>
-                    </tr>
-                    <tr className="border-b border-border">
-                      <td className="px-4 py-3 font-semibold">Profile Display</td>
-                      <td className="px-4 py-3">✅</td>
-                      <td className="px-4 py-3">✅</td>
-                      <td className="px-4 py-3">✅</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+
 
       {/* 8. Completed Challenges Showcase */}
       {completedChallenges.length > 0 && (

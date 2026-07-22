@@ -22,6 +22,7 @@ import {
   Info,
   MessageSquareX,
   ThumbsUp,
+  Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -677,12 +678,25 @@ export default function JournalPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {!isProUser && (
-              <span className="text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                Free Plan: {trades.length}/50 Trades
-              </span>
+              (() => {
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth();
+                const monthlyTradesCount = trades.filter((t: any) => {
+                  if (!t.created_at) return false;
+                  const date = new Date(t.created_at);
+                  return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+                }).length;
+
+                return (
+                  <span className="text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Free Plan: {monthlyTradesCount}/50 Monthly Trades
+                  </span>
+                );
+              })()
             )}
             <input
               type="file"
@@ -694,8 +708,17 @@ export default function JournalPage() {
             />
             <button
               onClick={() => {
-                if (!isProUser && trades.length >= 50) {
-                  setUpgradeFeature("Unlimited Trade Journaling (50 Trade Limit Reached)");
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth();
+                const monthlyTradesCount = trades.filter((t: any) => {
+                  if (!t.created_at) return false;
+                  const date = new Date(t.created_at);
+                  return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+                }).length;
+
+                if (!isProUser && monthlyTradesCount >= 50) {
+                  setUpgradeFeature("Unlimited Trade Journaling (50 Monthly Trade Limit Reached)");
                   setShowUpgradeModal(true);
                   return;
                 }
@@ -735,8 +758,17 @@ export default function JournalPage() {
             </button>
             <button
               onClick={() => {
-                if (!isProUser && trades.length >= 50) {
-                  setUpgradeFeature("Unlimited Trade Journaling (50 Trade Limit Reached)");
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth();
+                const monthlyTradesCount = trades.filter((t: any) => {
+                  if (!t.created_at) return false;
+                  const date = new Date(t.created_at);
+                  return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+                }).length;
+
+                if (!isProUser && monthlyTradesCount >= 50) {
+                  setUpgradeFeature("Unlimited Trade Journaling (50 Monthly Trade Limit Reached)");
                   setShowUpgradeModal(true);
                   return;
                 }
@@ -914,7 +946,18 @@ export default function JournalPage() {
                   )}
                 </div>
                 <div className="col-span-2 flex items-center gap-2">
-                  {(() => {
+                  {!isProUser ? (
+                    <button
+                      onClick={() => {
+                        setUpgradeFeature("AI Mistake & Behavioral Diagnostics");
+                        setShowUpgradeModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-success/15 border border-success/30 text-success hover:bg-success/20 text-[10px] font-bold transition-all cursor-pointer animate-pulse-slow"
+                    >
+                      <Lock className="h-3 w-3" />
+                      <span>Unlock Diagnostics</span>
+                    </button>
+                  ) : (() => {
                     // Find mistake tag from daily report for this trade
                     const reportMistake = mistakeTags.find(
                       (mt) => mt.stock.toLowerCase() === trade.stock.toLowerCase()
@@ -1174,7 +1217,20 @@ export default function JournalPage() {
                   return (
                     <div className="pt-1 flex items-center justify-between gap-2">
                       <div className="flex flex-wrap gap-1">
-                        {renderingBadges}
+                        {!isProUser ? (
+                          <button
+                            onClick={() => {
+                              setUpgradeFeature("AI Mistake & Behavioral Diagnostics");
+                              setShowUpgradeModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-success/30 bg-success/10 text-success text-[10px] font-semibold transition-all cursor-pointer"
+                          >
+                            <Lock className="h-2.5 w-2.5" />
+                            <span>Unlock Diagnostics</span>
+                          </button>
+                        ) : (
+                          renderingBadges
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
