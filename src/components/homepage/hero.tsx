@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Shield, TrendingUp, Target, Brain, Trophy, FileText, Check, AlertTriangle } from "lucide-react";
+import { Shield, TrendingUp, Target, Brain, Trophy, FileText, Check, AlertTriangle, Sparkles, ArrowRight } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ParticleField } from "@/components/ui/particle-field";
 import { HeroCtaButton } from "./hero-cta-button";
@@ -105,12 +105,14 @@ export default function HeroSection() {
                     </Link>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[11px] text-muted-foreground/80 font-mono tracking-tight">
-                      🔒 No credit card required to start • Set up in 2 minutes
+                    <p className="text-[11px] text-muted-foreground/90 font-mono tracking-tight flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                      <span>100% Free Forever Plan Included • No credit card required</span>
                     </p>
-                    <p className="text-sm">
+                    <p className="text-xs text-muted-foreground">
+                      <span>Includes Sizer, Sentiment, Score & 50 Journal Entries. </span>
                       <Link href="/pricing" className="text-success hover:text-success/90 font-semibold transition-colors inline-flex items-center gap-1 group/pricing">
-                        See pricing plans starting at ₹{monthlyPrice}/month 
+                        View all plans
                         <span className="inline-block transition-transform group-hover/pricing:translate-x-0.5">→</span>
                       </Link>
                     </p>
@@ -223,6 +225,33 @@ export default function HeroSection() {
                     Rule followed! +5 pts
                   </p>
                 </div>
+              </div>
+
+              {/* Starter Free Plan Callout Card near Desktop Picture */}
+              <div className="mt-6 p-4 rounded-2xl bg-card/90 border border-success/40 backdrop-blur-xl shadow-2xl flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-success/20 border border-success/30 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-heading font-bold text-sm text-foreground">Starter Free</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/20 text-success border border-success/30">
+                        100% Free Forever
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Position Sizer, Sentiment Engine, Basic Score & 50 Journal Entries (₹0/mo)
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/auth/signup"
+                  className="shrink-0 px-4 py-2.5 rounded-xl bg-success text-success-foreground font-bold text-xs hover:bg-success/90 transition-all shadow-md shadow-success/20 flex items-center gap-1 cursor-pointer"
+                >
+                  Start Free ₹0
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </div>
           </div>

@@ -89,7 +89,7 @@ export async function sendWelcomeTrialEmail(params: WelcomeEmailParams): Promise
   `;
 
   if (type === "welcome_trial") {
-    subject = "Welcome to INTROSPECT™ – Your 5-Day Trial Starts Now";
+    subject = "Welcome to INTROSPECT™ – Your Account is Active";
     emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -101,10 +101,10 @@ export async function sendWelcomeTrialEmail(params: WelcomeEmailParams): Promise
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
     ${headerHtml}
     
-    <!-- Trial Details Banner -->
+    <!-- Welcome Banner -->
     <div style="background-color: #f0fdf4; padding: 16px; text-align: center; border-bottom: 1px solid #dcfce7;">
       <p style="margin: 0; color: #15803d; font-size: 14px; font-weight: 600;">
-        🎁 Thank you for joining! Your 5 Trading Days Trial starts from ${startStr} to ${endStr}
+        🎁 Welcome! Your Forever Free Starter Account is Active
       </p>
     </div>
 
@@ -115,7 +115,7 @@ export async function sendWelcomeTrialEmail(params: WelcomeEmailParams): Promise
       </p>
       
       <p style="margin: 0 0 16px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
-        Thank you for starting your journey with INTROSPECT™. Your 5-trading-days trial is now active starting from <strong>${startStr}</strong> until <strong>${endStr}</strong>.
+        Thank you for joining INTROSPECT™. Your account includes access to our Position Sizing Calculators, Market Sentiment Engine, Diagnostic Assessment Score, and 50 Journal Entries completely free forever.
       </p>
 
       <p style="margin: 0 0 16px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
