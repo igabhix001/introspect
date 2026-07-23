@@ -634,7 +634,7 @@ function DashboardContent() {
       variants={staggerContainer}
       initial="hidden"
       animate="show"
-      className="space-y-6"
+      className="space-y-4 sm:space-y-5"
     >
       {/* Smart Money Filter Message */}
       <motion.div

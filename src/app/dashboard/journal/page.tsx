@@ -76,7 +76,7 @@ interface TradeRow {
 }
 
 export default function JournalPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, hasActiveSubscription, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const { data: tradesData, isLoading } = useTradesQuery();
@@ -116,22 +116,9 @@ export default function JournalPage() {
   const [submittingReflection, setSubmittingReflection] = useState(false);
   
   // Pro Subscription Paywall State
-  const [isProUser, setIsProUser] = useState(false);
+  const isProUser = hasActiveSubscription === true;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState("Pro Feature");
-
-  useEffect(() => {
-    const checkSub = async () => {
-      try {
-        const { checkUserSubscription } = await import("@/lib/paywall");
-        const sub = await checkUserSubscription(supabase, user?.id || "");
-        setIsProUser(sub.isPro);
-      } catch (err) {
-        console.error("Subscription check error:", err);
-      }
-    };
-    if (user?.id) checkSub();
-  }, [user?.id]);
 
   // Bulk upload state
   const [importing, setImporting] = useState(false);
@@ -510,7 +497,7 @@ export default function JournalPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Challenge Reminder Banner */}
       {activeChallenge && (
         <div className={`rounded-xl p-4 border ${

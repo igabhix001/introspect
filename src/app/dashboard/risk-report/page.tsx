@@ -75,12 +75,14 @@ export default function RiskReportPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const isPro = hasActiveSubscription === true;
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (assessment && hasActiveSubscription !== false) {
+    if (assessment && isPro) {
       setAiLoading(true);
       fetch("/api/risk-report/summary")
         .then((res) => res.json())
@@ -92,13 +94,12 @@ export default function RiskReportPage() {
         .catch((err) => console.error("Error fetching AI summary:", err))
         .finally(() => setAiLoading(false));
     }
-  }, [assessment, hasActiveSubscription]);
+  }, [assessment, isPro]);
 
   const loading = assessmentLoading && !assessment;
 
   // Non-subscribers cannot view full report - show subscribe prompt
-  // Only block if explicitly false (not undefined/loading)
-  if (!loading && !authLoading && hasActiveSubscription === false) {
+  if (!loading && !authLoading && !isPro) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -217,7 +218,7 @@ export default function RiskReportPage() {
       </div>
 
       {/* AI Executive Summary */}
-      {hasActiveSubscription !== false && (
+      {isPro && (
         <motion.div
           variants={stagger.item}
           className="rounded-2xl border border-border bg-gradient-to-r from-success/5 via-transparent to-transparent p-6 relative overflow-hidden screen-only"

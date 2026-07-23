@@ -295,6 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const isDifferentUser = userRef.current?.id !== session.user.id;
                 const missingProfile = !profileRef.current;
                 if (isDifferentUser || missingProfile) {
+                  setHasActiveSubscription(false); // Reset subscription state immediately for new account
+                  setProfile(null);
                   hydrationStartedRef.current = false; // Allow fresh hydration for new sign-in
                   await hydrateUser(session.user);
                 } else {

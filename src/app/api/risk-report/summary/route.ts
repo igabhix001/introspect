@@ -14,6 +14,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check subscription status
+    const { checkUserSubscription } = await import("@/lib/paywall");
+    const subStatus = await checkUserSubscription(supabase, user.id);
+    if (!subStatus.isPro) {
+      return NextResponse.json(
+        { error: "AI Risk Report Summary is a Pro feature. Please upgrade to Pro.", isPro: false },
+        { status: 403 }
+      );
+    }
+
     // Fetch the user's latest assessment
     const { data: assessment, error: fetchError } = await supabase
       .from("assessments")

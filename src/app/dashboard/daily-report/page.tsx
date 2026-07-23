@@ -83,31 +83,18 @@ interface DailyReport {
 }
 
 export default function DailyReportPage() {
-  const { loading: authLoading } = useAuth();
+  const { user, hasActiveSubscription } = useAuth();
   const queryClient = useQueryClient();
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [generating, setGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isProUser, setIsProUser] = useState(false);
+  const isProUser = hasActiveSubscription === true;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState("Historical Daily Reports");
 
   useEffect(() => {
     setMounted(true);
-    const checkSub = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { checkUserSubscription } = await import("@/lib/paywall");
-          const sub = await checkUserSubscription(supabase, user.id);
-          setIsProUser(sub.isPro);
-        }
-      } catch (err) {
-        console.error("Subscription check error:", err);
-      }
-    };
-    checkSub();
   }, []);
 
   const { data: reportData, isLoading: reportLoading } = useDailyReportQuery(selectedDate);
@@ -235,7 +222,7 @@ export default function DailyReportPage() {
   const winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-4 sm:space-y-5 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
