@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const envPubId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
-  const pubId = envPubId && envPubId.startsWith("pub-")
-    ? envPubId
-    : envPubId && envPubId.startsWith("ca-pub-")
-    ? envPubId.replace("ca-pub-", "pub-")
-    : "pub-0000000000000000";
+  const envPubId = (process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID || "").trim();
+  const digitsOnly = envPubId.replace(/[^0-9]/g, "");
+  const pubId = digitsOnly ? `pub-${digitsOnly}` : "pub-0000000000000000";
 
   const content = `google.com, ${pubId}, DIRECT, f08c47fec0942fa0\n`;
 

@@ -18,7 +18,15 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "Googlebot",
         allow: "/",
-        disallow: ["/api/", "/dashboard/"],
+        disallow: ["/api/"],
+      },
+      {
+        userAgent: "Mediapartners-Google",
+        allow: "/",
+      },
+      {
+        userAgent: "Google-AdSense-Bot",
+        allow: "/",
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

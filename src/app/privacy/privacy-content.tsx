@@ -60,11 +60,12 @@ const sections = [
     icon: Globe,
     title: "Cookies, Advertising & Third-Party Vendors",
     content: [
-      "Essential cookies: required for authentication, security, and user preferences.",
-      "Google AdSense & Advertising: We use third-party advertising companies like Google AdSense to serve ads when you visit our public tools and pages.",
-      "Google's use of advertising cookies enables it and its partners to serve ads to users based on their visit to our site and/or other sites on the Internet.",
-      "Users may opt out of personalized advertising by visiting Google Ad Settings (www.google.com/settings/ads) or www.aboutads.info.",
-      "Logged-in Pro subscribers enjoy a 100% ad-free experience with zero third-party ad tracking.",
+      "Essential Cookies: Used strictly for secure authentication, session management, and user preference persistence.",
+      "Third-Party Advertising: We use third-party advertising companies like Google AdSense to serve ads when you visit our public tools and pages.",
+      "Google DART Cookies: Google, as a third-party vendor, uses cookies to serve ads on our site. Google's use of advertising cookies enables it and its partners to serve ads to our users based on their visits to our site and/or other sites on the Internet.",
+      "Opting Out of Personalized Ads: Users may opt out of personalized advertising by visiting Google Ads Settings (https://adssettings.google.com) or the Network Advertising Initiative opt-out page (https://optout.networkadvertising.org) and Digital Advertising Alliance (https://optout.aboutads.info).",
+      "Google Privacy Policy: To learn more about how Google uses data when you use our site, visit Google's Privacy & Terms at https://policies.google.com/technologies/ads.",
+      "Ad-Free for Subscribers: Logged-in active Pro subscribers enjoy a 100% ad-free experience with zero third-party advertising tracking.",
     ],
   },
   {

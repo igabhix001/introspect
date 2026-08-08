@@ -9,16 +9,23 @@ interface GoogleAdSenseScriptProps {
 }
 
 export function GoogleAdSenseScript({ pId }: GoogleAdSenseScriptProps) {
-  const publisherId = pId || process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
+  const rawId = pId || process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
 
-  if (!publisherId) {
+  if (!rawId) {
     return null;
   }
 
+  const clientId = rawId.startsWith("ca-pub-")
+    ? rawId
+    : rawId.startsWith("pub-")
+    ? `ca-${rawId}`
+    : `ca-pub-${rawId}`;
+
   return (
     <Script
+      id="google-adsense"
       async
-      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}`}
+      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`}
       crossOrigin="anonymous"
       strategy="afterInteractive"
     />
@@ -91,7 +98,14 @@ export function AdBanner({
     return null;
   }
 
-  const publisherId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
+  const rawPubId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
+  const publisherId = rawPubId
+    ? rawPubId.startsWith("ca-pub-")
+      ? rawPubId
+      : rawPubId.startsWith("pub-")
+      ? `ca-${rawPubId}`
+      : `ca-pub-${rawPubId}`
+    : null;
 
   return (
     <div
