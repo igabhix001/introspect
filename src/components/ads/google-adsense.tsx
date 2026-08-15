@@ -40,13 +40,14 @@ interface AdBannerProps {
 }
 
 export function AdBanner({
-  slot = "1234567890",
+  slot,
   format = "auto",
   responsive = true,
   className = "",
 }: AdBannerProps) {
   const [isProUser, setIsProUser] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [adPushed, setAdPushed] = useState(false);
 
   useEffect(() => {
     const checkUserSub = async () => {
@@ -82,22 +83,6 @@ export function AdBanner({
     checkUserSub();
   }, []);
 
-  useEffect(() => {
-    if (isLoaded && !isProUser) {
-      try {
-        // @ts-ignore
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.error("AdSense push error:", e);
-      }
-    }
-  }, [isLoaded, isProUser]);
-
-  // Paid Pro users get 100% AD-FREE experience
-  if (isProUser) {
-    return null;
-  }
-
   const rawPubId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
   const publisherId = rawPubId
     ? rawPubId.startsWith("ca-pub-")
@@ -106,6 +91,32 @@ export function AdBanner({
       ? `ca-${rawPubId}`
       : `ca-pub-${rawPubId}`
     : null;
+
+  // Only use slot if it's a valid numeric ID
+  const validSlot = slot && /^\d+$/.test(slot.trim()) ? slot.trim() : undefined;
+
+  useEffect(() => {
+    if (isLoaded && !isProUser && publisherId && !adPushed) {
+      const timer = setTimeout(() => {
+        try {
+          if (typeof window !== "undefined") {
+            // @ts-ignore
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+            setAdPushed(true);
+          }
+        } catch (e) {
+          console.warn("AdSense push notice:", e);
+        }
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, isProUser, publisherId, adPushed]);
+
+  // Paid Pro users get 100% AD-FREE experience
+  if (isProUser) {
+    return null;
+  }
 
   return (
     <div
@@ -118,9 +129,9 @@ export function AdBanner({
       {publisherId ? (
         <ins
           className="adsbygoogle"
-          style={{ display: "block", width: "100%" }}
+          style={{ display: "block", width: "100%", minHeight: "90px" }}
           data-ad-client={publisherId}
-          data-ad-slot={slot}
+          {...(validSlot ? { "data-ad-slot": validSlot } : {})}
           data-ad-format={format}
           data-full-width-responsive={responsive ? "true" : "false"}
         />

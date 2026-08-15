@@ -15,21 +15,17 @@ import "./globals.css";
 const outfit = Outfit({
   variable: "--font-heading",
   subsets: ["latin"],
-  display: "optional",
+  display: "swap",
   weight: ["600", "700", "800"],
-  preload: false,
   fallback: ["system-ui", "sans-serif"],
-  adjustFontFallback: true,
 });
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  display: "optional",
+  display: "swap",
   weight: ["400", "600"],
-  preload: false,
   fallback: ["system-ui", "sans-serif"],
-  adjustFontFallback: true,
 });
 
 // Viewport configuration for mobile optimization
