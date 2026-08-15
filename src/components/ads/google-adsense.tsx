@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import Script from "next/script";
-import { createClient } from "@/lib/supabase/client";
+import React, { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth/auth-context";
 
 interface GoogleAdSenseScriptProps {
   pId?: string;
@@ -43,9 +43,9 @@ export function AdBanner({
   responsive = true,
   className = "",
 }: AdBannerProps) {
-  const [isProUser, setIsProUser] = useState<boolean | null>(null); // null = loading
+  const pathname = usePathname();
+  const { hasActiveSubscription, loading: authLoading } = useAuth();
   const insRef = useRef<HTMLModElement>(null);
-  const pushed = useRef(false);
 
   const rawPubId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
   const publisherId = rawPubId
@@ -59,77 +59,47 @@ export function AdBanner({
   // Only use slot if it's a valid numeric ID
   const validSlot = slot && /^\d+$/.test(slot.trim()) ? slot.trim() : undefined;
 
-  // Step 1: Check if user is a Pro subscriber
+  // Trigger AdSense push on initial load and whenever the route (pathname) changes in SPA
   useEffect(() => {
-    const checkUserSub = async () => {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+    // Pro subscribers get an ad-free experience
+    if (hasActiveSubscription === true) return;
+    if (!publisherId) return;
 
-        if (!user) {
-          setIsProUser(false);
-          return;
-        }
-
-        const { data: subscription } = await supabase
-          .from("subscriptions")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .gte("current_period_end", new Date().toISOString())
-          .limit(1)
-          .maybeSingle();
-
-        setIsProUser(!!subscription);
-      } catch (err) {
-        console.error("AdBanner subscription check error:", err);
-        setIsProUser(false); // Fail open — show ads on error
-      }
-    };
-
-    checkUserSub();
-  }, []);
-
-  // Step 2: Push adsbygoogle AFTER <ins> is in the DOM and we know user is free
-  useEffect(() => {
-    // Wait until we know the user's subscription status
-    if (isProUser !== false) return;
-    // Don't push if no publisher ID or already pushed
-    if (!publisherId || pushed.current) return;
-    // Don't push if the <ins> element is not in DOM yet
-    if (!insRef.current) return;
-
+    // Small delay to ensure the fresh <ins> element is mounted in the DOM
     const timer = setTimeout(() => {
       try {
         if (typeof window !== "undefined" && insRef.current) {
-          // @ts-ignore
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-          pushed.current = true;
+          // Check if this specific <ins> has not already been filled
+          const status = insRef.current.getAttribute("data-adsbygoogle-status");
+          if (!status) {
+            // @ts-ignore
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+          }
         }
       } catch (e) {
-        console.warn("AdSense push:", e);
+        console.warn("[AdSense] Client-side route transition push notice:", e);
       }
-    }, 300);
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [isProUser, publisherId]);
+  }, [pathname, slot, publisherId, hasActiveSubscription]);
 
-  // Still loading subscription status — render nothing to avoid race
-  if (isProUser === null) {
+  // Don't render until we know whether the user is a paid subscriber
+  if (authLoading && hasActiveSubscription === null) {
     return null;
   }
 
   // Paid Pro users get 100% AD-FREE experience
-  if (isProUser === true) {
+  if (hasActiveSubscription === true) {
     return null;
   }
 
   // No publisher ID configured — show placeholder in dev
   if (!publisherId) {
     return (
-      <div className={`my-6 flex flex-col items-center justify-center p-3 rounded-2xl border border-dashed border-border bg-muted/30 text-center min-h-[100px] ${className}`}>
+      <div
+        className={`my-6 flex flex-col items-center justify-center p-3 rounded-2xl border border-dashed border-border bg-muted/30 text-center min-h-[100px] ${className}`}
+      >
         <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">
           AdSense — Set NEXT_PUBLIC_GOOGLE_ADSENSE_ID
         </span>
@@ -139,20 +109,24 @@ export function AdBanner({
 
   return (
     <div
-      className={`my-6 flex flex-col items-center justify-center p-2 rounded-2xl border border-border/40 bg-card/30 text-center overflow-hidden min-h-[100px] ${className}`}
+      key={`ad-container-${pathname}-${slot}`}
+      className={`my-6 w-full max-w-full p-2 sm:p-3 rounded-2xl border border-border/40 bg-card/30 text-center overflow-hidden ${className}`}
     >
-      <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1.5 text-center">
         Advertisement
-      </span>
-      <ins
-        ref={insRef}
-        className="adsbygoogle"
-        style={{ display: "block", width: "100%", minHeight: "90px" }}
-        data-ad-client={publisherId}
-        data-ad-slot={validSlot}
-        data-ad-format={format}
-        data-full-width-responsive={responsive ? "true" : "false"}
-      />
+      </div>
+      <div className="w-full flex justify-center overflow-hidden">
+        <ins
+          key={`ins-${pathname}-${slot}`}
+          ref={insRef}
+          className="adsbygoogle"
+          style={{ display: "block", width: "100%", minWidth: "250px", minHeight: "50px" }}
+          data-ad-client={publisherId}
+          data-ad-slot={validSlot}
+          data-ad-format={format}
+          data-full-width-responsive={responsive ? "true" : "false"}
+        />
+      </div>
     </div>
   );
 }
