@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -22,10 +23,12 @@ export function GoogleAdSenseScript({ pId }: GoogleAdSenseScriptProps) {
     : `ca-pub-${rawId}`;
 
   return (
-    <script
+    <Script
+      id="google-adsense-script"
       async
       src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`}
       crossOrigin="anonymous"
+      strategy="afterInteractive"
     />
   );
 }
@@ -45,6 +48,9 @@ export function AdBanner({
 }: AdBannerProps) {
   const pathname = usePathname();
   const { hasActiveSubscription, loading: authLoading } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  const [isUnfilled, setIsUnfilled] = useState(false);
+  const [isFilled, setIsFilled] = useState(false);
   const insRef = useRef<HTMLModElement>(null);
 
   const rawPubId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
@@ -59,17 +65,48 @@ export function AdBanner({
   // Only use slot if it's a valid numeric ID
   const validSlot = slot && /^\d+$/.test(slot.trim()) ? slot.trim() : undefined;
 
-  // Trigger AdSense push on initial load and whenever the route (pathname) changes in SPA
+  // Step 1: Prevent SSR/Client hydration mismatch (Fixes React Error #418)
   useEffect(() => {
-    // Pro subscribers get an ad-free experience
+    setMounted(true);
+  }, []);
+
+  // Step 2: Push adsbygoogle and observe ad status for auto-collapse
+  useEffect(() => {
+    if (!mounted) return;
     if (hasActiveSubscription === true) return;
     if (!publisherId) return;
 
-    // Small delay to ensure the fresh <ins> element is mounted in the DOM
+    // Reset status on navigation
+    setIsUnfilled(false);
+    setIsFilled(false);
+
+    // Watch for AdSense status changes (filled vs unfilled)
+    const currentIns = insRef.current;
+    let observer: MutationObserver | null = null;
+
+    if (currentIns) {
+      observer = new MutationObserver(() => {
+        const status = currentIns.getAttribute("data-ad-status");
+        if (status === "unfilled") {
+          setIsUnfilled(true);
+          setIsFilled(false);
+        } else if (status === "filled" || currentIns.hasChildNodes()) {
+          setIsFilled(true);
+          setIsUnfilled(false);
+        }
+      });
+
+      observer.observe(currentIns, {
+        attributes: true,
+        attributeFilter: ["data-ad-status", "style"],
+        childList: true,
+      });
+    }
+
+    // Push ad request with debounce
     const timer = setTimeout(() => {
       try {
         if (typeof window !== "undefined" && insRef.current) {
-          // Check if this specific <ins> has not already been filled
           const status = insRef.current.getAttribute("data-adsbygoogle-status");
           if (!status) {
             // @ts-ignore
@@ -77,15 +114,20 @@ export function AdBanner({
           }
         }
       } catch (e) {
-        console.warn("[AdSense] Client-side route transition push notice:", e);
+        console.warn("[AdSense] Route push notice:", e);
       }
     }, 200);
 
-    return () => clearTimeout(timer);
-  }, [pathname, slot, publisherId, hasActiveSubscription]);
+    return () => {
+      clearTimeout(timer);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [pathname, slot, publisherId, hasActiveSubscription, mounted]);
 
-  // Don't render until we know whether the user is a paid subscriber
-  if (authLoading && hasActiveSubscription === null) {
+  // Don't render on server pass or until mounted (Guarantees 0 hydration errors)
+  if (!mounted) {
     return null;
   }
 
@@ -94,7 +136,12 @@ export function AdBanner({
     return null;
   }
 
-  // No publisher ID configured — show placeholder in dev
+  // If Google AdSense returned "unfilled" for this auction, collapse completely (No ugly blank box)
+  if (isUnfilled) {
+    return null;
+  }
+
+  // No publisher ID configured — show dev placeholder
   if (!publisherId) {
     return (
       <div
@@ -109,10 +156,19 @@ export function AdBanner({
 
   return (
     <div
-      key={`ad-container-${pathname}-${slot}`}
-      className={`my-6 w-full max-w-full p-2 sm:p-3 rounded-2xl border border-border/40 bg-card/30 text-center overflow-hidden ${className}`}
+      key={`ad-box-${pathname}-${slot}`}
+      className={`my-6 w-full max-w-full text-center transition-all duration-300 ${
+        isFilled
+          ? `p-2 sm:p-3 rounded-2xl border border-border/40 bg-card/30 ${className}`
+          : "min-h-[1px] opacity-90"
+      }`}
     >
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1.5 text-center">
+      {/* Label only visible when ad is filled or loading */}
+      <div
+        className={`text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1.5 text-center ${
+          isFilled ? "block" : "hidden"
+        }`}
+      >
         Advertisement
       </div>
       <div className="w-full flex justify-center overflow-hidden">
@@ -130,3 +186,4 @@ export function AdBanner({
     </div>
   );
 }
+
