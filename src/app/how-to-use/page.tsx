@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChallengeCTA } from "@/components/home/challenge-cta";
+import { AdBanner } from "@/components/ads/google-adsense";
 import { BookOpen, Trophy, Star, Shield, Gift, Zap, Target, BarChart3, Calendar, Award, CheckCircle2, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -384,6 +385,9 @@ export default function HowToUsePage() {
         </div>
       </section>
 
+      <div className="max-w-4xl mx-auto px-4 my-8">
+        <AdBanner slot="1992174832" format="auto" />
+      </div>
 
       <ChallengeCTA />
     </>

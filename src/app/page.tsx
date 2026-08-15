@@ -48,6 +48,7 @@ const FinalCtaSection = dynamic(() => import("@/components/homepage/final-cta"),
 });
 
 import { redirect } from "next/navigation";
+import { AdBanner } from "@/components/ads/google-adsense";
 
 export const metadata: Metadata = {
   title: "Stop Blowing Accounts | INTROSPECT™ AI Trading Companion",
@@ -79,6 +80,12 @@ export default async function HomePage({
       <LazySection fallback={<SectionSkeleton />}><BeforeAfterSection /></LazySection>
       <LazySection fallback={<SectionSkeleton />}><WhoItIsForSection /></LazySection>
       <LazySection fallback={<SectionSkeleton />}><SocialProofSection /></LazySection>
+      
+      {/* Clean responsive Ad Banner on Landing Page */}
+      <div className="max-w-4xl mx-auto px-4 my-8">
+        <AdBanner slot="1992174832" format="auto" />
+      </div>
+
       <LazySection fallback={<SectionSkeleton />}><PricingSection /></LazySection>
       <LazySection fallback={<SectionSkeleton />}><FinalCtaSection /></LazySection>
     </div>
