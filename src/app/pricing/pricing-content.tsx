@@ -23,8 +23,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/toast";
-import { AdBanner } from "@/components/ads/google-adsense";
-
 import { createClient } from "@/lib/supabase/client";
 import { trackSubscribeClick, trackPaymentInitiated, trackPurchase } from "@/lib/analytics";
 
@@ -625,14 +623,8 @@ export function PricingContent() {
           </div>
         </motion.div>
 
-        {/* AdBanner */}
-        <div className="max-w-3xl mx-auto my-10">
-          <AdBanner slot="1992174832" format="auto" />
-        </div>
-
         {/* FAQ */}
         <motion.div
-
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}

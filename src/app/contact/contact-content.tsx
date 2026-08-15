@@ -13,8 +13,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { AdBanner } from "@/components/ads/google-adsense";
-
 
 const faqs = [
   {
@@ -282,16 +280,10 @@ export function ContactContent() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
-
-            {/* AdBanner */}
-            <div className="mt-8">
-              <AdBanner slot="1992174832" format="auto" />
-            </div>
           </motion.div>
 
           {/* FAQ */}
           <motion.div
-
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}

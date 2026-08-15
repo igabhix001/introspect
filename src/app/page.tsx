@@ -55,8 +55,6 @@ export const metadata: Metadata = {
   keywords: ["trading discipline", "trading psychology", "behavioral journal", "stop blowing accounts", "intraday options trading", "Nifty options", "capital protection"],
 };
 
-import { AdBanner } from "@/components/ads/google-adsense";
-
 export default async function HomePage({
   searchParams,
 }: {
@@ -82,11 +80,7 @@ export default async function HomePage({
       <LazySection fallback={<SectionSkeleton />}><WhoItIsForSection /></LazySection>
       <LazySection fallback={<SectionSkeleton />}><SocialProofSection /></LazySection>
       <LazySection fallback={<SectionSkeleton />}><PricingSection /></LazySection>
-      <div className="mx-auto max-w-6xl px-4 my-8">
-        <AdBanner slot="1992174832" format="auto" />
-      </div>
       <LazySection fallback={<SectionSkeleton />}><FinalCtaSection /></LazySection>
     </div>
   );
 }
-
