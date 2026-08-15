@@ -1287,7 +1287,7 @@ export default function CalculatorPage() {
       <PreMarketRoutineRow />
 
       {/* Google AdSense Banner for Free Users */}
-      <AdBanner slot="calculator-footer-ad" format="auto" className="mt-8" />
+      <AdBanner slot="1992174832" format="auto" className="mt-8" />
     </div>
   );
 }

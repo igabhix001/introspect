@@ -323,7 +323,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
 
         {/* AdSense Banner for Article Page */}
-        <AdBanner slot="article-bottom-ad" format="auto" className="mt-8" />
+        <AdBanner slot="1992174832" format="auto" className="mt-8" />
       </div>
     </article>
   );
