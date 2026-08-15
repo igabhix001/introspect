@@ -22,12 +22,10 @@ export function GoogleAdSenseScript({ pId }: GoogleAdSenseScriptProps) {
     : `ca-pub-${rawId}`;
 
   return (
-    <Script
-      id="google-adsense"
+    <script
       async
       src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`}
       crossOrigin="anonymous"
-      strategy="afterInteractive"
     />
   );
 }
