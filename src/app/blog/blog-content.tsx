@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, Clock, ArrowRight, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { blogPosts as localBlogPosts } from "./posts";
+import { AdBanner } from "@/components/ads/google-adsense";
+
 
 const categories = [
   "All",
@@ -175,6 +177,9 @@ export function BlogContent() {
                 <p className="text-sm mt-1">Check back soon!</p>
               </div>
             )}
+
+            {/* Ad between article grid and CTA — natural reading pause */}
+            <AdBanner slot="1992174832" format="auto" className="mt-10 mb-2" />
 
             {/* Learning Resources Section */}
             <motion.div

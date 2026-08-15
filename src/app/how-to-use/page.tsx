@@ -95,9 +95,12 @@ const quickStartSteps = [
   },
 ];
 
+import { AdBanner } from "@/components/ads/google-adsense";
+
 export default function HowToUsePage() {
   return (
     <>
+
       <section className="relative pt-32 pb-16 overflow-hidden min-h-screen">
         <div className="absolute inset-0 grid-pattern opacity-40 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-success/10 rounded-full blur-[100px] opacity-70 pointer-events-none" />
@@ -385,7 +388,12 @@ export default function HowToUsePage() {
       </section>
 
 
+      <div className="max-w-6xl mx-auto px-4 my-8">
+        <AdBanner slot="1992174832" format="auto" />
+      </div>
+
       <ChallengeCTA />
     </>
   );
 }
+

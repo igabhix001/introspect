@@ -8,6 +8,8 @@ import { useRealtimeInvalidation } from "@/lib/hooks/use-realtime-invalidation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { AdBanner } from "@/components/ads/google-adsense";
+
 
 function RealtimeInvalidator() {
   useRealtimeInvalidation();
@@ -76,6 +78,8 @@ export default function DashboardLayout({
           <main className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
               {children}
+              {/* Ad shown to free users at the bottom of every dashboard page — Pro users see nothing */}
+              <AdBanner slot="1992174832" format="auto" className="mt-6" />
             </div>
           </main>
         </div>

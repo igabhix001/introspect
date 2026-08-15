@@ -15,6 +15,8 @@ import {
   Award,
 } from "lucide-react";
 import { YouTubeEmbed } from "@/components/ui/youtube-embed";
+import { AdBanner } from "@/components/ads/google-adsense";
+
 const whyIBuiltThis = {
   intro: "I didn't struggle with finding a strategy.",
   struggle: "I struggled with following it.",
@@ -279,6 +281,11 @@ export function AboutContent() {
           ))}
         </div>
       </section>
+
+      {/* AdBanner */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+        <AdBanner slot="1992174832" format="auto" />
+      </div>
 
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
