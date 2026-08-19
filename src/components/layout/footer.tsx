@@ -7,6 +7,7 @@ const footerLinks = {
   product: [
     { label: "Pricing", href: "/pricing" },
     { label: "How to Use", href: "/how-to-use" },
+    { label: "Open Fyers Account", href: "https://fyers.onelink.me/cj1P/c6m75vge", external: true },
   ],
   company: [
     { label: "About Us", href: "/about" },
@@ -55,13 +56,25 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    prefetch={false}
-                    className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
-                  >
-                    {link.label}
-                  </Link>
+                  {"external" in link && link.external ? (
+                    <a
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span>{link.label}</span>
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-success/15 text-success font-semibold">Free</span>
+                    </a>
+                  ) : (
+                    <Link
+                      href={link.href}
+                      prefetch={false}
+                      className="text-xs text-muted-foreground hover:text-success transition-colors cursor-pointer"
+                    >
+                      {link.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

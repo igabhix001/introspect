@@ -28,6 +28,7 @@ import {
   FileText,
   MessageSquare,
   Lock,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -336,16 +337,28 @@ export function DashboardSidebar({
 
       {/* Psychology Learning Links - only show when not collapsed */}
       {!collapsed && (
-        <div className="mx-3 my-4 p-4 rounded-xl border border-success/15 bg-success/[0.02] space-y-2 shrink-0">
+        <div className="mx-3 my-4 p-4 rounded-xl border border-success/15 bg-success/[0.02] space-y-2.5 shrink-0">
           <span className="text-[10px] text-success font-bold uppercase tracking-wider block">
             Psychology Learning
           </span>
           <div className="space-y-1.5 text-xs">
             <a
+              href="https://fyers.onelink.me/cj1P/c6m75vge"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-2 rounded-lg bg-success/10 border border-success/25 text-success hover:bg-success/20 transition-all font-bold group"
+            >
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-3.5 w-3.5 text-success shrink-0" />
+                <span>Open Fyers Account</span>
+              </div>
+              <ExternalLink className="h-3 w-3 text-success/80 group-hover:text-success shrink-0" />
+            </a>
+            <a
               href="https://youtube.com/@intraday.mindview?sub_confirmation=1"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-muted-foreground hover:text-success transition-colors font-medium"
+              className="flex items-center gap-2 text-muted-foreground hover:text-success transition-colors font-medium pt-1"
             >
               <TrendingUp className="h-3.5 w-3.5 text-success shrink-0" />
               <span>YouTube (English)</span>

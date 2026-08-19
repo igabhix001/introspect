@@ -38,6 +38,15 @@ export default function FinalCtaSection() {
             <p className="text-xs text-white/50 font-mono uppercase tracking-widest">
               High value and affordable solution for traders
             </p>
+            <a
+              href="https://fyers.onelink.me/cj1P/c6m75vge"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-white/70 hover:text-[#00c853] transition-colors font-medium inline-flex items-center gap-1.5 pt-2"
+            >
+              <span>Need a high-speed execution broker? Open Free Fyers Account</span>
+              <ArrowRight className="h-3 w-3" />
+            </a>
           </div>
         </div>
       </div>

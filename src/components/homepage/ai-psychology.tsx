@@ -85,6 +85,27 @@ export default function AiPsychologySection() {
                 </li>
               ))}
             </ul>
+
+            {/* Fyers Partner CTA Card */}
+            <div className="mt-6 p-4 sm:p-5 rounded-2xl border border-success/20 bg-success/[0.03] backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-success uppercase tracking-wider">Broker Partner</span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30">Free Account Opening</span>
+                </div>
+                <h4 className="text-sm font-bold text-foreground">Trade with Fast Execution & Zero Demat AMC</h4>
+                <p className="text-xs text-muted-foreground">Open your Fyers account to trade directly from charts with high-speed execution.</p>
+              </div>
+              <a
+                href="https://fyers.onelink.me/cj1P/c6m75vge"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-md shadow-success/10 shrink-0 cursor-pointer"
+              >
+                <span>Open Fyers Account</span>
+                <Sparkles className="h-3.5 w-3.5" />
+              </a>
+            </div>
           </div>
 
         </div>

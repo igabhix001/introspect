@@ -201,10 +201,18 @@ export function BlogContent() {
                 </div>
                 <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
                   <a
+                    href="https://fyers.onelink.me/cj1P/c6m75vge"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-lg shadow-success/15 text-center cursor-pointer"
+                  >
+                    <span>Open Fyers Account (Free)</span>
+                  </a>
+                  <a
                     href="https://youtube.com/@intraday.mindview?sub_confirmation=1"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-lg shadow-success/10 text-center"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-success/30 hover:border-success/50 bg-background/50 hover:bg-background text-foreground text-xs font-bold transition-all text-center cursor-pointer"
                   >
                     <span>YouTube (English)</span>
                   </a>
@@ -212,7 +220,7 @@ export function BlogContent() {
                     href="https://www.youtube.com/channel/UCTMpGuxQcWKzDtA0TeQsdWQ?sub_confirmation=1"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-success text-success-foreground text-xs font-bold hover:bg-success/90 transition-all shadow-lg shadow-success/10 text-center"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-success/30 hover:border-success/50 bg-background/50 hover:bg-background text-foreground text-xs font-bold transition-all text-center cursor-pointer"
                   >
                     <span>YouTube (Hindi)</span>
                   </a>
@@ -220,7 +228,7 @@ export function BlogContent() {
                     href="https://www.linkedin.com/in/venkat-iyer-7839883b2"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-success/30 hover:border-success/50 bg-background/50 hover:bg-background text-foreground text-xs font-bold transition-all text-center"
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-success/30 hover:border-success/50 bg-background/50 hover:bg-background text-foreground text-xs font-bold transition-all text-center cursor-pointer"
                   >
                     <span>LinkedIn Profile</span>
                   </a>
