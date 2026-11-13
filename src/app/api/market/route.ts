@@ -28,14 +28,16 @@ const LAST_KNOWN_LIVE_TTL_SECONDS = 600; // Keep last valid Fyers snapshot up to
 const SIMULATED_CACHE_TTL_SECONDS = 60; // Keep fallback stable instead of changing randomly every second
 
 function isNseMarketOpen(): boolean {
-  const nowIst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const day = nowIst.getDay();
-  const hours = nowIst.getHours();
-  const minutes = nowIst.getMinutes();
-  const isOpenDay = day >= 1 && day <= 5;
-  const isAfterOpen = hours > 9 || (hours === 9 && minutes >= 15);
-  const isBeforeClose = hours < 15 || (hours === 15 && minutes <= 30);
-  return isOpenDay && isAfterOpen && isBeforeClose;
+  const nowIstStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const nowIst = new Date(nowIstStr);
+  const day = nowIst.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  if (day === 0 || day === 6) return false;
+
+  const totalMinutes = nowIst.getHours() * 60 + nowIst.getMinutes();
+  const openMinutes = 9 * 60 + 15; // 09:15 AM IST
+  const closeMinutes = 15 * 60 + 30; // 03:30 PM IST
+
+  return totalMinutes >= openMinutes && totalMinutes <= closeMinutes;
 }
 
 // GET: Fetch live market data with real Fyers or stable fallback
@@ -117,9 +119,13 @@ export async function GET(request: NextRequest) {
     if (!isDataValid) {
       const lastLive = cache.get<Record<string, unknown>>(lastLiveCacheKey);
       if (lastLive) {
+        const lastBias = (lastLive.data.raw_zone || lastLive.data.market_zone) as string;
+        const currentZone = market_status === "CLOSED" ? "Market Closed" : lastBias;
         const staleLivePayload = {
           ...lastLive.data,
           market_status,
+          market_zone: currentZone,
+          raw_zone: lastBias,
           stale_fallback: true,
           last_error: getLastFyersError()?.message ?? null,
         };
@@ -165,65 +171,96 @@ export async function GET(request: NextRequest) {
       market_zone = "BEARISH";
     }
 
-    // Sentiment Score
-    let sb = 0;
-    if (advances >= 35) sb = 1;
-    else if ((50 - advances) >= 35) sb = -1;
-
-    let sd = 0;
-    if (pcr >= CONFIG.PCR_BULLISH_THRESHOLD) sd = 1;
-    else if (pcr <= CONFIG.PCR_BEARISH_THRESHOLD) sd = -1;
-
-    const sentiment_score = sb + sd;
-
-    // Confidence
-    const confidence = Math.abs(sentiment_score) >= 2 ? "HIGH" : Math.abs(sentiment_score) === 1 ? "MODERATE" : "LOW";
-
-    // Momentum
-    const momentum = market_zone === "BULLISH" ? "RISING" : market_zone === "BEARISH" ? "WEAKENING" : "STEADY";
-
-    // Stability
-    const stability = vix > 20 ? "UNSTABLE" : vix > 15 ? "WATCH" : "STABLE";
-
-    // Radar Score
-    const priceScore = ref_buy > 0 ? Math.min(100, Math.max(0, ((niftyPrice - ref_buy) / ref_buy) * 10000 + 50)) : 50;
-    const breadthScore = (advances / 50) * 100;
-    const pcrScore = Math.min(100, Math.max(0, (pcr - 0.5) * 100));
-    const vixScore = Math.max(0, 100 - (vix - 10) * 3);
-    const radar_score = Math.round(priceScore * 0.3 + breadthScore * 0.3 + pcrScore * 0.2 + vixScore * 0.2);
-
-    // Regime Detection
-    let regime: "TREND_DAY" | "VOLATILE" | "COMPRESSION" | "BALANCED" = "BALANCED";
-    if (vix > 25) regime = "VOLATILE";
-    else if (vix < 12) regime = "COMPRESSION";
-    else if (momentum === "RISING" && advances >= 35 && radar_score > 65) regime = "TREND_DAY";
-
-    // Reasons - simplified user-facing messages
-    const reasons: string[] = [];
-    if (market_zone === "BULLISH") {
-      reasons.push("Price trading above short-term resistance levels");
-      if (advances >= 35) reasons.push("Market breadth currently bullish");
-      if (pcr >= 1.2) reasons.push("Derivatives sentiment supporting upside");
-      if (momentum === "RISING") reasons.push("Momentum rising across intraday timeframes");
-    } else if (market_zone === "BEARISH") {
-      reasons.push("Price trading below short-term support levels");
-      if (declines >= 35) reasons.push("Market breadth currently bearish");
-      if (pcr <= 0.7) reasons.push("Derivatives sentiment supporting downside");
-      if (momentum === "WEAKENING") reasons.push("Momentum weakening across intraday timeframes");
-    } else {
-      reasons.push("Price trading within a defined range");
-      reasons.push("Market breadth currently neutral");
-      reasons.push("Momentum mixed across intraday timeframes");
-    }
-    reasons.push(vix > 20 ? "Volatility conditions elevated" : "Volatility conditions stable");
-
     const mapZoneToBias = (zone: "BULLISH" | "BEARISH" | "NO_TRADE") => {
       if (zone === "BULLISH") return "Positive Market Bias";
       if (zone === "BEARISH") return "Negative Market Bias";
       return "Neutral Market Bias";
     };
 
-    const zoneName = mapZoneToBias(market_zone);
+    const calculatedBias = mapZoneToBias(market_zone);
+
+    let zoneName: "Positive Market Bias" | "Negative Market Bias" | "Neutral Market Bias" | "Market Closed";
+    let reasons: string[] = [];
+    let radar_score = 50;
+    let confidence: "HIGH" | "MODERATE" | "LOW" = "LOW";
+    let momentum: "RISING" | "WEAKENING" | "STEADY" = "STEADY";
+    let regime: "TREND_DAY" | "VOLATILE" | "COMPRESSION" | "BALANCED" = "BALANCED";
+
+    if (market_status === "CLOSED") {
+      // Client Requirement: When market is closed, display as closed in market sentiment
+      zoneName = "Market Closed";
+      confidence = "LOW";
+      momentum = "STEADY";
+      regime = "BALANCED";
+      radar_score = 50;
+      reasons = [
+        "NSE is currently closed (Trading hours: Monday – Friday, 9:15 AM – 3:30 PM IST)",
+        "Live directional sentiment is paused until the next market session",
+        dataSource === "fyers_live"
+          ? "Indicator values reflect closing levels from the last active session"
+          : "Fyers feed is currently offline; connect in Admin Settings for live data",
+      ];
+    } else if (dataSource === "simulated") {
+      // Client Requirement: When not connected, show neutral bias only (never positive or negative)
+      zoneName = "Neutral Market Bias";
+      confidence = "LOW";
+      momentum = "STEADY";
+      regime = "BALANCED";
+      radar_score = 50;
+      reasons = [
+        "Fyers data feed is currently disconnected — bias defaulted to Neutral",
+        "Live market sentiment indicators are on standby",
+        "Connect your Fyers account in Admin Settings to enable live bias analysis",
+      ];
+    } else {
+      // Market is OPEN and Fyers is connected — calculate real directional bias
+      zoneName = calculatedBias;
+
+      // Sentiment Score
+      let sb = 0;
+      if (advances >= 35) sb = 1;
+      else if ((50 - advances) >= 35) sb = -1;
+
+      let sd = 0;
+      if (pcr >= CONFIG.PCR_BULLISH_THRESHOLD) sd = 1;
+      else if (pcr <= CONFIG.PCR_BEARISH_THRESHOLD) sd = -1;
+
+      const sentiment_score = sb + sd;
+      confidence = Math.abs(sentiment_score) >= 2 ? "HIGH" : Math.abs(sentiment_score) === 1 ? "MODERATE" : "LOW";
+      momentum = market_zone === "BULLISH" ? "RISING" : market_zone === "BEARISH" ? "WEAKENING" : "STEADY";
+
+      // Radar Score
+      const priceScore = ref_buy > 0 ? Math.min(100, Math.max(0, ((niftyPrice - ref_buy) / ref_buy) * 10000 + 50)) : 50;
+      const breadthScore = (advances / 50) * 100;
+      const pcrScore = Math.min(100, Math.max(0, (pcr - 0.5) * 100));
+      const vixScore = Math.max(0, 100 - (vix - 10) * 3);
+      radar_score = Math.round(priceScore * 0.3 + breadthScore * 0.3 + pcrScore * 0.2 + vixScore * 0.2);
+
+      // Regime Detection
+      if (vix > 25) regime = "VOLATILE";
+      else if (vix < 12) regime = "COMPRESSION";
+      else if (momentum === "RISING" && advances >= 35 && radar_score > 65) regime = "TREND_DAY";
+
+      // Reasons - simplified user-facing messages
+      if (market_zone === "BULLISH") {
+        reasons.push("Price trading above short-term resistance levels");
+        if (advances >= 35) reasons.push("Market breadth currently bullish");
+        if (pcr >= 1.2) reasons.push("Derivatives sentiment supporting upside");
+        if (momentum === "RISING") reasons.push("Momentum rising across intraday timeframes");
+      } else if (market_zone === "BEARISH") {
+        reasons.push("Price trading below short-term support levels");
+        if (declines >= 35) reasons.push("Market breadth currently bearish");
+        if (pcr <= 0.7) reasons.push("Derivatives sentiment supporting downside");
+        if (momentum === "WEAKENING") reasons.push("Momentum weakening across intraday timeframes");
+      } else {
+        reasons.push("Price trading within a defined range");
+        reasons.push("Market breadth currently neutral");
+        reasons.push("Momentum mixed across intraday timeframes");
+      }
+      reasons.push(vix > 20 ? "Volatility conditions elevated" : "Volatility conditions stable");
+    }
+
+    const stability = vix > 20 ? "UNSTABLE" : vix > 15 ? "WATCH" : "STABLE";
     const trackingKey = "market:sentiment:tracking";
     let stability_duration = "00:00";
 
@@ -253,7 +290,7 @@ export async function GET(request: NextRequest) {
       advances,
       declines,
       market_zone: zoneName,
-      raw_zone: zoneName,
+      raw_zone: calculatedBias,
       radar_score: Math.max(0, Math.min(100, Math.round(radar_score * 10) / 10)),
       confidence,
       stability,

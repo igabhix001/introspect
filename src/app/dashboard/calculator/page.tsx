@@ -424,16 +424,23 @@ export default function CalculatorPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">
                   <Activity className="h-4 w-4 text-primary" />
-                  {marketData?.market_status === "OPEN" && (
+                  {marketData?.market_status === "OPEN" ? (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-success animate-ping" />
+                  ) : (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-zinc-500" />
                   )}
                 </div>
                 <h3 className="font-heading text-xs font-bold uppercase tracking-wider">
                   Market Intelligence
                 </h3>
+                {marketData?.market_status === "CLOSED" && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wide">
+                    Market Closed
+                  </span>
+                )}
               </div>
               <button
                 onClick={fetchMarketSentiment}
@@ -455,9 +462,13 @@ export default function CalculatorPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
                     <div className="flex items-center gap-2">
-                      {marketData.failsafe_mode ? (
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-destructive/15 text-destructive animate-pulse uppercase">
-                          FAIL-SAFE ACTIVE
+                      {marketData.market_status === "CLOSED" ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase">
+                          MARKET CLOSED
+                        </span>
+                      ) : marketData.data_source === "simulated" || marketData.failsafe_mode ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-500 uppercase">
+                          FEED OFFLINE
                         </span>
                       ) : marketData.zone_status === "WATCH" ? (
                         <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-500 animate-pulse uppercase">
@@ -473,6 +484,8 @@ export default function CalculatorPage() {
                           ? "bg-success/20 text-success border-success/30 shadow-[0_0_12px_rgba(34,197,94,0.15)]" 
                           : marketData.market_zone === "Negative Market Bias" 
                           ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
+                          : marketData.market_zone === "Market Closed"
+                          ? "bg-zinc-500/20 text-zinc-300 border-zinc-500/30 shadow-[0_0_12px_rgba(113,113,122,0.15)]"
                           : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
                         {marketData.market_zone}
@@ -499,12 +512,17 @@ export default function CalculatorPage() {
                       "Current market indicators show negative directional alignment. Market conditions may be supportive of bearish market behavior."
                     )}
                     {marketData.market_zone === "Neutral Market Bias" && (
-                      "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                      marketData.data_source === "simulated"
+                        ? "Fyers data feed is currently disconnected. Market sentiment defaults to a Neutral baseline until live feed is connected."
+                        : "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                    )}
+                    {marketData.market_zone === "Market Closed" && (
+                      "NSE is currently closed (Trading hours: Monday – Friday, 9:15 AM – 3:30 PM IST). Live directional bias calculation will resume when the market opens."
                     )}
                   </div>
 
                   {/* Watch State Progress Bar */}
-                  {marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
+                  {marketData.market_status === "OPEN" && marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
                     <div className="rounded-lg bg-amber-500/[0.03] border border-amber-500/10 p-2.5 space-y-1.5 animate-pulse">
                       <div className="flex items-center justify-between text-[10px] text-amber-500 font-semibold">
                         <span>Stabilizing Bias...</span>
@@ -520,7 +538,7 @@ export default function CalculatorPage() {
                   )}
 
                   {/* Persistence Timer */}
-                  {marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
+                  {marketData.market_status === "OPEN" && marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
                     <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border/30 px-3 py-1 rounded-lg">
                       <span>Bias Stability:</span>
                       <span className="text-foreground font-semibold flex items-center gap-1">
@@ -612,7 +630,9 @@ export default function CalculatorPage() {
                           : "Source: Live Market Feed"
                         : "Source: Offline Fallback (Feed Disconnected)"}
                     </span>
-                    <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
+                    <span className="capitalize">
+                      Market: {marketData.market_status === "CLOSED" ? "Closed (09:15 - 15:30 IST)" : "Open (Live)"}
+                    </span>
                   </div>
                   <p className="text-[9px] text-white/70 leading-normal text-justify">
                     This assessment is generated using quantitative market indicators and is provided for informational and educational purposes only. It does not constitute investment advice, a recommendation, research report, or a solicitation to buy or sell any security. Users should exercise independent judgment before making trading decisions.

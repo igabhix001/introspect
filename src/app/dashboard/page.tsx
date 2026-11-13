@@ -74,6 +74,7 @@ function MarketZoneWidget() {
     "Positive Market Bias": { label: "Positive Market Bias", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
     "Negative Market Bias": { label: "Negative Market Bias", color: "text-destructive", bg: "bg-destructive/[0.07]", emoji: "🔴" },
     "Neutral Market Bias": { label: "Neutral Market Bias", color: "text-muted-foreground", bg: "bg-muted/30", emoji: "⚪" },
+    "Market Closed": { label: "Market Closed", color: "text-zinc-400", bg: "bg-zinc-500/[0.07]", emoji: "⏸️" },
   };
   const z = zone ? zoneMap[zone] || zoneMap["Neutral Market Bias"] : null;
 
@@ -92,10 +93,10 @@ function MarketZoneWidget() {
               </p>
               {/* Market Status Indicator */}
               {marketStatus && (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase ${
                   marketStatus === "OPEN" 
-                    ? "bg-success/10 text-success" 
-                    : "bg-amber-500/10 text-amber-500"
+                    ? "bg-success/10 text-success border border-success/20" 
+                    : "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30"
                 }`}>
                   {marketStatus === "OPEN" ? (
                     <>
@@ -106,7 +107,7 @@ function MarketZoneWidget() {
                       LIVE
                     </>
                   ) : (
-                    "CLOSED"
+                    "MARKET CLOSED"
                   )}
                 </span>
               )}
@@ -123,7 +124,11 @@ function MarketZoneWidget() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-2xl">{z.emoji}</span>
                 <span className={`text-3xl font-bold font-heading ${z.color}`}>{z.label}</span>
-                {marketData?.zone_status === "WATCH" && (
+                {marketStatus === "CLOSED" ? (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wider">
+                    NSE 09:15 - 15:30 IST
+                  </span>
+                ) : marketData?.zone_status === "WATCH" && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-500 uppercase tracking-wider animate-pulse border border-amber-500/20">
                     STABILIZING ({marketData?.confirmation_count}/3)
                   </span>
@@ -151,11 +156,16 @@ function MarketZoneWidget() {
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border/40 pb-3 mb-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Activity className="h-4.5 w-4.5 text-primary" />
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground">
                     Market Intelligence
                   </h3>
+                  {marketStatus === "CLOSED" && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wide">
+                      Market Closed
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -186,9 +196,13 @@ function MarketZoneWidget() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
                     <div className="flex items-center gap-2">
-                      {marketData.failsafe_mode ? (
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-destructive/15 text-destructive animate-pulse uppercase">
-                          FAIL-SAFE ACTIVE
+                      {marketData.market_status === "CLOSED" ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase">
+                          MARKET CLOSED
+                        </span>
+                      ) : marketData.data_source === "simulated" || marketData.failsafe_mode ? (
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-500 uppercase">
+                          FEED OFFLINE
                         </span>
                       ) : marketData.zone_status === "WATCH" ? (
                         <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-500 animate-pulse uppercase">
@@ -204,6 +218,8 @@ function MarketZoneWidget() {
                           ? "bg-success/20 text-success border-success/30 shadow-[0_0_12px_rgba(34,197,94,0.15)]" 
                           : marketData.market_zone === "Negative Market Bias" 
                           ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
+                          : marketData.market_zone === "Market Closed"
+                          ? "bg-zinc-500/20 text-zinc-300 border-zinc-500/30 shadow-[0_0_12px_rgba(113,113,122,0.15)]"
                           : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
                         {marketData.market_zone}
@@ -230,12 +246,17 @@ function MarketZoneWidget() {
                       "Current market indicators show negative directional alignment. Market conditions may be supportive of bearish market behavior."
                     )}
                     {marketData.market_zone === "Neutral Market Bias" && (
-                      "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                      marketData.data_source === "simulated"
+                        ? "Fyers data feed is currently disconnected. Market sentiment defaults to a Neutral baseline until live feed is connected."
+                        : "Current market indicators are mixed or lack directional confirmation. Current conditions do not indicate a strong directional market bias."
+                    )}
+                    {marketData.market_zone === "Market Closed" && (
+                      "NSE is currently closed (Trading hours: Monday – Friday, 9:15 AM – 3:30 PM IST). Live directional bias calculation will resume when the market opens."
                     )}
                   </div>
 
                   {/* Watch State Progress Bar */}
-                  {marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
+                  {marketData.market_status === "OPEN" && marketData.zone_status === "WATCH" && !marketData.failsafe_mode && (
                     <div className="rounded-lg bg-amber-500/[0.03] border border-amber-500/10 p-3 space-y-1.5 animate-pulse">
                       <div className="flex items-center justify-between text-[10px] text-amber-500 font-semibold">
                         <span>Stabilizing Bias...</span>
@@ -251,7 +272,7 @@ function MarketZoneWidget() {
                   )}
 
                   {/* Persistence Timer */}
-                  {marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
+                  {marketData.market_status === "OPEN" && marketData.zone_status === "CONFIRMED" && marketData.stability_duration && !marketData.failsafe_mode && (
                     <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border/30 px-3 py-1.5 rounded-lg">
                       <span>Bias Stability:</span>
                       <span className="text-foreground font-semibold flex items-center gap-1">
@@ -331,9 +352,15 @@ function MarketZoneWidget() {
                   {/* Sources & SEBI Disclaimer (Client requirement Sec 3.3.8 / compliance) */}
                   <div className="border-t border-border/30 pt-3.5 space-y-2">
                     <div className="flex items-center justify-between text-[10px] text-white/80 font-mono">
-                      <span>Source: Third-party data providers</span>
+                      <span>
+                        {marketData.data_source === "fyers_live"
+                          ? "Source: Live Market Feed"
+                          : "Source: Offline Fallback (Feed Disconnected)"}
+                      </span>
                       {marketData.market_status && (
-                        <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
+                        <span className="capitalize">
+                          Market: {marketData.market_status === "CLOSED" ? "Closed (09:15 - 15:30 IST)" : "Open (Live)"}
+                        </span>
                       )}
                     </div>
                     <p className="text-[9px] text-white/70 leading-normal text-justify">
