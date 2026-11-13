@@ -74,7 +74,7 @@ function MarketZoneWidget() {
     "Positive Market Bias": { label: "Positive Market Bias", color: "text-success", bg: "bg-success/[0.07]", emoji: "🟢" },
     "Negative Market Bias": { label: "Negative Market Bias", color: "text-destructive", bg: "bg-destructive/[0.07]", emoji: "🔴" },
     "Neutral Market Bias": { label: "Neutral Market Bias", color: "text-muted-foreground", bg: "bg-muted/30", emoji: "⚪" },
-    "Market Closed": { label: "Market Closed", color: "text-zinc-400", bg: "bg-zinc-500/[0.07]", emoji: "⏸️" },
+    "Market Closed": { label: "Market Closed", color: "text-amber-400", bg: "bg-amber-500/[0.07]", emoji: "🟡" },
   };
   const z = zone ? zoneMap[zone] || zoneMap["Neutral Market Bias"] : null;
 
@@ -87,16 +87,16 @@ function MarketZoneWidget() {
         <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-all ${z?.bg || "bg-muted/30"}`} />
         <div className="relative">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Nifty 50 Sentiment
               </p>
               {/* Market Status Indicator */}
               {marketStatus && (
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase ${
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase ${
                   marketStatus === "OPEN" 
-                    ? "bg-success/10 text-success border border-success/20" 
-                    : "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30"
+                    ? "bg-success/20 text-success border border-success/40 shadow-[0_0_8px_rgba(34,197,94,0.2)]" 
+                    : "bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
                 }`}>
                   {marketStatus === "OPEN" ? (
                     <>
@@ -104,10 +104,13 @@ function MarketZoneWidget() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" />
                       </span>
-                      LIVE
+                      LIVE (OPEN)
                     </>
                   ) : (
-                    "MARKET CLOSED"
+                    <>
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      MARKET CLOSED
+                    </>
                   )}
                 </span>
               )}
@@ -125,7 +128,7 @@ function MarketZoneWidget() {
                 <span className="text-2xl">{z.emoji}</span>
                 <span className={`text-3xl font-bold font-heading ${z.color}`}>{z.label}</span>
                 {marketStatus === "CLOSED" ? (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wider">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[8px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
                     NSE 09:15 - 15:30 IST
                   </span>
                 ) : marketData?.zone_status === "WATCH" && (
@@ -156,15 +159,26 @@ function MarketZoneWidget() {
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border/40 pb-3 mb-4">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <Activity className="h-4.5 w-4.5 text-primary" />
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground">
                     Market Intelligence
                   </h3>
-                  {marketStatus === "CLOSED" && (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wide">
-                      Market Closed
-                    </span>
+                  {marketData && (
+                    marketData.market_status === "OPEN" ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-success/20 text-success border border-success/40 uppercase tracking-wide shadow-[0_0_10px_rgba(34,197,94,0.25)]">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+                        </span>
+                        Market: Live (Open)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/40 uppercase tracking-wide shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                        Market: Closed
+                      </span>
+                    )
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -197,7 +211,7 @@ function MarketZoneWidget() {
                     <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
                     <div className="flex items-center gap-2">
                       {marketData.market_status === "CLOSED" ? (
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase">
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase">
                           MARKET CLOSED
                         </span>
                       ) : marketData.data_source === "simulated" || marketData.failsafe_mode ? (
@@ -219,7 +233,7 @@ function MarketZoneWidget() {
                           : marketData.market_zone === "Negative Market Bias" 
                           ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
                           : marketData.market_zone === "Market Closed"
-                          ? "bg-zinc-500/20 text-zinc-300 border-zinc-500/30 shadow-[0_0_12px_rgba(113,113,122,0.15)]"
+                          ? "bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                           : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
                         {marketData.market_zone}

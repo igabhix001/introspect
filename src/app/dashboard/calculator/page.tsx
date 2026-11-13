@@ -424,28 +424,40 @@ export default function CalculatorPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <div className="relative">
                   <Activity className="h-4 w-4 text-primary" />
                   {marketData?.market_status === "OPEN" ? (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-success animate-ping" />
                   ) : (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-zinc-500" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400" />
                   )}
                 </div>
-                <h3 className="font-heading text-xs font-bold uppercase tracking-wider">
+                <h3 className="font-heading text-xs font-bold uppercase tracking-wider text-foreground">
                   Market Intelligence
                 </h3>
-                {marketData?.market_status === "CLOSED" && (
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase tracking-wide">
-                    Market Closed
-                  </span>
+                {marketData && (
+                  marketData.market_status === "OPEN" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-success/20 text-success border border-success/40 uppercase tracking-wide shadow-[0_0_10px_rgba(34,197,94,0.25)]">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+                      </span>
+                      Market: Live (Open)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/40 uppercase tracking-wide shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                      <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                      Market: Closed
+                    </span>
+                  )
                 )}
               </div>
               <button
                 onClick={fetchMarketSentiment}
                 disabled={loadingMarket}
                 className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                title="Refresh Market Data"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${loadingMarket ? "animate-spin" : ""}`} />
               </button>
@@ -463,7 +475,7 @@ export default function CalculatorPage() {
                     <span className="text-xs text-muted-foreground font-medium">Market Bias</span>
                     <div className="flex items-center gap-2">
                       {marketData.market_status === "CLOSED" ? (
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 uppercase">
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase">
                           MARKET CLOSED
                         </span>
                       ) : marketData.data_source === "simulated" || marketData.failsafe_mode ? (
@@ -485,7 +497,7 @@ export default function CalculatorPage() {
                           : marketData.market_zone === "Negative Market Bias" 
                           ? "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]" 
                           : marketData.market_zone === "Market Closed"
-                          ? "bg-zinc-500/20 text-zinc-300 border-zinc-500/30 shadow-[0_0_12px_rgba(113,113,122,0.15)]"
+                          ? "bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                           : "bg-amber-500/20 text-amber-500 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                       }`}>
                         {marketData.market_zone}
