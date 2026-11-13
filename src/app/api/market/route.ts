@@ -1,13 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { marketRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 import { cache } from "@/lib/cache";
 import {
-  getFyersToken,
-  fetchNiftyPrice,
-  fetchVIX,
+  getFyersAuth,
+  fetchNiftyAndVix,
   fetchMarketBreadth,
   fetchATR,
+  getLastFyersError,
 } from "@/lib/fyers/fyers-service";
 
 export const dynamic = "force-dynamic";
@@ -21,25 +21,45 @@ const CONFIG = {
   PCR_BEARISH_THRESHOLD: 0.70,
 };
 
-// Cache TTL settings
-const CACHE_TTL_SECONDS = 1; // 1 second cache for instant updates
-const CACHE_STALE_SECONDS = 2;
+// Cache TTL settings — tuned for Fyers Oct 2026 Data API Limits (50 req/min, 5000 req/day)
+const LIVE_CACHE_TTL_OPEN_SECONDS = 10; // 10s when NSE is open (~6 calls/min max)
+const LIVE_CACHE_TTL_CLOSED_SECONDS = 60; // 60s when market is closed
+const LAST_KNOWN_LIVE_TTL_SECONDS = 600; // Keep last valid Fyers snapshot up to 10 min on transient glitches
+const SIMULATED_CACHE_TTL_SECONDS = 60; // Keep fallback stable instead of changing randomly every second
 
-// GET: Fetch live market data with real Fyers or fallback
+function isNseMarketOpen(): boolean {
+  const nowIst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const day = nowIst.getDay();
+  const hours = nowIst.getHours();
+  const minutes = nowIst.getMinutes();
+  const isOpenDay = day >= 1 && day <= 5;
+  const isAfterOpen = hours > 9 || (hours === 9 && minutes >= 15);
+  const isBeforeClose = hours < 15 || (hours === 15 && minutes <= 30);
+  return isOpenDay && isAfterOpen && isBeforeClose;
+}
+
+// GET: Fetch live market data with real Fyers or stable fallback
 export async function GET(request: NextRequest) {
-  // Rate limiting (more lenient for market data - 200 requests per 15 min)
-  const identifier = getRateLimitIdentifier(request);
-  const rateLimitResult = await apiRateLimit(identifier);
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { error: rateLimitResult.message },
-      { status: 429 }
-    );
-  }
-
   try {
-    // Check Cache first
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Rate limit per authenticated user (so shared office/mobile IPs don't collide)
+    const identifier = getRateLimitIdentifier(request, user.id);
+    const rateLimitResult = await marketRateLimit(identifier);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: rateLimitResult.message },
+        { status: 429 }
+      );
+    }
+
+    // Check fresh cache first (before hitting Fyers)
     const responseCacheKey = "market:sentiment:live";
+    const lastLiveCacheKey = "market:sentiment:last_live";
+    const simulatedCacheKey = "market:sentiment:simulated_snapshot";
+
     const cachedResponse = cache.get<Record<string, unknown>>(responseCacheKey);
     if (cachedResponse && !cachedResponse.isStale) {
       return NextResponse.json(cachedResponse.data, {
@@ -49,9 +69,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const marketOpen = isNseMarketOpen();
+    const market_status = marketOpen ? "OPEN" : "CLOSED";
 
     let niftyPrice = 0;
     let prevClose = 0;
@@ -65,22 +84,22 @@ export async function GET(request: NextRequest) {
     let isDataValid = false;
 
     // Try real Fyers API first
-    const token = await getFyersToken();
+    const auth = await getFyersAuth();
 
-    if (token) {
+    if (auth) {
       try {
-        const [niftyData, vixData, breadthData, atrData] = await Promise.all([
-          fetchNiftyPrice(token),
-          fetchVIX(token),
-          fetchMarketBreadth(token),
-          fetchATR(token),
+        // Combine Nifty + VIX into 1 quote request; Breadth & ATR are cached 60s internally
+        const [niftyAndVix, breadthData, atrData] = await Promise.all([
+          fetchNiftyAndVix(auth.token, auth.appId),
+          fetchMarketBreadth(auth.token, auth.appId),
+          fetchATR(auth.token, auth.appId),
         ]);
 
-        if (niftyData) {
-          niftyPrice = niftyData.current;
-          prevClose = niftyData.prevClose;
-          todayOpen = niftyData.open;
-          vix = vixData ?? 14;
+        if (niftyAndVix && niftyAndVix.nifty.current > 0) {
+          niftyPrice = niftyAndVix.nifty.current;
+          prevClose = niftyAndVix.nifty.prevClose;
+          todayOpen = niftyAndVix.nifty.open;
+          vix = niftyAndVix.vix ?? 14;
           pcr = breadthData?.pcr ?? 1.0;
           advances = breadthData?.advances ?? 25;
           declines = breadthData?.declines ?? 25;
@@ -93,9 +112,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fallback strategy to simulated data
+    // If live Fyers fetch failed momentarily (e.g. brief 429 or network hiccup),
+    // serve the last-known live snapshot rather than jumping to random numbers
     if (!isDataValid) {
-      const sim = generateSimulatedData();
+      const lastLive = cache.get<Record<string, unknown>>(lastLiveCacheKey);
+      if (lastLive) {
+        const staleLivePayload = {
+          ...lastLive.data,
+          market_status,
+          stale_fallback: true,
+          last_error: getLastFyersError()?.message ?? null,
+        };
+        cache.set(responseCacheKey, staleLivePayload, 10, 10);
+        return NextResponse.json(staleLivePayload, {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          },
+        });
+      }
+
+      // True fallback when no Fyers token / data is available: use a stable cached snapshot
+      const cachedSim = cache.get<ReturnType<typeof generateSimulatedData>>(simulatedCacheKey);
+      const sim = cachedSim?.data ?? generateSimulatedData();
+      if (!cachedSim) {
+        cache.set(simulatedCacheKey, sim, SIMULATED_CACHE_TTL_SECONDS, SIMULATED_CACHE_TTL_SECONDS);
+      }
       niftyPrice = sim.niftyPrice;
       prevClose = sim.prevClose;
       todayOpen = sim.todayOpen;
@@ -111,7 +152,7 @@ export async function GET(request: NextRequest) {
     const ref_buy = Math.max(todayOpen, prevClose);
     const ref_sell = Math.min(todayOpen, prevClose);
 
-    let buffer_percent = (atrValue / ref_buy) * CONFIG.ATR_MULTIPLIER;
+    let buffer_percent = ref_buy > 0 ? (atrValue / ref_buy) * CONFIG.ATR_MULTIPLIER : CONFIG.MIN_BUFFER_PERCENT;
     buffer_percent = Math.max(CONFIG.MIN_BUFFER_PERCENT, Math.min(CONFIG.MAX_BUFFER_PERCENT, buffer_percent));
 
     const bullish_threshold = ref_buy * (1 + buffer_percent);
@@ -145,7 +186,7 @@ export async function GET(request: NextRequest) {
     const stability = vix > 20 ? "UNSTABLE" : vix > 15 ? "WATCH" : "STABLE";
 
     // Radar Score
-    const priceScore = Math.min(100, Math.max(0, ((niftyPrice - ref_buy) / ref_buy) * 10000 + 50));
+    const priceScore = ref_buy > 0 ? Math.min(100, Math.max(0, ((niftyPrice - ref_buy) / ref_buy) * 10000 + 50)) : 50;
     const breadthScore = (advances / 50) * 100;
     const pcrScore = Math.min(100, Math.max(0, (pcr - 0.5) * 100));
     const vixScore = Math.max(0, 100 - (vix - 10) * 3);
@@ -176,16 +217,6 @@ export async function GET(request: NextRequest) {
     }
     reasons.push(vix > 20 ? "Volatility conditions elevated" : "Volatility conditions stable");
 
-    // Market status
-    const nowIst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const day = nowIst.getDay();
-    const hours = nowIst.getHours();
-    const minutes = nowIst.getMinutes();
-    const isOpenDay = day >= 1 && day <= 5;
-    const isAfterOpen = hours > 9 || (hours === 9 && minutes >= 15);
-    const isBeforeClose = hours < 15 || (hours === 15 && minutes <= 30);
-    const market_status = (isOpenDay && isAfterOpen && isBeforeClose) ? "OPEN" : "CLOSED";
-
     const mapZoneToBias = (zone: "BULLISH" | "BEARISH" | "NO_TRADE") => {
       if (zone === "BULLISH") return "Positive Market Bias";
       if (zone === "BEARISH") return "Negative Market Bias";
@@ -213,6 +244,8 @@ export async function GET(request: NextRequest) {
       cache.set(trackingKey, { current_zone: zoneName, start_time: now }, 86400, 86400);
     }
 
+    const lastError = dataSource === "simulated" ? getLastFyersError()?.message ?? null : null;
+
     const responseData = {
       nifty_price: Math.round(niftyPrice * 100) / 100,
       vix: Math.round(vix * 100) / 100,
@@ -230,14 +263,20 @@ export async function GET(request: NextRequest) {
       data_source: dataSource,
       market_status,
       timestamp: new Date().toISOString(),
-      failsafe_mode: false,
+      failsafe_mode: dataSource === "simulated",
+      last_error: lastError,
       zone_status: "CONFIRMED" as const,
       confirmation_count: 3,
       stability_duration,
     };
 
-    // Cache user response for 1 second
-    cache.set(responseCacheKey, responseData, CACHE_TTL_SECONDS, CACHE_STALE_SECONDS);
+    if (dataSource === "fyers_live") {
+      const ttl = marketOpen ? LIVE_CACHE_TTL_OPEN_SECONDS : LIVE_CACHE_TTL_CLOSED_SECONDS;
+      cache.set(responseCacheKey, responseData, ttl, ttl);
+      cache.set(lastLiveCacheKey, responseData, LAST_KNOWN_LIVE_TTL_SECONDS, LAST_KNOWN_LIVE_TTL_SECONDS);
+    } else {
+      cache.set(responseCacheKey, responseData, 15, 15);
+    }
 
     return NextResponse.json(responseData, {
       headers: {
@@ -250,15 +289,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Simulated data fallback
+// Stable deterministic fallback when Fyers feed is offline
 function generateSimulatedData() {
-  const prevClose = 22350;
-  const todayOpen = prevClose + Math.floor(Math.random() * 100 - 50);
-  const niftyPrice = todayOpen + Math.floor(Math.random() * 300 - 100);
-  const atrValue = 100 + Math.random() * 80;
-  const vix = 11 + Math.random() * 16;
-  const pcr = 0.6 + Math.random() * 0.8;
-  const advances = 15 + Math.floor(Math.random() * 30);
-  const declines = 50 - advances;
+  const prevClose = 24250;
+  const todayOpen = 24265;
+  const niftyPrice = 24280;
+  const atrValue = 120;
+  const vix = 14.2;
+  const pcr = 1.02;
+  const advances = 26;
+  const declines = 24;
   return { niftyPrice, prevClose, todayOpen, vix, pcr, advances, declines, atrValue };
 }

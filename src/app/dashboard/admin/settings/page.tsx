@@ -39,10 +39,17 @@ function AdminSettingsContent() {
   // Fyers state
   const [fyersStatus, setFyersStatus] = useState<{
     connected: boolean;
+    dataFeedOk?: boolean;
     appId?: string;
     tokenExpiry?: string;
     lastRefreshed?: string;
     isExpired?: boolean;
+    profileName?: string;
+    fyersId?: string;
+    hasPinConfigured?: boolean;
+    hasRefreshToken?: boolean;
+    message?: string;
+    lastError?: { code?: number | string; message?: string; endpoint?: string; timestamp?: string } | null;
   }>({ connected: false });
   const [fyersAuthCode, setFyersAuthCode] = useState("");
   const [fyersAppId, setFyersAppId] = useState("");
@@ -119,7 +126,9 @@ function AdminSettingsContent() {
   };
 
   const handleFyersAuth = async () => {
-    if (!fyersAuthCode || !fyersAppId) {
+    const trimmedAppId = fyersAppId.trim();
+    const trimmedAuthCode = fyersAuthCode.trim();
+    if (!trimmedAuthCode || !trimmedAppId) {
       setFyersMessage({ type: "error", text: "App ID and Auth Code are required" });
       return;
     }
@@ -129,11 +138,14 @@ function AdminSettingsContent() {
       const res = await fetch("/api/admin/fyers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ authCode: fyersAuthCode, appId: fyersAppId }),
+        body: JSON.stringify({ authCode: trimmedAuthCode, appId: trimmedAppId }),
       });
       const data = await res.json();
       if (res.ok) {
-        setFyersMessage({ type: "success", text: "Fyers connected successfully! Token will auto-refresh." });
+        setFyersMessage({
+          type: data.warning ? "error" : "success",
+          text: data.message || "Fyers connected successfully!",
+        });
         setFyersAuthCode("");
         queryClient.invalidateQueries({ queryKey: ["adminFyersStatus"] });
       } else {
@@ -143,6 +155,31 @@ function AdminSettingsContent() {
       setFyersMessage({ type: "error", text: "Network error" });
     }
     setFyersLoading(false);
+  };
+
+  const handleVerifyFyers = async () => {
+    setAutoConnecting(true);
+    setFyersMessage(null);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["adminFyersStatus"] });
+      const fresh = await queryClient.fetchQuery({
+        queryKey: ["adminFyersStatus"],
+        queryFn: async () => {
+          const res = await fetch("/api/admin/fyers");
+          return res.json();
+        },
+      });
+      if (fresh) {
+        setFyersStatus(fresh);
+        setFyersMessage({
+          type: fresh.connected && fresh.dataFeedOk ? "success" : "error",
+          text: fresh.message || (fresh.connected ? "Fyers verified!" : "Fyers connection check failed"),
+        });
+      }
+    } catch {
+      setFyersMessage({ type: "error", text: "Failed to verify Fyers status" });
+    }
+    setAutoConnecting(false);
   };
 
   const handleSaveDefaultInstrument = async () => {
@@ -161,9 +198,8 @@ function AdminSettingsContent() {
   };
 
   // Redirect to admin settings page to auto-capture auth code
-  // Using /dashboard/admin/settings as redirect to avoid conflict with TradeSync's /auth/fyers/callback
-  const fyersAuthUrl = fyersAppId
-    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${fyersAppId}&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_FYERS_REDIRECT_URI || "https://www.intradaymindview.com/auth/fyers/callback")}&response_type=code&state=introspect`
+  const fyersAuthUrl = fyersAppId.trim()
+    ? `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${encodeURIComponent(fyersAppId.trim())}&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_FYERS_REDIRECT_URI || "https://www.intradaymindview.com/auth/fyers/callback")}&response_type=code&state=introspect`
     : "";
 
   const systemChecks = [
@@ -181,11 +217,13 @@ function AdminSettingsContent() {
     },
     {
       name: "Fyers API",
-      status: fyersStatus.connected,
+      status: Boolean(fyersStatus.connected && fyersStatus.dataFeedOk !== false),
       icon: Globe,
       detail: fyersStatus.connected
-        ? `Token valid until ${new Date(fyersStatus.tokenExpiry || "").toLocaleString("en-IN")}`
-        : "Not connected",
+        ? fyersStatus.dataFeedOk === false
+          ? `Auth OK, Data Feed Error: ${fyersStatus.lastError?.message || "Check App/Rate Limit"}`
+          : `Live (${fyersStatus.fyersId || fyersStatus.appId}) • Valid until ${new Date(fyersStatus.tokenExpiry || "").toLocaleString("en-IN")}`
+        : fyersStatus.message || "Not connected",
     },
     {
       name: "Next.js Server",
@@ -240,26 +278,54 @@ function AdminSettingsContent() {
 
       {/* Fyers API Integration */}
       <div className="rounded-2xl border border-border bg-card p-5">
-        <h3 className="font-heading text-sm font-bold mb-4 flex items-center gap-2">
-          <Key className="h-4 w-4 text-amber-500" />
-          Fyers API Integration
-          {fyersStatus.connected ? (
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-success font-medium">
-              <Wifi className="h-3 w-3" /> Connected
-            </span>
-          ) : (
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
-              <WifiOff className="h-3 w-3" /> Not Connected
-            </span>
-          )}
-        </h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="font-heading text-sm font-bold flex items-center gap-2">
+            <Key className="h-4 w-4 text-amber-500" />
+            Fyers API Integration
+          </h3>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleVerifyFyers}
+              disabled={autoConnecting}
+              className="px-2.5 py-1 rounded-lg border border-border hover:bg-muted text-[10px] font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${autoConnecting ? "animate-spin" : ""}`} />
+              Test Live Feed
+            </button>
+            {fyersStatus.connected && fyersStatus.dataFeedOk !== false ? (
+              <span className="flex items-center gap-1 text-[10px] text-success font-medium">
+                <Wifi className="h-3 w-3" /> Live Connected
+              </span>
+            ) : fyersStatus.connected ? (
+              <span className="flex items-center gap-1 text-[10px] text-amber-500 font-medium">
+                <AlertTriangle className="h-3 w-3" /> Data Feed Error
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[10px] text-destructive font-medium">
+                <WifiOff className="h-3 w-3" /> Disconnected
+              </span>
+            )}
+          </div>
+        </div>
 
-        {fyersStatus.connected && (
-          <div className="mb-4 p-3 rounded-xl bg-success/5 border border-success/20">
+        {(fyersStatus.connected || fyersStatus.lastError || fyersStatus.isExpired) && (
+          <div className={`mb-4 p-3 rounded-xl border ${
+            fyersStatus.connected && fyersStatus.dataFeedOk !== false
+              ? "bg-success/5 border-success/20"
+              : "bg-destructive/5 border-destructive/20"
+          }`}>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="text-muted-foreground">App ID</p>
-                <p className="font-mono font-medium">{fyersStatus.appId}</p>
+                <p className="font-mono font-medium">{fyersStatus.appId || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Account / Data Feed</p>
+                <p className={`font-mono font-medium ${fyersStatus.dataFeedOk ? "text-success" : "text-destructive"}`}>
+                  {fyersStatus.fyersId ? `${fyersStatus.fyersId} • ` : ""}
+                  {fyersStatus.dataFeedOk ? "Live Quotes OK" : "Feed Failing"}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Last Refreshed</p>
@@ -270,7 +336,7 @@ function AdminSettingsContent() {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Token Expiry</p>
+                <p className="text-muted-foreground">Daily Expiry (6:30 AM IST)</p>
                 <p className="font-mono font-medium">
                   {fyersStatus.tokenExpiry
                     ? new Date(fyersStatus.tokenExpiry).toLocaleString("en-IN")
@@ -278,24 +344,36 @@ function AdminSettingsContent() {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Auto-Refresh</p>
-                <p className="font-mono font-medium text-success">Enabled</p>
+                <p className="text-muted-foreground">Auto-Refresh PIN</p>
+                <p className={`font-mono font-medium ${fyersStatus.hasPinConfigured ? "text-success" : "text-amber-500"}`}>
+                  {fyersStatus.hasPinConfigured ? "FYERS_PIN Configured" : "FYERS_PIN Missing (Manual Re-auth Daily)"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status Detail</p>
+                <p className="font-mono font-medium truncate" title={fyersStatus.message}>
+                  {fyersStatus.message || "—"}
+                </p>
               </div>
             </div>
+            {fyersStatus.lastError?.message && (
+              <p className="mt-2 pt-2 border-t border-border/40 text-[11px] text-destructive font-mono">
+                Last Error ({fyersStatus.lastError.endpoint}{fyersStatus.lastError.code ? ` #${fyersStatus.lastError.code}` : ""}): {fyersStatus.lastError.message}
+              </p>
+            )}
           </div>
         )}
 
         <div className="space-y-3">
           <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-muted-foreground">
             <p className="font-semibold text-amber-500 mb-1 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> One-Time Setup
+              <AlertTriangle className="h-3 w-3" /> Setup & 2026 Fyers API Requirements
             </p>
             <ol className="list-decimal ml-4 space-y-0.5">
-              <li>Enter your Fyers App ID below</li>
-              <li>Click &quot;Generate Auth Code&quot; — this opens Fyers login</li>
-              <li>After login, copy the auth code from the redirect URL</li>
-              <li>Paste the auth code below and click &quot;Connect&quot;</li>
-              <li>Token auto-refreshes — no daily login needed</li>
+              <li>On FYERS API Dashboard, use a <strong>Non-Trading (Data-Only) App</strong> so Vercel dynamic IPs are not blocked (Trading apps ending in <code className="px-1 bg-muted rounded">-200</code> require Static IP whitelisting).</li>
+              <li>Ensure <code className="px-1 bg-muted rounded">FYERS_SECRET_KEY</code> (and <code className="px-1 bg-muted rounded">FYERS_PIN</code> for 6:30 AM auto-refresh) in Vercel match this App ID.</li>
+              <li>Set Redirect URI in Fyers Dashboard to <code className="px-1 bg-muted rounded">https://www.intradaymindview.com/auth/fyers/callback</code>.</li>
+              <li>Enter your Fyers App ID below, click &quot;Generate Auth Code&quot;, login, and click &quot;Connect Fyers&quot;.</li>
             </ol>
           </div>
 

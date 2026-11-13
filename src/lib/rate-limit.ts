@@ -83,6 +83,11 @@ export const apiRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // per 15 minutes
 });
 
+export const marketRateLimit = rateLimit({
+  max: 300, // 300 requests per 15 min (~1 every 3s headroom)
+  windowMs: 15 * 60 * 1000,
+});
+
 export const authRateLimit = rateLimit({
   max: 5, // 5 attempts
   windowMs: 15 * 60 * 1000, // per 15 minutes

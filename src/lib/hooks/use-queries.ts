@@ -192,8 +192,9 @@ export function useMarketQuery() {
       return res.json();
     },
     enabled: !!user?.id,
-    staleTime: 1000,
-    refetchInterval: 1000,
+    staleTime: 8000,
+    refetchInterval: 10000, // 10s interval keeps usage safely below Fyers Oct 2026 Data API limits (50/min, 5000/day)
+    refetchIntervalInBackground: false,
     retry: 1,
   });
 }

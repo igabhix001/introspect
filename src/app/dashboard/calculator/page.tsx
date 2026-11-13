@@ -598,7 +598,20 @@ export default function CalculatorPage() {
 
                 <div className="border-t border-border/30 pt-2.5 space-y-2">
                   <div className="flex items-center justify-between text-[10px] text-white/80 font-mono">
-                    <span>Source: Third-party data providers</span>
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block w-1.5 h-1.5 rounded-full ${
+                          marketData.data_source === "fyers_live"
+                            ? "bg-success"
+                            : "bg-amber-500"
+                        }`}
+                      />
+                      {marketData.data_source === "fyers_live"
+                        ? marketData.stale_fallback
+                          ? "Source: Live Feed (Cached Snapshot)"
+                          : "Source: Live Market Feed"
+                        : "Source: Offline Fallback (Feed Disconnected)"}
+                    </span>
                     <span className="capitalize">Market: {marketData.market_status.toLowerCase()}</span>
                   </div>
                   <p className="text-[9px] text-white/70 leading-normal text-justify">

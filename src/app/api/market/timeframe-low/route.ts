@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { getFyersToken } from "@/lib/fyers/fyers-service";
-import { apiRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { getFyersAuth } from "@/lib/fyers/fyers-service";
+import { marketRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ const CACHE_TTL_MS = 15000; // 15 seconds Cache-TTL
 export async function GET(request: NextRequest) {
   // Rate limit check
   const identifier = getRateLimitIdentifier(request);
-  const rateLimitResult = await apiRateLimit(identifier);
+  const rateLimitResult = await marketRateLimit(identifier);
   if (!rateLimitResult.success) {
     return NextResponse.json({ error: rateLimitResult.message }, { status: 429 });
   }
@@ -84,21 +84,21 @@ export async function GET(request: NextRequest) {
     let atrVal = 0;
     let dataSource: "fyers_live" | "simulated" = "simulated";
 
-    const token = await getFyersToken();
+    const auth = await getFyersAuth();
 
-    if (token) {
+    if (auth) {
       const now = Math.floor(Date.now() / 1000);
-      // Fetch sufficient window (e.g. 5 days for 1D, 2 days for intraday)
-      const lookbackSeconds = fyersResolution === "1D" ? 86400 * 7 : 86400 * 2;
+      // Fetch sufficient window (e.g. 7 days for 1D, 4 days for intraday to handle weekends)
+      const lookbackSeconds = fyersResolution === "1D" ? 86400 * 7 : 86400 * 4;
       const rangeFrom = now - lookbackSeconds;
 
       try {
         const res = await fetch(
-          `https://api-t1.fyers.in/data/history?symbol=${fyersSymbol}&resolution=${fyersResolution}&date_format=0&range_from=${rangeFrom}&range_to=${now}&cont_flag=1`,
+          `https://api-t1.fyers.in/data/history?symbol=${encodeURIComponent(fyersSymbol)}&resolution=${fyersResolution}&date_format=0&range_from=${rangeFrom}&range_to=${now}&cont_flag=1`,
           {
             cache: "no-store",
             headers: {
-              Authorization: `${process.env.FYERS_APP_ID}:${token}`,
+              Authorization: `${auth.appId}:${auth.token}`,
               "Content-Type": "application/json",
             },
           }
