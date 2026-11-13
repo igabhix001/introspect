@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MarketingShell } from "@/components/layout/marketing-shell";
 import { ToastProvider } from "@/components/ui/toast";
@@ -11,22 +10,6 @@ import { GoogleAnalytics, Hotjar } from "@/components/analytics";
 import { GoogleAdSenseScript } from "@/components/ads/google-adsense";
 import { StructuredData } from "@/components/seo/structured-data";
 import "./globals.css";
-
-const outfit = Outfit({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["600", "700", "800"],
-  fallback: ["system-ui", "sans-serif"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "600"],
-  fallback: ["system-ui", "sans-serif"],
-});
 
 // Viewport configuration for mobile optimization
 export const viewport: Viewport = {
@@ -117,11 +100,15 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="canonical" href="https://www.intradaymindview.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;600&display=swap"
+          rel="stylesheet"
+        />
         <StructuredData />
       </head>
-      <body
-        className={`${outfit.variable} ${jakarta.variable} font-sans antialiased`}
-      >
+      <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

@@ -55,6 +55,8 @@
 }
 
 :root {
+  --font-heading: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --radius: 0.625rem;
   /* Light mode - clean, professional with subtle warmth */
   --background: oklch(0.985 0.002 247);
